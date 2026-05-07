@@ -1,28 +1,50 @@
+using System;
 using System.Collections.Generic;
 
 namespace GladeAgenticAI.Services
 {
     /// <summary>
-    /// Enforces the "Reference demo assets" setting: when disabled, no asset under the plugin's
-    /// DemoAssets folder may be used or listed. The setting lives in EditorPrefs under
-    /// `GladeAI.ReferenceDemoAssets` and defaults to true when unset.
+    /// Enforces the "Reference demo assets" setting: when disabled, no asset under any
+    /// known DemoAssets folder may be used or listed. The setting lives in EditorPrefs
+    /// under `GladeAI.ReferenceDemoAssets` and defaults to true when unset.
+    ///
+    /// Recognized roots (kept in sync with deploy-plugin.ps1 destinations):
+    ///   - "Assets/DemoAssets"                              — dev project (this repo)
+    ///   - "Packages/com.gladekit.agenticai/DemoAssets"     — DLL bridge install (UPM package)
+    /// The MCP bridge (com.gladekit.mcp-bridge) does not ship demo assets.
     /// </summary>
     public static class DemoAssetsGuard
     {
-        private const string DemoAssetsRoot = "Assets/Editor/GladeAgenticAI/DemoAssets";
-        private static readonly string DemoRootForward = DemoAssetsRoot + "/";
+        private static readonly string[] DemoAssetsRoots = new[]
+        {
+            "Assets/DemoAssets",
+            "Packages/com.gladekit.agenticai/DemoAssets",
+        };
 
         /// <summary>
-        /// Returns true if the given asset path is under the plugin's DemoAssets folder (case-insensitive, normalizes path).
+        /// Returns true if the given asset path is under any known DemoAssets root
+        /// (case-insensitive, normalizes backslashes, accepts Asset-relative inputs).
         /// </summary>
         public static bool IsPathUnderDemoAssets(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
             string normalized = path.Replace('\\', '/').Trim();
-            if (!normalized.StartsWith("Assets/", System.StringComparison.OrdinalIgnoreCase))
+
+            // Accept Asset-relative inputs like "DemoAssets/X.prefab" by prepending "Assets/".
+            // Do NOT prepend for "Packages/..." paths (UPM AssetDatabase paths) or
+            // already-rooted "Assets/..." paths.
+            bool isAssetsRooted = normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase);
+            bool isPackagesRooted = normalized.StartsWith("Packages/", StringComparison.OrdinalIgnoreCase);
+            if (!isAssetsRooted && !isPackagesRooted)
                 normalized = "Assets/" + normalized;
-            return normalized.StartsWith(DemoRootForward, System.StringComparison.OrdinalIgnoreCase)
-                   || normalized.Equals(DemoAssetsRoot, System.StringComparison.OrdinalIgnoreCase);
+
+            foreach (string root in DemoAssetsRoots)
+            {
+                string rootForward = root + "/";
+                if (normalized.StartsWith(rootForward, StringComparison.OrdinalIgnoreCase)) return true;
+                if (normalized.Equals(root, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -32,19 +54,16 @@ namespace GladeAgenticAI.Services
         public static bool AllowUseOfDemoAssetPath(string path)
         {
             if (!IsPathUnderDemoAssets(path)) return true;
-            // Read setting from EditorPrefs (defaults to true if not set)
             return UnityEditor.EditorPrefs.GetBool("GladeAI.ReferenceDemoAssets", true);
         }
 
         /// <summary>
-        /// When "Reference demo assets" is false, removes any path under DemoAssets from the list.
-        /// Otherwise returns the list unchanged.
-        /// Reads `GladeAI.ReferenceDemoAssets` from EditorPrefs.
+        /// When "Reference demo assets" is false, removes any path under any DemoAssets
+        /// root from the list. Otherwise returns the list unchanged.
         /// </summary>
         public static List<string> FilterPathsExcludingDemoAssets(List<string> paths)
         {
             if (paths == null || paths.Count == 0) return paths;
-            // Read setting from EditorPrefs (defaults to true if not set)
             if (UnityEditor.EditorPrefs.GetBool("GladeAI.ReferenceDemoAssets", true)) return paths;
             var filtered = new List<string>(paths.Count);
             foreach (string p in paths)

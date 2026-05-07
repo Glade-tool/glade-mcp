@@ -33,7 +33,7 @@ namespace GladeAgenticAI.Services
         {
             if (string.IsNullOrEmpty(path)) return null;
             if (DemoAssetsGuard.AllowUseOfDemoAssetPath(path)) return null;
-            return $"{{\"error\":\"Demo assets are disabled in Settings. Enable 'Reference existing demo assets in project' to use assets in Assets/Editor/GladeAgenticAI/DemoAssets.\"}}";
+            return "{\"error\":\"Demo assets are disabled in Settings. Enable 'Reference demo assets' to use bundled demo content (Assets/DemoAssets or Packages/com.gladekit.agenticai/DemoAssets).\"}";
         }
 
         private static readonly string[] AssetPathArgKeys = new[]
@@ -52,7 +52,12 @@ namespace GladeAgenticAI.Services
                 if (!args.TryGetValue(key, out var val) || val == null) continue;
                 string path = val.ToString();
                 if (string.IsNullOrWhiteSpace(path)) continue;
-                if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                // Accept Asset-relative inputs by prepending "Assets/", but preserve
+                // "Packages/..." UPM AssetDatabase paths verbatim — DemoAssets can live
+                // in a deployed UPM package (Packages/com.gladekit.agenticai/DemoAssets/).
+                bool rooted = path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                              || path.StartsWith("Packages/", StringComparison.OrdinalIgnoreCase);
+                if (!rooted)
                     path = "Assets/" + path.TrimStart('/');
                 var err = RejectIfDemoPathDisallowed(path);
                 if (err != null) return err;

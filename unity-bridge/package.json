@@ -25,5 +25,8 @@
   "dependencies": {
     "com.unity.inputsystem": "1.0.0",
     "com.unity.ai.navigation": "1.0.0"
-  }
+  },
+  "testables": [
+    "GladeKit.Bridge.Tests"
+  ]
 }

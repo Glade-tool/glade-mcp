@@ -1592,7 +1592,10 @@ namespace GladeAgenticAI.Bridge
         }
 
         /// <summary>
-        /// Handle settings update request
+        /// Handle settings update request. Reads optional bool fields manually because
+        /// JsonUtility silently drops <c>Nullable&lt;bool&gt;</c> fields, which made the
+        /// pre-2026-05-07 implementation a no-op in production (verified live: no
+        /// "Updated referenceDemoAssets" log fired despite repeated POSTs).
         /// </summary>
         private static void HandleSettings(HttpListenerContext context)
         {
@@ -1602,18 +1605,17 @@ namespace GladeAgenticAI.Bridge
                 using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8))
                 {
                     string json = reader.ReadToEnd();
-                    var settings = JsonUtility.FromJson<SettingsRequest>(json);
-                    
-                    if (settings.referenceDemoAssets.HasValue)
+
+                    bool? referenceDemoAssets = TryReadBoolField(json, "referenceDemoAssets");
+                    if (referenceDemoAssets.HasValue)
                     {
-                        EditorPrefs.SetBool("GladeAI.ReferenceDemoAssets", settings.referenceDemoAssets.Value);
-                        Debug.Log($"[UnityBridge] Updated referenceDemoAssets setting: {settings.referenceDemoAssets.Value}");
+                        EditorPrefs.SetBool("GladeAI.ReferenceDemoAssets", referenceDemoAssets.Value);
+                        Debug.Log($"[UnityBridge] Updated referenceDemoAssets setting: {referenceDemoAssets.Value}");
                     }
-                    
-                    var result = new { success = true };
-                    string resultJson = JsonUtility.ToJson(result);
-                    byte[] buffer = Encoding.UTF8.GetBytes(resultJson);
-                    
+
+                    // Plain anonymous types don't serialize through JsonUtility — emit literal JSON.
+                    byte[] buffer = Encoding.UTF8.GetBytes("{\"success\":true}");
+
                     response.ContentType = "application/json";
                     response.ContentLength64 = buffer.Length;
                     response.StatusCode = 200;
@@ -1630,11 +1632,15 @@ namespace GladeAgenticAI.Bridge
                 response.Close();
             }
         }
-        
-        [System.Serializable]
-        private class SettingsRequest
+
+        private static bool? TryReadBoolField(string json, string fieldName)
         {
-            public bool? referenceDemoAssets;
+            if (string.IsNullOrEmpty(json)) return null;
+            string pattern = "\"" + System.Text.RegularExpressions.Regex.Escape(fieldName) + "\"\\s*:\\s*(true|false)";
+            var match = System.Text.RegularExpressions.Regex.Match(
+                json, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+            return string.Equals(match.Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
