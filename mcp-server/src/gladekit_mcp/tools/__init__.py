@@ -19,10 +19,13 @@ to the current request rather than all 222 tools simultaneously.
     (always includes ALWAYS_INCLUDED + matched groups)
 """
 
+import os
 from typing import Dict, List, Set
 
 from .animation import CATEGORY as ANIMATION_CATEGORY
 from .animation import TOOLS as ANIMATION_TOOLS
+from .asset_pipeline import CATEGORY as ASSET_PIPELINE_CATEGORY
+from .asset_pipeline import TOOLS as ASSET_PIPELINE_TOOLS
 from .camera import CATEGORY as CAMERA_CATEGORY
 from .camera import TOOLS as CAMERA_TOOLS
 from .core import CATEGORY as CORE_CATEGORY
@@ -53,19 +56,18 @@ from .ui import CATEGORY as UI_CATEGORY
 from .ui import TOOLS as UI_TOOLS
 from .vfx_audio import CATEGORY as VFX_AUDIO_CATEGORY
 from .vfx_audio import TOOLS as VFX_AUDIO_TOOLS
-from .asset_pipeline import CATEGORY as ASSET_PIPELINE_CATEGORY
-from .asset_pipeline import TOOLS as ASSET_PIPELINE_TOOLS
-
-import os
 
 # All categories in priority order (core always first). asset_pipeline is
 # included by default but suppressed when GLADEKIT_MCP_DISABLE_ASSET_PIPELINE=1
 # (matches the existing GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING pattern). Studios
 # working in a curated-asset workflow set this to keep the agent from offering
 # external downloads.
-_ASSET_PIPELINE_DISABLED = os.environ.get(
-    "GLADEKIT_MCP_DISABLE_ASSET_PIPELINE", ""
-).strip().lower() in {"1", "true", "yes", "on"}
+_ASSET_PIPELINE_DISABLED = os.environ.get("GLADEKIT_MCP_DISABLE_ASSET_PIPELINE", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 ALL_CATEGORIES = [
     (CORE_CATEGORY, CORE_TOOLS),

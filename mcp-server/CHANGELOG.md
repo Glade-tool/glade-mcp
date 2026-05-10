@@ -4,6 +4,14 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-05-10
+
+### Fixed
+
+- **MCP-bundled Kenney catalog now ships with working download URLs.** v0.5.1 shipped a catalog with every `download_url` field set to `null`, so MCP `import_asset` calls failed for all 17 packs. The MCP-side catalog is now in lockstep with the cloud-proxy catalog (13 of 17 packs have resolved URLs; the remaining 4 are flagged for the next `scripts/build_kenney_index.py` refresh).
+- Corrected the catalog `notes` field that incorrectly described the runtime provider as scraping `official_page` at fetch time. The provider reads pre-baked `download_url` values from the catalog; the refresh script (`scripts/build_kenney_index.py`) is the only component that scrapes, and it runs at index-refresh time, not at request time.
+- `_reload_tools_pkg` test helper now also clears the cached `tools` attribute on the parent `gladekit_mcp` package, so the `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE` env-var toggle is actually re-read across test cases.
+
 ### Added
 
 - **Asset pipeline (3 new tools).** Find and import free CC0 assets directly from your AI client; ships with a [Kenney.nl](https://kenney.nl) catalog and orchestrator bundled into the MCP server (no cloud dependency).
@@ -21,6 +29,7 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 - **The LLM never sees download URLs.** `import_asset` accepts `candidateId` from the LLM; the MCP server's preprocessor calls the orchestrator to resolve the actual download URL and injects it into the bridge call as underscore-prefixed fields the schema does not advertise. Any LLM attempt to set `_resolvedUrl` / `_resolvedLicense` / etc. is stripped before the orchestrator lookup, so a fabricated URL never survives even when resolution fails.
 - **License acknowledgment is a hard gate.** Both the MCP-side preprocessor and the Unity bridge tool require `licenseAcknowledged: true` and refuse with a clear error otherwise. Set this only after the user has explicitly accepted the license shown by `find_asset`.
+- **Bridge-side URL host allowlist (defense in depth).** Even if a client bypasses both the cloud and MCP preprocessors and sends `import_asset` directly to the bridge with a forged `_resolvedUrl`, the bridge refuses to download from any host outside the per-provider allowlist in `AssetPipelineGuard.IsResolvedUrlHostAllowed` (Kenney → `kenney.nl` / `www.kenney.nl`, HTTPS only). Adding a new provider to the orchestrator requires adding its hosts here too — the bridge fails closed on unknown providers.
 
 ### Notes
 

@@ -8,9 +8,9 @@
   "license_summary": "Public domain. No attribution required for any use, including commercial. Crediting 'Kenney.nl' is appreciated but not required.",
   "attribution_required": false,
   "attribution_recommended": "Kenney.nl",
-  "indexed_at": "2026-05-09",
+  "indexed_at": "2026-05-10",
   "indexing_strategy": "hand_curated_seed_v0",
-  "notes": "Seed list of well-known Kenney packs. download_url is null per entry; provider scrapes official_page at fetch time so we ride Kenney's URL rotations. Refresh via scripts/build_kenney_index.py (TODO) to enumerate the full catalog (~250 packs as of 2026).",
+  "notes": "Hand-curated seed list of widely-used Kenney packs. Per-pack download_url values are pre-baked into this catalog; the runtime provider reads them directly without live scraping. Refresh download URLs (Kenney rotates the random-id segment when packs update) via scripts/build_kenney_index.py. A future pass will broaden coverage toward Kenney's full ~250-pack catalog.",
   "packs": [
     {
       "id": "kenney/platformer-pack-redux",
@@ -19,7 +19,17 @@
       "description": "360+ side-scrolling platformer sprites — characters, enemies, tiles, items, hazards. The default 2D platformer starter.",
       "asset_type": "sprite_2d",
       "style": "vector",
-      "tags": ["platformer", "2d", "sprites", "tiles", "side-scroller", "characters", "enemies", "items", "hazards"],
+      "tags": [
+        "platformer",
+        "2d",
+        "sprites",
+        "tiles",
+        "side-scroller",
+        "characters",
+        "enemies",
+        "items",
+        "hazards"
+      ],
       "approx_assets": 360,
       "official_page": "https://kenney.nl/assets/platformer-pack-redux",
       "download_url": null
@@ -31,10 +41,18 @@
       "description": "Pixel-art platformer tiles, characters, and items in a small consistent palette.",
       "asset_type": "sprite_2d",
       "style": "pixel art",
-      "tags": ["platformer", "2d", "sprites", "tiles", "pixel art", "characters", "16x16"],
+      "tags": [
+        "platformer",
+        "2d",
+        "sprites",
+        "tiles",
+        "pixel art",
+        "characters",
+        "16x16"
+      ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/pixel-platformer",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/pixel-platformer/bef991136c-1696667883/kenney_pixel-platformer.zip"
     },
     {
       "id": "kenney/1-bit-pack",
@@ -43,10 +61,18 @@
       "description": "Monochrome 1-bit pixel art — characters, tiles, UI. Great for retro / minimalist projects.",
       "asset_type": "sprite_2d",
       "style": "pixel art",
-      "tags": ["1-bit", "monochrome", "pixel art", "retro", "minimalist", "tiles", "characters"],
+      "tags": [
+        "1-bit",
+        "monochrome",
+        "pixel art",
+        "retro",
+        "minimalist",
+        "tiles",
+        "characters"
+      ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/1-bit-pack",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/1-bit-pack/f41b6925f0-1677578516/kenney_1-bit-pack.zip"
     },
     {
       "id": "kenney/tiny-town",
@@ -55,10 +81,20 @@
       "description": "Top-down pixel art tileset — buildings, characters, NPCs for a village/town setting.",
       "asset_type": "sprite_2d",
       "style": "pixel art",
-      "tags": ["top-down", "tilemap", "town", "village", "rpg", "pixel art", "buildings", "characters", "16x16"],
+      "tags": [
+        "top-down",
+        "tilemap",
+        "town",
+        "village",
+        "rpg",
+        "pixel art",
+        "buildings",
+        "characters",
+        "16x16"
+      ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/tiny-town",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/tiny-town/5e46f9e551-1735736916/kenney_tiny-town.zip"
     },
     {
       "id": "kenney/tiny-dungeon",
@@ -67,10 +103,19 @@
       "description": "Top-down dungeon tileset — walls, floors, doors, monsters, items. Pairs with Tiny Town.",
       "asset_type": "sprite_2d",
       "style": "pixel art",
-      "tags": ["top-down", "tilemap", "dungeon", "rpg", "roguelike", "monsters", "pixel art", "16x16"],
+      "tags": [
+        "top-down",
+        "tilemap",
+        "dungeon",
+        "rpg",
+        "roguelike",
+        "monsters",
+        "pixel art",
+        "16x16"
+      ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/tiny-dungeon",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/tiny-dungeon/b56d7a13e3-1674742415/kenney_tiny-dungeon.zip"
     },
     {
       "id": "kenney/roguelike-caves-and-dungeons",
@@ -79,7 +124,15 @@
       "description": "Top-down roguelike caves and dungeon sprites — heavily themed for ASCII-roguelike-inspired projects.",
       "asset_type": "sprite_2d",
       "style": "pixel art",
-      "tags": ["roguelike", "dungeon", "caves", "tilemap", "top-down", "rpg", "pixel art"],
+      "tags": [
+        "roguelike",
+        "dungeon",
+        "caves",
+        "tilemap",
+        "top-down",
+        "rpg",
+        "pixel art"
+      ],
       "approx_assets": 700,
       "official_page": "https://kenney.nl/assets/roguelike-caves-and-dungeons",
       "download_url": null
@@ -91,10 +144,18 @@
       "description": "Game UI elements — buttons, panels, sliders, icons. Multiple color variants.",
       "asset_type": "sprite_2d",
       "style": "vector",
-      "tags": ["ui", "interface", "buttons", "panels", "icons", "menu", "hud"],
+      "tags": [
+        "ui",
+        "interface",
+        "buttons",
+        "panels",
+        "icons",
+        "menu",
+        "hud"
+      ],
       "approx_assets": 400,
       "official_page": "https://kenney.nl/assets/ui-pack",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/ui-pack/af874291da-1718203990/kenney_ui-pack.zip"
     },
     {
       "id": "kenney/ui-pack-rpg-expansion",
@@ -103,10 +164,19 @@
       "description": "RPG-themed UI — fantasy panels, item slots, scrolls, buttons. Pairs with the base UI Pack.",
       "asset_type": "sprite_2d",
       "style": "vector",
-      "tags": ["ui", "rpg", "fantasy", "interface", "buttons", "panels", "menu", "inventory"],
+      "tags": [
+        "ui",
+        "rpg",
+        "fantasy",
+        "interface",
+        "buttons",
+        "panels",
+        "menu",
+        "inventory"
+      ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/ui-pack-rpg-expansion",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/ui-pack-rpg-expansion/b1e1f298c6-1677661824/kenney_ui-pack-rpg-expansion.zip"
     },
     {
       "id": "kenney/game-icons",
@@ -115,10 +185,17 @@
       "description": "Square-format game icons — power-ups, items, badges, achievements.",
       "asset_type": "sprite_2d",
       "style": "vector",
-      "tags": ["icons", "ui", "items", "powerups", "achievements", "badges"],
+      "tags": [
+        "icons",
+        "ui",
+        "items",
+        "powerups",
+        "achievements",
+        "badges"
+      ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/game-icons",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/game-icons/94af1f5c0b-1677661579/kenney_game-icons.zip"
     },
     {
       "id": "kenney/space-shooter-redux",
@@ -127,7 +204,16 @@
       "description": "Top-down/vertical space shooter sprites — ships, enemies, projectiles, effects, backgrounds.",
       "asset_type": "sprite_2d",
       "style": "vector",
-      "tags": ["space", "shooter", "shmup", "ships", "enemies", "projectiles", "2d", "top-down"],
+      "tags": [
+        "space",
+        "shooter",
+        "shmup",
+        "ships",
+        "enemies",
+        "projectiles",
+        "2d",
+        "top-down"
+      ],
       "approx_assets": 290,
       "official_page": "https://kenney.nl/assets/space-shooter-redux",
       "download_url": null
@@ -139,10 +225,18 @@
       "description": "Low-poly voxel-style 3D models — buildings, terrain, environment. Game-ready FBX.",
       "asset_type": "model_3d",
       "style": "voxel",
-      "tags": ["3d", "voxel", "low-poly", "buildings", "terrain", "environment", "blocky"],
+      "tags": [
+        "3d",
+        "voxel",
+        "low-poly",
+        "buildings",
+        "terrain",
+        "environment",
+        "blocky"
+      ],
       "approx_assets": 350,
       "official_page": "https://kenney.nl/assets/voxel-pack",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/voxel-pack/ee6f21f078-1677662501/kenney_voxel-pack.zip"
     },
     {
       "id": "kenney/mini-dungeon",
@@ -151,10 +245,19 @@
       "description": "Low-poly 3D dungeon kit — walls, floors, props, characters, monsters. FBX-ready.",
       "asset_type": "model_3d",
       "style": "low-poly",
-      "tags": ["3d", "low-poly", "dungeon", "rpg", "fantasy", "props", "monsters", "characters"],
+      "tags": [
+        "3d",
+        "low-poly",
+        "dungeon",
+        "rpg",
+        "fantasy",
+        "props",
+        "monsters",
+        "characters"
+      ],
       "approx_assets": 80,
       "official_page": "https://kenney.nl/assets/mini-dungeon",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/mini-dungeon/2de2de674e-1771249391/kenney_mini-dungeon.zip"
     },
     {
       "id": "kenney/survival-kit",
@@ -163,10 +266,18 @@
       "description": "Low-poly 3D survival/crafting assets — tools, resources, environment. Game-ready FBX.",
       "asset_type": "model_3d",
       "style": "low-poly",
-      "tags": ["3d", "low-poly", "survival", "crafting", "tools", "resources", "wilderness"],
+      "tags": [
+        "3d",
+        "low-poly",
+        "survival",
+        "crafting",
+        "tools",
+        "resources",
+        "wilderness"
+      ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/survival-kit",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/survival-kit/750a1eb3f9-1712149243/kenney_survival-kit.zip"
     },
     {
       "id": "kenney/animal-pack-redux",
@@ -175,7 +286,14 @@
       "description": "Low-poly 3D animals — game-ready FBX, suitable for casual or stylized projects.",
       "asset_type": "model_3d",
       "style": "low-poly",
-      "tags": ["3d", "low-poly", "animals", "characters", "casual", "stylized"],
+      "tags": [
+        "3d",
+        "low-poly",
+        "animals",
+        "characters",
+        "casual",
+        "stylized"
+      ],
       "approx_assets": 90,
       "official_page": "https://kenney.nl/assets/animal-pack-redux",
       "download_url": null
@@ -187,10 +305,18 @@
       "description": "UI/menu sound effects — clicks, confirms, cancels, hovers. WAV format.",
       "asset_type": "audio_sfx",
       "style": "synthetic",
-      "tags": ["sfx", "audio", "ui", "interface", "menu", "clicks", "buttons"],
+      "tags": [
+        "sfx",
+        "audio",
+        "ui",
+        "interface",
+        "menu",
+        "clicks",
+        "buttons"
+      ],
       "approx_assets": 50,
       "official_page": "https://kenney.nl/assets/interface-sounds",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/interface-sounds/d23a84242e-1677589452/kenney_interface-sounds.zip"
     },
     {
       "id": "kenney/impact-sounds",
@@ -199,10 +325,19 @@
       "description": "Hit, punch, crash, break sound effects. WAV format.",
       "asset_type": "audio_sfx",
       "style": "synthetic",
-      "tags": ["sfx", "audio", "impact", "hit", "punch", "crash", "break", "combat"],
+      "tags": [
+        "sfx",
+        "audio",
+        "impact",
+        "hit",
+        "punch",
+        "crash",
+        "break",
+        "combat"
+      ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/impact-sounds",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/impact-sounds/8aa7b545c9-1677589768/kenney_impact-sounds.zip"
     },
     {
       "id": "kenney/sci-fi-sounds",
@@ -211,10 +346,19 @@
       "description": "Sci-fi sound effects — lasers, blasters, computer beeps, force fields.",
       "asset_type": "audio_sfx",
       "style": "synthetic",
-      "tags": ["sfx", "audio", "sci-fi", "space", "lasers", "blasters", "computer", "synthetic"],
+      "tags": [
+        "sfx",
+        "audio",
+        "sci-fi",
+        "space",
+        "lasers",
+        "blasters",
+        "computer",
+        "synthetic"
+      ],
       "approx_assets": 40,
       "official_page": "https://kenney.nl/assets/sci-fi-sounds",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/sci-fi-sounds/e3af5f7ed7-1677589334/kenney_sci-fi-sounds.zip"
     }
   ]
 }

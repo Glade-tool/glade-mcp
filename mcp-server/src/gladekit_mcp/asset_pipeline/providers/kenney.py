@@ -14,7 +14,7 @@ import logging
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from ..types import AssetCandidate, AssetSpec, AssetType, License
 from .base import AssetProvider, FetchResult
@@ -25,8 +25,21 @@ _CATALOG_PATH = Path(__file__).resolve().parent.parent / "catalogs" / "kenney.js
 
 # Tokens that aren't useful for matching (too generic).
 _STOPWORDS = {
-    "the", "a", "an", "of", "for", "with", "and", "or", "to", "in",
-    "asset", "assets", "pack", "sprite", "sprites",
+    "the",
+    "a",
+    "an",
+    "of",
+    "for",
+    "with",
+    "and",
+    "or",
+    "to",
+    "in",
+    "asset",
+    "assets",
+    "pack",
+    "sprite",
+    "sprites",
 }
 
 # Provider-specific license string -> normalized License enum.
@@ -39,8 +52,7 @@ _LICENSE_MAP = {
 def _load_catalog() -> dict:
     if not _CATALOG_PATH.exists():
         raise FileNotFoundError(
-            f"Kenney catalog not found at {_CATALOG_PATH}. "
-            f"Run scripts/build_kenney_index.py to generate it."
+            f"Kenney catalog not found at {_CATALOG_PATH}. Run scripts/build_kenney_index.py to generate it."
         )
     with _CATALOG_PATH.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -63,9 +75,7 @@ def _score(spec: AssetSpec, pack: dict) -> float:
     score = 0.0
 
     pack_tags = {t.lower() for t in pack.get("tags", [])}
-    pack_text_tokens = set(
-        _tokenize(pack.get("name", "") + " " + pack.get("description", ""))
-    )
+    pack_text_tokens = set(_tokenize(pack.get("name", "") + " " + pack.get("description", "")))
     pack_name_lower = pack.get("name", "").lower()
 
     # Explicit tag matches
@@ -112,10 +122,7 @@ class KenneyProvider(AssetProvider):
             )
 
         # License-constraint filter
-        if (
-            spec.license_constraint is not None
-            and spec.license_constraint != provider_license
-        ):
+        if spec.license_constraint is not None and spec.license_constraint != provider_license:
             return []
 
         candidates: List[AssetCandidate] = []
@@ -176,8 +183,7 @@ class KenneyProvider(AssetProvider):
         attribution_text = None
         if catalog.get("attribution_recommended"):
             attribution_text = (
-                f"Asset from {catalog['attribution_recommended']} "
-                f"({pack.get('official_page', 'https://kenney.nl')})."
+                f"Asset from {catalog['attribution_recommended']} ({pack.get('official_page', 'https://kenney.nl')})."
             )
 
         return FetchResult(

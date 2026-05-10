@@ -218,9 +218,8 @@ def _is_asset_pipeline_enabled() -> bool:
     by dispatch even if the schema list is already cached.
     """
     import os
-    return os.environ.get(
-        "GLADEKIT_MCP_DISABLE_ASSET_PIPELINE", ""
-    ).strip().lower() not in {"1", "true", "yes", "on"}
+
+    return os.environ.get("GLADEKIT_MCP_DISABLE_ASSET_PIPELINE", "").strip().lower() not in {"1", "true", "yes", "on"}
 
 
 def _handle_find_asset_locally(arguments: dict[str, Any]) -> str:
@@ -230,7 +229,8 @@ def _handle_find_asset_locally(arguments: dict[str, Any]) -> str:
     without a cloud round-trip. Identical orchestrator and ranking logic as
     the Proxy backend.
     """
-    from ..asset_pipeline import AssetSpec, search as _asset_search
+    from ..asset_pipeline import AssetSpec
+    from ..asset_pipeline import search as _asset_search
 
     try:
         spec = AssetSpec.from_dict(arguments)
@@ -246,13 +246,15 @@ def _handle_find_asset_locally(arguments: dict[str, Any]) -> str:
         return json.dumps({"success": False, "error": f"find_asset failed: {exc}"})
 
 
-_CLOUD_INJECTED_ARG_KEYS = frozenset({
-    "_resolvedUrl",
-    "_resolvedLicense",
-    "_resolvedAttribution",
-    "_resolvedArchiveFormat",
-    "_resolvedFileExtension",
-})
+_CLOUD_INJECTED_ARG_KEYS = frozenset(
+    {
+        "_resolvedUrl",
+        "_resolvedLicense",
+        "_resolvedAttribution",
+        "_resolvedArchiveFormat",
+        "_resolvedFileExtension",
+    }
+)
 
 
 def _preprocess_import_asset_args(arguments: dict[str, Any]) -> dict[str, Any] | str:
@@ -284,11 +286,10 @@ def _preprocess_import_asset_args(arguments: dict[str, Any]) -> dict[str, Any] |
 
     try:
         from ..asset_pipeline import fetch as _asset_fetch
+
         fr = _asset_fetch(candidate_id)
     except Exception as exc:
-        return json.dumps(
-            {"success": False, "error": f"Could not resolve {candidate_id!r}: {exc}"}
-        )
+        return json.dumps({"success": False, "error": f"Could not resolve {candidate_id!r}: {exc}"})
 
     cleaned["_resolvedUrl"] = fr.download_url
     cleaned["_resolvedLicense"] = fr.license_at_fetch

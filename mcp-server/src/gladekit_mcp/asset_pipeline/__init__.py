@@ -22,8 +22,8 @@ Provider design contract (see providers/base.py):
       from settings when needed (BYOK in v1).
 """
 
-from .types import AssetSpec, AssetCandidate, License, AssetType
-from .orchestrator import search, fetch
+from .orchestrator import fetch, search
+from .types import AssetCandidate, AssetSpec, AssetType, License
 
 __all__ = [
     "AssetSpec",

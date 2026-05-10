@@ -352,6 +352,7 @@ CC0 needs no attribution; the audit report is empty for required attributions. I
 
 - The LLM never sees download URLs. URL resolution happens cloud/MCP-side; the bridge tool refuses if the resolved fields are missing or LLM-injected.
 - `licenseAcknowledged: true` is required on every `import_asset` call. The bridge refuses without it. Do not set it without explicit user confirmation.
+- The bridge validates `_resolvedUrl`'s host against a per-provider allowlist (`AssetPipelineGuard.IsResolvedUrlHostAllowed`) before downloading. Even a client bypassing both the cloud and MCP preprocessors cannot smuggle in an arbitrary download URL — unknown hosts fail closed. HTTPS only.
 - Every imported asset bundle gets a `.gladekit-asset.json` sidecar recording the candidate id, provider, license, attribution string, source URL, and timestamp. `list_imported_assets` reads these for the audit report.
 - Asset Pipeline tools are gated by `AssetPipelineGuard` on the bridge side. A misconfigured client cannot bypass it.
 

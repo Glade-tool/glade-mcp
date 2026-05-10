@@ -31,10 +31,16 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
     ///   importOptions       (LLM)     optional asset-type-specific overrides
     ///
     /// Security — the underscore-prefixed fields MUST be set by the cloud
-    /// preprocessor, not by the LLM. The cloud schema for import_asset does
-    /// not document them, and a future hardening pass will reject calls where
-    /// _resolvedUrl is missing (proxy didn't preprocess) OR doesn't match a
-    /// known provider URL pattern (LLM tried to inject).
+    /// (or MCP) preprocessor, not by the LLM. The cloud schema for import_asset
+    /// does not document them. Three defense layers guard the download:
+    ///   1. Cloud/MCP preprocessors strip caller-supplied underscore-prefixed
+    ///      fields before resolving against the trusted catalog.
+    ///   2. The bridge refuses calls with an empty _resolvedUrl (preprocessor
+    ///      didn't run).
+    ///   3. The bridge validates _resolvedUrl's host against
+    ///      AssetPipelineGuard.IsResolvedUrlHostAllowed for the candidate's
+    ///      provider prefix — so even a client bypassing both preprocessors
+    ///      can't smuggle in an arbitrary download URL.
     /// </summary>
     public class ImportAssetTool : ITool
     {
@@ -94,6 +100,17 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
                     "this import_asset call. Did you call find_asset first via the cloud, " +
                     "or are you running the bridge against a stale proxy that doesn't know " +
                     "about asset_pipeline preprocessing?");
+            }
+
+            if (!AssetPipelineGuard.IsResolvedUrlHostAllowed(candidateId, resolvedUrl))
+            {
+                return ToolUtils.CreateErrorResponse(
+                    "Resolved URL host is not in the allowed-providers list for " +
+                    $"candidate {candidateId}. This means either (a) the URL was injected " +
+                    "by a client bypassing cloud / MCP preprocessing, or (b) the provider's " +
+                    "official download host has changed and the bridge allowlist in " +
+                    "AssetPipelineGuard.cs needs updating. The bridge will not download " +
+                    "from arbitrary hosts.");
             }
 
             // ── Optional import overrides ────────────────────────────────────

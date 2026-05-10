@@ -8,7 +8,7 @@ older clients.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -52,8 +52,7 @@ def _coerce_enum(value, enum_cls, field_name: str):
         except ValueError as exc:
             valid = sorted(m.value for m in enum_cls)
             raise ValueError(
-                f"{field_name}={value!r} is not a valid {enum_cls.__name__}. "
-                f"Expected one of {valid}."
+                f"{field_name}={value!r} is not a valid {enum_cls.__name__}. Expected one of {valid}."
             ) from exc
     raise TypeError(f"{field_name} must be {enum_cls.__name__} or str, got {type(value).__name__}")
 
@@ -96,9 +95,7 @@ class AssetSpec:
             asset_type=_coerce_enum(data.get("asset_type"), AssetType, "asset_type"),
             style=data.get("style"),
             tags=list(data.get("tags") or []),
-            license_constraint=_coerce_enum(
-                data.get("license_constraint"), License, "license_constraint"
-            ),
+            license_constraint=_coerce_enum(data.get("license_constraint"), License, "license_constraint"),
             max_results=int(data.get("max_results") or 8),
         )
 

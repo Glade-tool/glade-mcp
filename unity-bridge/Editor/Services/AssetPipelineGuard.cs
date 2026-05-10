@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 
 namespace GladeAgenticAI.Services
@@ -19,6 +20,21 @@ namespace GladeAgenticAI.Services
     public static class AssetPipelineGuard
     {
         private const string PrefKey = "GladeAI.AssetPipelineEnabled";
+
+        // Provider → allowed download hostnames (matched case-insensitively).
+        // When a new provider is added to the cloud / MCP orchestrator, add its
+        // host(s) here too — the bridge refuses to download from any host not
+        // in this map even when _resolvedUrl arrives pre-filled. This is the
+        // defense against a client that bypasses cloud / MCP preprocessing and
+        // sends a forged URL directly to localhost:8765.
+        private static readonly Dictionary<string, HashSet<string>> _allowedHostsByProvider =
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                {
+                    "kenney",
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "kenney.nl", "www.kenney.nl" }
+                },
+            };
 
         public static bool IsEnabled
         {
@@ -42,6 +58,48 @@ namespace GladeAgenticAI.Services
                 "Asset pipeline is disabled. Enable 'Asset Pipeline' in GladeKit settings " +
                 "(or POST { \"assetPipelineEnabled\": true } to /api/settings) to allow " +
                 "downloads of external assets.");
+        }
+
+        /// <summary>
+        /// True iff <paramref name="resolvedUrl"/> is an https URL whose host is
+        /// in the allowlist for the provider implied by <paramref name="candidateId"/>
+        /// (the prefix before the first '/'). The cloud and MCP preprocessors
+        /// resolve URLs from a trusted catalog; this is a third-layer check so
+        /// that even a client bypassing both preprocessors can't smuggle in an
+        /// arbitrary download URL.
+        /// </summary>
+        public static bool IsResolvedUrlHostAllowed(string candidateId, string resolvedUrl)
+        {
+            if (string.IsNullOrEmpty(candidateId) || string.IsNullOrEmpty(resolvedUrl))
+                return false;
+
+            int slash = candidateId.IndexOf('/');
+            if (slash <= 0) return false;
+            string provider = candidateId.Substring(0, slash);
+
+            if (!_allowedHostsByProvider.TryGetValue(provider, out var allowedHosts))
+                return false;
+
+            if (!Uri.TryCreate(resolvedUrl, UriKind.Absolute, out var uri))
+                return false;
+            if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return allowedHosts.Contains(uri.Host);
+        }
+
+        /// <summary>
+        /// The configured allowlist of hostnames for <paramref name="provider"/>,
+        /// or an empty enumerable if the provider is unknown. Exposed for the
+        /// /api/health endpoint and diagnostics — never used to make a security
+        /// decision (use <see cref="IsResolvedUrlHostAllowed"/> for that).
+        /// </summary>
+        public static IEnumerable<string> AllowedHostsForProvider(string provider)
+        {
+            if (string.IsNullOrEmpty(provider)) return Array.Empty<string>();
+            return _allowedHostsByProvider.TryGetValue(provider, out var hosts)
+                ? (IEnumerable<string>)hosts
+                : Array.Empty<string>();
         }
 
         private static string ToolUtilsErrorString(string message)

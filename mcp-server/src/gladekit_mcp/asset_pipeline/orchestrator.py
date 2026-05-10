@@ -27,9 +27,7 @@ _PROVIDERS: Dict[str, AssetProvider] = {
 def _provider_for_id(candidate_id: str) -> AssetProvider:
     """Resolve a candidate id ('kenney/foo') to its provider."""
     if "/" not in candidate_id:
-        raise ValueError(
-            f"Invalid candidate id {candidate_id!r}: expected '<provider>/<slug>'"
-        )
+        raise ValueError(f"Invalid candidate id {candidate_id!r}: expected '<provider>/<slug>'")
     provider_name = candidate_id.split("/", 1)[0]
     provider = _PROVIDERS.get(provider_name)
     if provider is None:
@@ -44,8 +42,8 @@ def search(spec: AssetSpec) -> List[AssetCandidate]:
     """Multi-provider search. Returns up to spec.max_results ranked candidates.
 
     A provider failure does NOT short-circuit — other providers still get to
-    answer. The intent is that the user always sees something, even if one
-    provider is sad.
+    answer. The intent is that the user always sees results from the healthy
+    providers, even if one provider is unavailable.
     """
     all_candidates: List[AssetCandidate] = []
     for provider_name, provider in _PROVIDERS.items():
