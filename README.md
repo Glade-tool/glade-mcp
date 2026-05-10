@@ -2,7 +2,7 @@
 
 Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients directly to your Unity Editor.
 
-**230+ tools.** A full Unity-aware system prompt. GLADE.md project context. Script semantic search. Skill calibration. Cloud intelligence layer with RAG and cross-session memory. All core features are free and local.
+**235+ tools.** A full Unity-aware system prompt. GLADE.md project context. Script semantic search. Skill calibration. Free CC0 asset pipeline (Kenney). Cloud intelligence layer with RAG and cross-session memory. All core features are free and local.
 
 ![GladeKit MCP Demo](GladeKitMCP_DemoGIF.gif)
 
@@ -171,7 +171,7 @@ Add to `.vscode/mcp.json` in your workspace:
 
 | Feature            | GladeKit Unity MCP                                                                                   | unity-mcp (CoplayDev)  |
 | ------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------- |
-| Tools              | **230+ granular tools** across 15 categories                                                         | ~40 consolidated tools |
+| Tools              | **235+ granular tools** across 16 categories                                                         | ~40 consolidated tools |
 | System prompt      | **Full Unity intelligence** - render pipeline detection, input system routing, tool discipline rules | None                   |
 | Project context    | **GLADE.md** - inject your game design doc into every request                                        | None                   |
 | Script search      | **Semantic search** via OpenAI embeddings (bring your own key)                                       | None                   |
@@ -187,11 +187,11 @@ All core features are **free and local**. The cloud intelligence layer is option
 ## Features
 
 <details>
-<summary><strong>230+ tools across 15 categories</strong></summary>
+<summary><strong>235+ tools across 16 categories</strong></summary>
 
-Scene • GameObjects • Scripts • Prefabs • Materials • Lighting • VFX & Audio • Animation • IK • Physics • Camera • UI • Input System • Terrain & NavMesh • Profiler
+Scene • GameObjects • Scripts • Prefabs • Materials • Lighting • VFX & Audio • Animation • IK • Physics • Camera • UI • Input System • Terrain & NavMesh • Profiler • Asset Pipeline
 
-All 230+ tools are dispatchable. Claude Code sees ~80 curated core tools by default (Claude Code has a practical 128-tool limit; Unity AI Gateway has a cloud token budget). Use `get_relevant_tools` to discover extended tools for specialized work (blend trees, NavMesh, IK, Cinemachine, etc.).
+All 235+ tools are dispatchable. Claude Code sees ~80 curated core tools by default (Claude Code has a practical 128-tool limit; Unity AI Gateway has a cloud token budget). Use `get_relevant_tools` to discover extended tools for specialized work (blend trees, NavMesh, IK, Cinemachine, etc.).
 
 **5 meta-tools:** `get_relevant_tools` (task-based tool discovery + RAG context), `remember_for_session` (store facts), `recall_session_memories` (retrieve facts), `batch_execute` (multi-step tool dispatch), `search_project_scripts` (semantic code search).
 
@@ -242,6 +242,136 @@ Without the key, `search_project_scripts` still returns scripts - just unranked.
 <summary><strong>Skill calibration</strong></summary>
 
 The server tracks vocabulary across your messages and detects whether you're a Unity beginner or expert. Beginners get plain-language explanations and encouraging framing. Experts get terse, technical responses. Calibration persists to `.gladekit/skill_level.json` in your project.
+
+</details>
+
+<details>
+<summary><strong>Asset pipeline (free CC0 imports)</strong></summary>
+
+Three tools for finding and importing free, commercially-usable assets directly from your AI client. All assets are CC0 (public domain — no attribution required). v1 ships [Kenney.nl](https://kenney.nl) packs; additional providers (Freesound, Quaternius, AI generation) are on the roadmap.
+
+| Tool | Purpose |
+| --- | --- |
+| `find_asset` | Search ranked candidates by description, asset type, style, and license. Read-only, no Unity dispatch. |
+| `import_asset` | Download, extract, place under `Assets/`, configure import settings for the asset type, and write a `.gladekit-asset.json` sidecar with license metadata. Requires explicit `licenseAcknowledged: true`. |
+| `list_imported_assets` | Walk the project's sidecars and surface a license audit (license counts, attribution-required count). Useful before a commercial release. |
+
+**Example workflow** (Cursor, Claude Code, Windsurf — same pattern across clients):
+
+> **You:** I'm prototyping a 2D platformer and need placeholder character + tile art. Find me something free.
+
+The AI calls `find_asset`:
+
+```json
+{
+  "description": "platformer character and tiles",
+  "asset_type": "sprite_2d",
+  "max_results": 5
+}
+```
+
+Result (truncated):
+
+```json
+{
+  "success": true,
+  "candidates": [
+    {
+      "id": "kenney/platformer-pack-redux",
+      "name": "Platformer Pack Redux",
+      "description": "360+ side-scrolling platformer sprites — characters, enemies, tiles, items, hazards.",
+      "license": "CC0-1.0",
+      "license_summary": "Public domain. No attribution required for any use, including commercial.",
+      "official_page": "https://kenney.nl/assets/platformer-pack-redux",
+      "approx_assets": 360,
+      "score": 0.92
+    },
+    { "id": "kenney/pixel-platformer", "score": 0.71, ... },
+    { "id": "kenney/tiny-town", "score": 0.45, ... }
+  ],
+  "count": 3
+}
+```
+
+> **You:** Let's go with Platformer Pack Redux. Import it to `Assets/Sprites/Platformer/`. I accept the CC0 license.
+
+The AI calls `import_asset`:
+
+```json
+{
+  "candidateId": "kenney/platformer-pack-redux",
+  "assetType": "sprite_2d",
+  "licenseAcknowledged": true,
+  "targetPath": "Assets/Sprites/Platformer/"
+}
+```
+
+The MCP server resolves the download URL locally (catalog is bundled with the server — no cloud dependency), passes it to the Unity bridge, which downloads, extracts, configures `TextureImporter` for each sprite (Texture Type = Sprite, Filter Mode = Point, Uncompressed) and writes the license sidecar. Result:
+
+```json
+{
+  "success": true,
+  "message": "Imported 360 file(s) from kenney/platformer-pack-redux to Assets/Sprites/Platformer/",
+  "downloadedBytes": 1842340,
+  "importedFileCount": 360,
+  "configuredImportSettings": 354,
+  "license": "CC0-1.0",
+  "sidecarPath": "Assets/Sprites/Platformer/.gladekit-asset.json"
+}
+```
+
+The sprites appear in the Unity Project window, ready to drop into a scene.
+
+> **You:** Before I ship, audit my imported assets. Anything that needs attribution?
+
+The AI calls `list_imported_assets`:
+
+```json
+{
+  "success": true,
+  "count": 1,
+  "licenseCounts": { "CC0-1.0": 1 },
+  "attributionRequiredCount": 0,
+  "entries": [
+    {
+      "candidate_id": "kenney/platformer-pack-redux",
+      "license": "CC0-1.0",
+      "asset_type": "sprite_2d",
+      "imported_at": "2026-05-10T09:37:42Z",
+      "target_path": "Assets/Sprites/Platformer/",
+      "imported_file_count": 360,
+      "sidecar_path": "Assets/Sprites/Platformer/.gladekit-asset.json"
+    }
+  ]
+}
+```
+
+CC0 needs no attribution; the audit report is empty for required attributions. If you imported a CC-BY asset later, it would surface here so you remember to credit it.
+
+**Security and license discipline:**
+
+- The LLM never sees download URLs. URL resolution happens cloud/MCP-side; the bridge tool refuses if the resolved fields are missing or LLM-injected.
+- `licenseAcknowledged: true` is required on every `import_asset` call. The bridge refuses without it. Do not set it without explicit user confirmation.
+- Every imported asset bundle gets a `.gladekit-asset.json` sidecar recording the candidate id, provider, license, attribution string, source URL, and timestamp. `list_imported_assets` reads these for the audit report.
+- Asset Pipeline tools are gated by `AssetPipelineGuard` on the bridge side. A misconfigured client cannot bypass it.
+
+**Disabling the pipeline (for studio / curated-asset workflows):**
+
+Set `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE=1` in the MCP server's environment to suppress the three tools entirely. They will not appear in the tool list and dispatch will refuse with a clear error. This is the recommended setting for projects that already have a managed asset workflow (Perforce-tracked libraries, internal asset stores) where AI-driven external downloads aren't appropriate.
+
+```json
+{
+  "mcpServers": {
+    "gladekit-unity": {
+      "command": "uvx",
+      "args": ["gladekit-mcp"],
+      "env": { "GLADEKIT_MCP_DISABLE_ASSET_PIPELINE": "1" }
+    }
+  }
+}
+```
+
+The Unity bridge enforces the same gate via `EditorPrefs` (`GladeAI.AssetPipelineEnabled`, default `true`). Toggle it via `POST http://localhost:8765/api/settings { "assetPipelineEnabled": false }`.
 
 </details>
 
@@ -313,11 +443,13 @@ Endpoints:
 <details>
 <summary><strong>Environment Variables</strong></summary>
 
-| Variable           | Required | Description                                                                                     |
-| ------------------ | -------- | ----------------------------------------------------------------------------------------------- |
-| `UNITY_BRIDGE_URL` | No       | Unity bridge URL (default: `http://localhost:8765`)                                             |
-| `OPENAI_API_KEY`   | No       | Enables script semantic search via embeddings ([get one](https://platform.openai.com/api-keys)) |
-| `GLADEKIT_API_KEY` | No       | Enables RAG knowledge base, cross-session memory, convention extraction                         |
+| Variable                              | Required | Description                                                                                     |
+| ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------- |
+| `UNITY_BRIDGE_URL`                    | No       | Unity bridge URL (default: `http://localhost:8765`)                                             |
+| `OPENAI_API_KEY`                      | No       | Enables script semantic search via embeddings ([get one](https://platform.openai.com/api-keys)) |
+| `GLADEKIT_API_KEY`                    | No       | Enables RAG knowledge base, cross-session memory, convention extraction                         |
+| `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE` | No       | Set to `1` to suppress `find_asset` / `import_asset` / `list_imported_assets` (curated-asset workflows) |
+| `GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING`| No       | Set to `1` to silence the stderr warning when the Unity bridge is older than the recommended version |
 
 </details>
 

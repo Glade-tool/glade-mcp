@@ -2,6 +2,31 @@
 
 All notable changes to `gladekit-mcp` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Asset pipeline (3 new tools).** Find and import free CC0 assets directly from your AI client; ships with a [Kenney.nl](https://kenney.nl) catalog and orchestrator bundled into the MCP server (no cloud dependency).
+  - `find_asset` — read-only search across asset providers. Returns ranked candidates with name, description, license, license summary, official page, approximate asset count, and a relevance score. Filterable by `asset_type` (`sprite_2d` / `model_3d` / `audio_sfx` / `audio_music` / `animation` / `ui_sprite`), free-text `style` (`pixel art`, `vector`, `low-poly`, `voxel`), explicit `tags`, and `license_constraint`. Runs entirely against the bundled Kenney catalog — works offline.
+  - `import_asset` — downloads the resolved asset, extracts (zip) into `Assets/<targetPath>/`, configures Unity import settings for the asset type (`TextureImporter` for sprites with pixel-art-friendly defaults — Sprite mode, Point filter, Uncompressed; `ModelImporter` for 3D; `AudioImporter` for audio), and writes a `.gladekit-asset.json` sidecar with license metadata. Requires explicit `licenseAcknowledged: true`.
+  - `list_imported_assets` — read-only audit. Walks `.gladekit-asset.json` sidecars under `Assets/`, returns license counts and attribution-required count. Supports `licenseFilter` to filter by a specific license. Useful before a commercial release.
+- **Bundled orchestrator (`gladekit_mcp.asset_pipeline/`).** Self-contained search and URL resolution — same orchestrator as the GladeKit cloud proxy, mirrored into the MCP package so the asset pipeline works without cloud reachability.
+- **Two layers of toggle for studios with curated-asset workflows:**
+  - **MCP server:** set `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE=1` in the server environment. The three tools are stripped from the tool list and dispatch refuses with a clear error.
+  - **Unity bridge:** `EditorPrefs["GladeAI.AssetPipelineEnabled"]` (default `true`). Toggleable via `POST /api/settings { "assetPipelineEnabled": false }`. Enforced by `AssetPipelineGuard` on every asset-pipeline tool — defense-in-depth in case a misconfigured client makes it through.
+  - The state is also surfaced on `GET /api/health` as `assetPipelineEnabled` so clients can detect and reflect the bridge-side setting.
+- **License + attribution discipline.** Every imported asset bundle gets a `.gladekit-asset.json` sidecar recording: candidate id, provider, license, attribution string, source URL, import timestamp, asset type, target path, and imported file paths. `list_imported_assets` reads these to surface required attributions before shipping.
+
+### Security
+
+- **The LLM never sees download URLs.** `import_asset` accepts `candidateId` from the LLM; the MCP server's preprocessor calls the orchestrator to resolve the actual download URL and injects it into the bridge call as underscore-prefixed fields the schema does not advertise. Any LLM attempt to set `_resolvedUrl` / `_resolvedLicense` / etc. is stripped before the orchestrator lookup, so a fabricated URL never survives even when resolution fails.
+- **License acknowledgment is a hard gate.** Both the MCP-side preprocessor and the Unity bridge tool require `licenseAcknowledged: true` and refuse with a clear error otherwise. Set this only after the user has explicitly accepted the license shown by `find_asset`.
+
+### Notes
+
+- v1 ships Kenney.nl only. Additional providers (Freesound for SFX, Quaternius / Poly Pizza for 3D, AI generation via Replicate / PixelLab / Meshy / ElevenLabs) are on the roadmap.
+- Tool count is now 235+ across 16 categories (was 230+ across 15).
+
 ## [0.5.0] - 2026-05-05
 
 ### Added
