@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GladeAgenticAI.Core.Tools;
 using GladeAgenticAI.Core.Tools.Implementations.Assets;
+using GladeAgenticAI.Core.Tools.Implementations.AssetPipeline;
 using GladeAgenticAI.Core.Tools.Implementations.Scene;
 using GladeAgenticAI.Core.Tools.Implementations.Scripts;
 using GladeAgenticAI.Core.Tools.Implementations.Selection;
@@ -130,6 +131,11 @@ namespace GladeAgenticAI.Services
             Register(new ListAssetsTool());
             Register(new CreateScriptableObjectTool());
             Register(new SetScriptableObjectPropertyTool());
+
+            // Asset pipeline (external asset orchestration). Gated by
+            // AssetPipelineGuard.IsEnabled — tools self-reject when disabled.
+            Register(new ImportAssetTool());
+            Register(new ListImportedAssetsTool());
 
             // Materials
             Register(new CreateMaterialTool());

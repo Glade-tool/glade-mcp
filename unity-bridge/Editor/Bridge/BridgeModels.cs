@@ -73,6 +73,9 @@ namespace GladeAgenticAI.Bridge
         // scraping package.json from disk.
         public string bridgeVersion; // e.g. "0.4.0" — null if package.json unreadable
         public string bridgeKind;    // "mcp" | "agenticai" | null
+        // User-toggled feature flags surfaced to the cloud + Electron so the
+        // tool registry can be filtered before the LLM ever sees it. Default true.
+        public bool assetPipelineEnabled = true;
     }
     
     [Serializable]

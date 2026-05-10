@@ -140,6 +140,10 @@ CORE_TOOLS: set[str] = {
     "get_runtime_events",
     "get_play_mode_state",
     "apply_queued_fix",
+    # ── Asset pipeline (gated by GLADEKIT_MCP_DISABLE_ASSET_PIPELINE) ──────────
+    "find_asset",
+    "import_asset",
+    "list_imported_assets",
 }
 # NOTE: Unity AI Gateway has a cloud schema token budget (~76 small tools).
 # Demoted to extended-only (still callable via get_relevant_tools):
@@ -206,6 +210,94 @@ def sanitize_args(arguments: dict[str, Any]) -> dict[str, Any]:
     return sanitized
 
 
+def _is_asset_pipeline_enabled() -> bool:
+    """Single source of truth for the MCP-side asset pipeline gate.
+
+    Mirrors the env-var check in tools/__init__.py — kept in sync so a runtime
+    flip (rare, but possible if a wrapper sets the env mid-process) is honored
+    by dispatch even if the schema list is already cached.
+    """
+    import os
+    return os.environ.get(
+        "GLADEKIT_MCP_DISABLE_ASSET_PIPELINE", ""
+    ).strip().lower() not in {"1", "true", "yes", "on"}
+
+
+def _handle_find_asset_locally(arguments: dict[str, Any]) -> str:
+    """Run the bundled asset_pipeline orchestrator locally — no bridge call.
+
+    The MCP server hosts its own copy of the Kenney catalog so search works
+    without a cloud round-trip. Identical orchestrator and ranking logic as
+    the Proxy backend.
+    """
+    from ..asset_pipeline import AssetSpec, search as _asset_search
+
+    try:
+        spec = AssetSpec.from_dict(arguments)
+        candidates = _asset_search(spec)
+        return json.dumps(
+            {
+                "success": True,
+                "candidates": [c.to_dict() for c in candidates],
+                "count": len(candidates),
+            }
+        )
+    except Exception as exc:
+        return json.dumps({"success": False, "error": f"find_asset failed: {exc}"})
+
+
+_CLOUD_INJECTED_ARG_KEYS = frozenset({
+    "_resolvedUrl",
+    "_resolvedLicense",
+    "_resolvedAttribution",
+    "_resolvedArchiveFormat",
+    "_resolvedFileExtension",
+})
+
+
+def _preprocess_import_asset_args(arguments: dict[str, Any]) -> dict[str, Any] | str:
+    """Inject the resolved download URL + license into args for the bridge.
+
+    Returns the augmented args dict on success, or a JSON error string on
+    failure (caller short-circuits with the error string).
+
+    Strips any caller-supplied underscore-prefixed fields BEFORE attempting
+    resolution so a fabricated URL never survives even when the catalog
+    lookup fails.
+    """
+    # Strip first — order matters so failed-resolution doesn't leak fakes.
+    cleaned = {k: v for k, v in arguments.items() if k not in _CLOUD_INJECTED_ARG_KEYS}
+
+    if not cleaned.get("licenseAcknowledged"):
+        return json.dumps(
+            {
+                "success": False,
+                "error": (
+                    "licenseAcknowledged must be true. Confirm with the user "
+                    "that they accept the license shown in find_asset's preview."
+                ),
+            }
+        )
+    candidate_id = cleaned.get("candidateId") or cleaned.get("candidate_id")
+    if not candidate_id:
+        return json.dumps({"success": False, "error": "candidateId is required"})
+
+    try:
+        from ..asset_pipeline import fetch as _asset_fetch
+        fr = _asset_fetch(candidate_id)
+    except Exception as exc:
+        return json.dumps(
+            {"success": False, "error": f"Could not resolve {candidate_id!r}: {exc}"}
+        )
+
+    cleaned["_resolvedUrl"] = fr.download_url
+    cleaned["_resolvedLicense"] = fr.license_at_fetch
+    cleaned["_resolvedAttribution"] = fr.attribution_text or ""
+    cleaned["_resolvedArchiveFormat"] = fr.archive_format
+    cleaned["_resolvedFileExtension"] = fr.file_extension
+    return cleaned
+
+
 async def dispatch_tool_call(name: str, arguments: dict[str, Any]) -> str:
     """
     Execute a tool call by dispatching to the Unity bridge.
@@ -213,6 +305,32 @@ async def dispatch_tool_call(name: str, arguments: dict[str, Any]) -> str:
     Returns the tool result as a JSON string.
     All tools (core + extended) are dispatchable even if not in the listed set.
     """
+    # Asset pipeline gate — refuse early when disabled, regardless of cache state.
+    if name in {"find_asset", "import_asset", "list_imported_assets"}:
+        if not _is_asset_pipeline_enabled():
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": (
+                        "Asset pipeline is disabled "
+                        "(GLADEKIT_MCP_DISABLE_ASSET_PIPELINE is set). Unset the "
+                        "env var to re-enable find/import of external assets."
+                    ),
+                }
+            )
+
+    # find_asset is cloud-only in spirit — runs entirely against the bundled
+    # catalog with no bridge round-trip.
+    if name == "find_asset":
+        return _handle_find_asset_locally(arguments)
+
+    # import_asset needs URL injection before bridge dispatch.
+    if name == "import_asset":
+        prepped = _preprocess_import_asset_args(arguments)
+        if isinstance(prepped, str):
+            return prepped  # already a JSON error envelope
+        arguments = prepped
+
     # Ensure the full tool name index is populated
     get_mcp_tools()
     if _all_tool_names and name not in _all_tool_names:

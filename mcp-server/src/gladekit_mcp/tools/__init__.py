@@ -53,8 +53,20 @@ from .ui import CATEGORY as UI_CATEGORY
 from .ui import TOOLS as UI_TOOLS
 from .vfx_audio import CATEGORY as VFX_AUDIO_CATEGORY
 from .vfx_audio import TOOLS as VFX_AUDIO_TOOLS
+from .asset_pipeline import CATEGORY as ASSET_PIPELINE_CATEGORY
+from .asset_pipeline import TOOLS as ASSET_PIPELINE_TOOLS
 
-# All categories in priority order (core always first)
+import os
+
+# All categories in priority order (core always first). asset_pipeline is
+# included by default but suppressed when GLADEKIT_MCP_DISABLE_ASSET_PIPELINE=1
+# (matches the existing GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING pattern). Studios
+# working in a curated-asset workflow set this to keep the agent from offering
+# external downloads.
+_ASSET_PIPELINE_DISABLED = os.environ.get(
+    "GLADEKIT_MCP_DISABLE_ASSET_PIPELINE", ""
+).strip().lower() in {"1", "true", "yes", "on"}
+
 ALL_CATEGORIES = [
     (CORE_CATEGORY, CORE_TOOLS),
     (SCENE_CATEGORY, SCENE_TOOLS),
@@ -73,6 +85,8 @@ ALL_CATEGORIES = [
     (TERRAIN_NAV_CATEGORY, TERRAIN_NAV_TOOLS),
     (RUNTIME_CATEGORY, RUNTIME_TOOLS),
 ]
+if not _ASSET_PIPELINE_DISABLED:
+    ALL_CATEGORIES.append((ASSET_PIPELINE_CATEGORY, ASSET_PIPELINE_TOOLS))
 
 # Categories always included regardless of request content
 ALWAYS_INCLUDED = {"core", "scene", "scripting"}

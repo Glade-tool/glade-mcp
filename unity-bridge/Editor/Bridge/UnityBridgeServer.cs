@@ -322,7 +322,8 @@ namespace GladeAgenticAI.Bridge
                 projectPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..")),
                 isCompiling = EditorApplication.isCompiling,
                 bridgeVersion = bridgeVersion,
-                bridgeKind = bridgeKind
+                bridgeKind = bridgeKind,
+                assetPipelineEnabled = AssetPipelineGuard.IsEnabled
             };
 
             SendJson(context.Response, response);
@@ -1611,6 +1612,13 @@ namespace GladeAgenticAI.Bridge
                     {
                         EditorPrefs.SetBool("GladeAI.ReferenceDemoAssets", referenceDemoAssets.Value);
                         Debug.Log($"[UnityBridge] Updated referenceDemoAssets setting: {referenceDemoAssets.Value}");
+                    }
+
+                    bool? assetPipelineEnabled = TryReadBoolField(json, "assetPipelineEnabled");
+                    if (assetPipelineEnabled.HasValue)
+                    {
+                        AssetPipelineGuard.SetEnabled(assetPipelineEnabled.Value);
+                        Debug.Log($"[UnityBridge] Updated assetPipelineEnabled setting: {assetPipelineEnabled.Value}");
                     }
 
                     // Plain anonymous types don't serialize through JsonUtility — emit literal JSON.
