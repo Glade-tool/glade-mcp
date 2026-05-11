@@ -8,32 +8,10 @@
   "license_summary": "Public domain. No attribution required for any use, including commercial. Crediting 'Kenney.nl' is appreciated but not required.",
   "attribution_required": false,
   "attribution_recommended": "Kenney.nl",
-  "indexed_at": "2026-05-10",
-  "indexing_strategy": "hand_curated_seed_v0",
-  "notes": "Hand-curated seed list of widely-used Kenney packs. Per-pack download_url values are pre-baked into this catalog; the runtime provider reads them directly without live scraping. Refresh download URLs (Kenney rotates the random-id segment when packs update) via scripts/build_kenney_index.py. A future pass will broaden coverage toward Kenney's full ~250-pack catalog.",
+  "indexed_at": "2026-05-11",
+  "indexing_strategy": "hand_curated_seed_v0_1",
+  "notes": "Hand-curated seed list of widely-used Kenney packs. Per-pack download_url + thumbnail_url values are pre-baked into this catalog by scripts/build_kenney_index.py (Kenney rotates both the download zip's random-id segment and the og:image's random-id segment when packs update). Refresh quarterly or when a user reports a stale download. Dead packs (Kenney occasionally retires/renames without redirect) are purged by the indexer; commit the resulting diff after each refresh. Coverage target for v0.1: 35-40 packs spanning sprite_2d (platformer, top-down, UI, pixel), model_3d (kits, characters, vehicles), and audio_sfx (UI, impact, sci-fi, RPG).",
   "packs": [
-    {
-      "id": "kenney/platformer-pack-redux",
-      "slug": "platformer-pack-redux",
-      "name": "Platformer Pack Redux",
-      "description": "360+ side-scrolling platformer sprites — characters, enemies, tiles, items, hazards. The default 2D platformer starter.",
-      "asset_type": "sprite_2d",
-      "style": "vector",
-      "tags": [
-        "platformer",
-        "2d",
-        "sprites",
-        "tiles",
-        "side-scroller",
-        "characters",
-        "enemies",
-        "items",
-        "hazards"
-      ],
-      "approx_assets": 360,
-      "official_page": "https://kenney.nl/assets/platformer-pack-redux",
-      "download_url": null
-    },
     {
       "id": "kenney/pixel-platformer",
       "slug": "pixel-platformer",
@@ -52,7 +30,32 @@
       ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/pixel-platformer",
-      "download_url": "https://kenney.nl/media/pages/assets/pixel-platformer/bef991136c-1696667883/kenney_pixel-platformer.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/pixel-platformer/bef991136c-1696667883/kenney_pixel-platformer.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/pixel-platformer/f1edd7a868-1696667860/samplea.png"
+    },
+    {
+      "id": "kenney/platformer-art-pixel",
+      "slug": "platformer-art-pixel",
+      "name": "Platformer Art (Pixel)",
+      "description": "900+ pixel-art platformer sprites — characters, enemies, tiles, items, hazards. Successor to the retired Platformer Pack Redux.",
+      "asset_type": "sprite_2d",
+      "style": "pixel art",
+      "tags": [
+        "platformer",
+        "2d",
+        "sprites",
+        "tiles",
+        "pixel art",
+        "side-scroller",
+        "characters",
+        "enemies",
+        "items",
+        "hazards"
+      ],
+      "approx_assets": 900,
+      "official_page": "https://kenney.nl/assets/platformer-art-pixel",
+      "download_url": "https://kenney.nl/media/pages/assets/platformer-art-pixel/25ea8359e9-1774772636/kenney_platformer-art-pixel.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/platformer-art-pixel/642389b026-1677696731/sample.png"
     },
     {
       "id": "kenney/1-bit-pack",
@@ -72,7 +75,29 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/1-bit-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/1-bit-pack/f41b6925f0-1677578516/kenney_1-bit-pack.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/1-bit-pack/f41b6925f0-1677578516/kenney_1-bit-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/1-bit-pack/fda061c324-1677578508/sample_fantasy.png"
+    },
+    {
+      "id": "kenney/monochrome-rpg",
+      "slug": "monochrome-rpg",
+      "name": "Monochrome RPG",
+      "description": "Monochrome top-down RPG tileset — characters, environments, items in a single-color palette.",
+      "asset_type": "sprite_2d",
+      "style": "pixel art",
+      "tags": [
+        "monochrome",
+        "rpg",
+        "top-down",
+        "tilemap",
+        "pixel art",
+        "retro",
+        "minimalist"
+      ],
+      "approx_assets": 130,
+      "official_page": "https://kenney.nl/assets/monochrome-rpg",
+      "download_url": "https://kenney.nl/media/pages/assets/monochrome-rpg/f05d9b5c5b-1674742619/kenney_monochrome-rpg.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/monochrome-rpg/41151fda79-1674742616/sample.png"
     },
     {
       "id": "kenney/tiny-town",
@@ -94,7 +119,8 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/tiny-town",
-      "download_url": "https://kenney.nl/media/pages/assets/tiny-town/5e46f9e551-1735736916/kenney_tiny-town.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/tiny-town/5e46f9e551-1735736916/kenney_tiny-town.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/tiny-town/1c57d72b26-1674742338/sample.png"
     },
     {
       "id": "kenney/tiny-dungeon",
@@ -115,27 +141,160 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/tiny-dungeon",
-      "download_url": "https://kenney.nl/media/pages/assets/tiny-dungeon/b56d7a13e3-1674742415/kenney_tiny-dungeon.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/tiny-dungeon/b56d7a13e3-1674742415/kenney_tiny-dungeon.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/tiny-dungeon/331078e148-1674742412/sample.png"
     },
     {
-      "id": "kenney/roguelike-caves-and-dungeons",
-      "slug": "roguelike-caves-and-dungeons",
-      "name": "Roguelike Caves & Dungeons",
-      "description": "Top-down roguelike caves and dungeon sprites — heavily themed for ASCII-roguelike-inspired projects.",
+      "id": "kenney/roguelike-rpg-pack",
+      "slug": "roguelike-rpg-pack",
+      "name": "Roguelike/RPG Pack",
+      "description": "1700+ roguelike/RPG sprites — characters, monsters, items, tiles, weapons. Comprehensive top-down RPG starter.",
       "asset_type": "sprite_2d",
       "style": "pixel art",
       "tags": [
         "roguelike",
-        "dungeon",
-        "caves",
-        "tilemap",
-        "top-down",
         "rpg",
+        "dungeon",
+        "top-down",
+        "tilemap",
+        "characters",
+        "monsters",
+        "items",
         "pixel art"
       ],
-      "approx_assets": 700,
-      "official_page": "https://kenney.nl/assets/roguelike-caves-and-dungeons",
-      "download_url": null
+      "approx_assets": 1700,
+      "official_page": "https://kenney.nl/assets/roguelike-rpg-pack",
+      "download_url": "https://kenney.nl/media/pages/assets/roguelike-rpg-pack/1cb71b28fb-1677697420/kenney_roguelike-rpg-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/roguelike-rpg-pack/7fa8ea469e-1677697411/sample1.png"
+    },
+    {
+      "id": "kenney/roguelike-modern-city",
+      "slug": "roguelike-modern-city",
+      "name": "Roguelike Modern City",
+      "description": "1000+ modern-city roguelike sprites — characters, vehicles, buildings, urban props.",
+      "asset_type": "sprite_2d",
+      "style": "pixel art",
+      "tags": [
+        "roguelike",
+        "modern",
+        "city",
+        "urban",
+        "top-down",
+        "tilemap",
+        "vehicles",
+        "characters",
+        "pixel art"
+      ],
+      "approx_assets": 1036,
+      "official_page": "https://kenney.nl/assets/roguelike-modern-city",
+      "download_url": "https://kenney.nl/media/pages/assets/roguelike-modern-city/2c69d77360-1677694743/kenney_roguelike-modern-city.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/roguelike-modern-city/511a3682cf-1677694738/sample.png"
+    },
+    {
+      "id": "kenney/space-shooter-extension",
+      "slug": "space-shooter-extension",
+      "name": "Space Shooter Extension",
+      "description": "270+ vertical space-shooter sprites — ships, enemies, projectiles, effects. Successor to the retired Space Shooter Redux.",
+      "asset_type": "sprite_2d",
+      "style": "vector",
+      "tags": [
+        "space",
+        "shooter",
+        "shmup",
+        "ships",
+        "enemies",
+        "projectiles",
+        "2d",
+        "vertical"
+      ],
+      "approx_assets": 270,
+      "official_page": "https://kenney.nl/assets/space-shooter-extension",
+      "download_url": "https://kenney.nl/media/pages/assets/space-shooter-extension/9a8d3c431c-1677693518/kenney_space-shooter-extension.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/space-shooter-extension/4a86b6525d-1677693514/sample.png"
+    },
+    {
+      "id": "kenney/simple-space",
+      "slug": "simple-space",
+      "name": "Simple Space",
+      "description": "Minimalist space-shooter sprites — clean geometric ships, projectiles, asteroids. Great for prototyping.",
+      "asset_type": "sprite_2d",
+      "style": "vector",
+      "tags": [
+        "space",
+        "shooter",
+        "minimalist",
+        "geometric",
+        "prototype",
+        "ships",
+        "2d"
+      ],
+      "approx_assets": 48,
+      "official_page": "https://kenney.nl/assets/simple-space",
+      "download_url": "https://kenney.nl/media/pages/assets/simple-space/f694a6eca6-1677578143/kenney_simple-space.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/simple-space/7e8b2171fb-1677578140/sample.png"
+    },
+    {
+      "id": "kenney/shape-characters",
+      "slug": "shape-characters",
+      "name": "Shape Characters",
+      "description": "Simple geometric-shape character sprites — abstract avatars, perfect for puzzle / arcade prototypes.",
+      "asset_type": "sprite_2d",
+      "style": "vector",
+      "tags": [
+        "characters",
+        "shapes",
+        "geometric",
+        "minimalist",
+        "abstract",
+        "prototype",
+        "2d"
+      ],
+      "approx_assets": 100,
+      "official_page": "https://kenney.nl/assets/shape-characters",
+      "download_url": "https://kenney.nl/media/pages/assets/shape-characters/10e737ac29-1698339465/kenney_shape-characters.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/shape-characters/81b9e106b6-1698339460/sample.png"
+    },
+    {
+      "id": "kenney/puzzle-pack-2",
+      "slug": "puzzle-pack-2",
+      "name": "Puzzle Pack 2",
+      "description": "795 match-3/casual puzzle sprites — gems, tiles, backgrounds, UI elements.",
+      "asset_type": "sprite_2d",
+      "style": "vector",
+      "tags": [
+        "puzzle",
+        "match-3",
+        "casual",
+        "gems",
+        "tiles",
+        "ui",
+        "2d"
+      ],
+      "approx_assets": 795,
+      "official_page": "https://kenney.nl/assets/puzzle-pack-2",
+      "download_url": "https://kenney.nl/media/pages/assets/puzzle-pack-2/848ff5c698-1677667476/kenney_puzzle-pack-2.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/puzzle-pack-2/019f174dcc-1677667469/sample1.png"
+    },
+    {
+      "id": "kenney/particle-pack",
+      "slug": "particle-pack",
+      "name": "Particle Pack",
+      "description": "80 particle effect sprites — fire, smoke, sparkles, magic, explosions. Drop into Unity ParticleSystem as Texture Sheet.",
+      "asset_type": "sprite_2d",
+      "style": "vector",
+      "tags": [
+        "particles",
+        "vfx",
+        "effects",
+        "fire",
+        "smoke",
+        "magic",
+        "explosions"
+      ],
+      "approx_assets": 80,
+      "official_page": "https://kenney.nl/assets/particle-pack",
+      "download_url": "https://kenney.nl/media/pages/assets/particle-pack/1dd3d4cbe2-1677578741/kenney_particle-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/particle-pack/f4b578ccc9-1677578655/preview.png"
     },
     {
       "id": "kenney/ui-pack",
@@ -155,7 +314,8 @@
       ],
       "approx_assets": 400,
       "official_page": "https://kenney.nl/assets/ui-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/ui-pack/af874291da-1718203990/kenney_ui-pack.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/ui-pack/af874291da-1718203990/kenney_ui-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/ui-pack/c2809d88f0-1718203984/sample.png"
     },
     {
       "id": "kenney/ui-pack-rpg-expansion",
@@ -176,7 +336,8 @@
       ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/ui-pack-rpg-expansion",
-      "download_url": "https://kenney.nl/media/pages/assets/ui-pack-rpg-expansion/b1e1f298c6-1677661824/kenney_ui-pack-rpg-expansion.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/ui-pack-rpg-expansion/b1e1f298c6-1677661824/kenney_ui-pack-rpg-expansion.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/ui-pack-rpg-expansion/8b93ae5ca6-1677661820/sample.png"
     },
     {
       "id": "kenney/game-icons",
@@ -195,28 +356,8 @@
       ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/game-icons",
-      "download_url": "https://kenney.nl/media/pages/assets/game-icons/94af1f5c0b-1677661579/kenney_game-icons.zip"
-    },
-    {
-      "id": "kenney/space-shooter-redux",
-      "slug": "space-shooter-redux",
-      "name": "Space Shooter Redux",
-      "description": "Top-down/vertical space shooter sprites — ships, enemies, projectiles, effects, backgrounds.",
-      "asset_type": "sprite_2d",
-      "style": "vector",
-      "tags": [
-        "space",
-        "shooter",
-        "shmup",
-        "ships",
-        "enemies",
-        "projectiles",
-        "2d",
-        "top-down"
-      ],
-      "approx_assets": 290,
-      "official_page": "https://kenney.nl/assets/space-shooter-redux",
-      "download_url": null
+      "download_url": "https://kenney.nl/media/pages/assets/game-icons/94af1f5c0b-1677661579/kenney_game-icons.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/game-icons/9081d21fd8-1677661575/preview.png"
     },
     {
       "id": "kenney/voxel-pack",
@@ -236,7 +377,8 @@
       ],
       "approx_assets": 350,
       "official_page": "https://kenney.nl/assets/voxel-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/voxel-pack/ee6f21f078-1677662501/kenney_voxel-pack.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/voxel-pack/ee6f21f078-1677662501/kenney_voxel-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/voxel-pack/1f57e1c461-1677662495/sample_2d.png"
     },
     {
       "id": "kenney/mini-dungeon",
@@ -257,7 +399,8 @@
       ],
       "approx_assets": 80,
       "official_page": "https://kenney.nl/assets/mini-dungeon",
-      "download_url": "https://kenney.nl/media/pages/assets/mini-dungeon/2de2de674e-1771249391/kenney_mini-dungeon.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/mini-dungeon/2de2de674e-1771249391/kenney_mini-dungeon.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/mini-dungeon/7212f8ae8b-1771249373/sample.png"
     },
     {
       "id": "kenney/survival-kit",
@@ -277,13 +420,14 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/survival-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/survival-kit/750a1eb3f9-1712149243/kenney_survival-kit.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/survival-kit/750a1eb3f9-1712149243/kenney_survival-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/survival-kit/25f7570cf5-1712149236/sample.png"
     },
     {
-      "id": "kenney/animal-pack-redux",
-      "slug": "animal-pack-redux",
-      "name": "Animal Pack Redux",
-      "description": "Low-poly 3D animals — game-ready FBX, suitable for casual or stylized projects.",
+      "id": "kenney/animal-pack",
+      "slug": "animal-pack",
+      "name": "Animal Pack",
+      "description": "Low-poly 3D animals — game-ready FBX, suitable for casual or stylized projects. Successor to the retired Animal Pack Redux.",
       "asset_type": "model_3d",
       "style": "low-poly",
       "tags": [
@@ -294,9 +438,249 @@
         "casual",
         "stylized"
       ],
-      "approx_assets": 90,
-      "official_page": "https://kenney.nl/assets/animal-pack-redux",
-      "download_url": null
+      "approx_assets": 80,
+      "official_page": "https://kenney.nl/assets/animal-pack",
+      "download_url": "https://kenney.nl/media/pages/assets/animal-pack/f6c9bf503d-1677669996/kenney_animal-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/animal-pack/a1e85a8ce8-1677669990/preview.png"
+    },
+    {
+      "id": "kenney/nature-kit",
+      "slug": "nature-kit",
+      "name": "Nature Kit",
+      "description": "Low-poly 3D nature assets — trees, rocks, plants, terrain features. Stylized outdoor environments.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "nature",
+        "outdoor",
+        "trees",
+        "rocks",
+        "plants",
+        "terrain",
+        "environment"
+      ],
+      "approx_assets": 330,
+      "official_page": "https://kenney.nl/assets/nature-kit",
+      "download_url": "https://kenney.nl/media/pages/assets/nature-kit/8334871c74-1677698939/kenney_nature-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/nature-kit/b154f66add-1677698896/sample.png"
+    },
+    {
+      "id": "kenney/city-kit-suburban",
+      "slug": "city-kit-suburban",
+      "name": "City Kit (Suburban)",
+      "description": "Low-poly 3D suburban buildings — houses, garages, fences, residential props.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "city",
+        "suburban",
+        "buildings",
+        "houses",
+        "residential",
+        "environment"
+      ],
+      "approx_assets": 40,
+      "official_page": "https://kenney.nl/assets/city-kit-suburban",
+      "download_url": "https://kenney.nl/media/pages/assets/city-kit-suburban/167f6dbc31-1745479373/kenney_city-kit-suburban_20.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/city-kit-suburban/32ed30a7a3-1745479402/sample.png"
+    },
+    {
+      "id": "kenney/city-kit-commercial",
+      "slug": "city-kit-commercial",
+      "name": "City Kit (Commercial)",
+      "description": "Low-poly 3D commercial buildings — shops, offices, urban storefronts.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "city",
+        "commercial",
+        "buildings",
+        "shops",
+        "offices",
+        "urban",
+        "environment"
+      ],
+      "approx_assets": 50,
+      "official_page": "https://kenney.nl/assets/city-kit-commercial",
+      "download_url": "https://kenney.nl/media/pages/assets/city-kit-commercial/16eb35d771-1753115042/kenney_city-kit-commercial_2.1.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/city-kit-commercial/44aa3589e4-1747481474/sample.png"
+    },
+    {
+      "id": "kenney/modular-buildings",
+      "slug": "modular-buildings",
+      "name": "Modular Buildings",
+      "description": "Low-poly 3D modular building parts — walls, floors, doors, windows. Snap-together level kit.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "modular",
+        "buildings",
+        "walls",
+        "level-design",
+        "kit",
+        "environment"
+      ],
+      "approx_assets": 100,
+      "official_page": "https://kenney.nl/assets/modular-buildings",
+      "download_url": "https://kenney.nl/media/pages/assets/modular-buildings/b7b9013fa2-1707397411/kenney_modular-buildings.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/modular-buildings/c3dc169249-1707397438/sample.png"
+    },
+    {
+      "id": "kenney/space-kit",
+      "slug": "space-kit",
+      "name": "Space Kit",
+      "description": "Low-poly 3D space assets — ships, stations, asteroids, props. Great for space-sim or arena shooters.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "space",
+        "ships",
+        "stations",
+        "asteroids",
+        "sci-fi"
+      ],
+      "approx_assets": 150,
+      "official_page": "https://kenney.nl/assets/space-kit",
+      "download_url": "https://kenney.nl/media/pages/assets/space-kit/cceeafbd0c-1677698978/kenney_space-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/space-kit/50f16c7294-1677698968/sample.png"
+    },
+    {
+      "id": "kenney/platformer-kit",
+      "slug": "platformer-kit",
+      "name": "Platformer Kit",
+      "description": "Low-poly 3D platformer kit — modular floors, walls, hazards, collectibles. 2.5D-friendly.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "platformer",
+        "kit",
+        "modular",
+        "level-design",
+        "2.5d"
+      ],
+      "approx_assets": 150,
+      "official_page": "https://kenney.nl/assets/platformer-kit",
+      "download_url": "https://kenney.nl/media/pages/assets/platformer-kit/9fd25e14aa-1775122253/kenney_platformer-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/platformer-kit/bc4001651f-1775122247/sample.png"
+    },
+    {
+      "id": "kenney/fantasy-town-kit",
+      "slug": "fantasy-town-kit",
+      "name": "Fantasy Town Kit",
+      "description": "Low-poly 3D fantasy town assets — medieval houses, market stalls, towers, props.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "fantasy",
+        "medieval",
+        "town",
+        "buildings",
+        "rpg",
+        "environment"
+      ],
+      "approx_assets": 160,
+      "official_page": "https://kenney.nl/assets/fantasy-town-kit",
+      "download_url": "https://kenney.nl/media/pages/assets/fantasy-town-kit/40ed2a2d51-1754222374/kenney_fantasy-town-kit_2.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/fantasy-town-kit/df49f1779e-1754222363/sample.png"
+    },
+    {
+      "id": "kenney/medieval-rts",
+      "slug": "medieval-rts",
+      "name": "Medieval RTS",
+      "description": "Low-poly 3D medieval RTS assets — units, buildings, resources for strategy games.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "medieval",
+        "rts",
+        "strategy",
+        "units",
+        "buildings",
+        "resources"
+      ],
+      "approx_assets": 120,
+      "official_page": "https://kenney.nl/assets/medieval-rts",
+      "download_url": "https://kenney.nl/media/pages/assets/medieval-rts/4e1b27c3ec-1677693589/kenney_medieval-rts.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/medieval-rts/1eaa1df4ef-1677693585/sample.png"
+    },
+    {
+      "id": "kenney/pirate-pack",
+      "slug": "pirate-pack",
+      "name": "Pirate Pack",
+      "description": "Low-poly 3D pirate-themed assets — ships, islands, treasure, characters.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "pirate",
+        "ships",
+        "islands",
+        "treasure",
+        "naval"
+      ],
+      "approx_assets": 190,
+      "official_page": "https://kenney.nl/assets/pirate-pack",
+      "download_url": "https://kenney.nl/media/pages/assets/pirate-pack/74634a27df-1677579020/kenney_pirate-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/pirate-pack/3e65e641ed-1677579015/sample.png"
+    },
+    {
+      "id": "kenney/racing-pack",
+      "slug": "racing-pack",
+      "name": "Racing Pack",
+      "description": "Low-poly 3D racing assets — cars, tracks, obstacles, environmental props.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "racing",
+        "cars",
+        "vehicles",
+        "tracks",
+        "arcade"
+      ],
+      "approx_assets": 420,
+      "official_page": "https://kenney.nl/assets/racing-pack",
+      "download_url": "https://kenney.nl/media/pages/assets/racing-pack/b27a2ace7a-1677662443/kenney_racing-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/racing-pack/be31af41a1-1677662439/sample.png"
+    },
+    {
+      "id": "kenney/rolling-ball-assets",
+      "slug": "rolling-ball-assets",
+      "name": "Rolling Ball Assets",
+      "description": "Low-poly 3D rolling-ball / marble run assets — ramps, tracks, obstacles, balls.",
+      "asset_type": "model_3d",
+      "style": "low-poly",
+      "tags": [
+        "3d",
+        "low-poly",
+        "rolling-ball",
+        "marble",
+        "puzzle",
+        "physics",
+        "tracks"
+      ],
+      "approx_assets": 60,
+      "official_page": "https://kenney.nl/assets/rolling-ball-assets",
+      "download_url": "https://kenney.nl/media/pages/assets/rolling-ball-assets/2f4cda9784-1677495701/kenney_rolling-ball-assets.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/rolling-ball-assets/8985e8ce1f-1677495687/sample.png"
     },
     {
       "id": "kenney/interface-sounds",
@@ -316,7 +700,8 @@
       ],
       "approx_assets": 50,
       "official_page": "https://kenney.nl/assets/interface-sounds",
-      "download_url": "https://kenney.nl/media/pages/assets/interface-sounds/d23a84242e-1677589452/kenney_interface-sounds.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/interface-sounds/d23a84242e-1677589452/kenney_interface-sounds.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/interface-sounds/f00aa25562-1677589445/preview_interface.png"
     },
     {
       "id": "kenney/impact-sounds",
@@ -337,7 +722,8 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/impact-sounds",
-      "download_url": "https://kenney.nl/media/pages/assets/impact-sounds/8aa7b545c9-1677589768/kenney_impact-sounds.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/impact-sounds/8aa7b545c9-1677589768/kenney_impact-sounds.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/impact-sounds/be93a2a5d7-1677589720/audio_impact.png"
     },
     {
       "id": "kenney/sci-fi-sounds",
@@ -358,7 +744,94 @@
       ],
       "approx_assets": 40,
       "official_page": "https://kenney.nl/assets/sci-fi-sounds",
-      "download_url": "https://kenney.nl/media/pages/assets/sci-fi-sounds/e3af5f7ed7-1677589334/kenney_sci-fi-sounds.zip"
+      "download_url": "https://kenney.nl/media/pages/assets/sci-fi-sounds/e3af5f7ed7-1677589334/kenney_sci-fi-sounds.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/sci-fi-sounds/3198e7f901-1677589328/audiopreview_scifi.png"
+    },
+    {
+      "id": "kenney/rpg-audio",
+      "slug": "rpg-audio",
+      "name": "RPG Audio",
+      "description": "RPG-themed sound effects — sword clashes, spell casts, item pickups, footsteps.",
+      "asset_type": "audio_sfx",
+      "style": "natural",
+      "tags": [
+        "sfx",
+        "audio",
+        "rpg",
+        "fantasy",
+        "combat",
+        "magic",
+        "items",
+        "footsteps"
+      ],
+      "approx_assets": 50,
+      "official_page": "https://kenney.nl/assets/rpg-audio",
+      "download_url": "https://kenney.nl/media/pages/assets/rpg-audio/706161bc16-1677590336/kenney_rpg-audio.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/rpg-audio/6667ff35f6-1677590326/preview-4.png"
+    },
+    {
+      "id": "kenney/casino-audio",
+      "slug": "casino-audio",
+      "name": "Casino Audio",
+      "description": "Casino sound effects — coins, slots, chips, card flips. Useful for any economy/reward UX.",
+      "asset_type": "audio_sfx",
+      "style": "natural",
+      "tags": [
+        "sfx",
+        "audio",
+        "casino",
+        "coins",
+        "rewards",
+        "economy",
+        "ui"
+      ],
+      "approx_assets": 50,
+      "official_page": "https://kenney.nl/assets/casino-audio",
+      "download_url": "https://kenney.nl/media/pages/assets/casino-audio/f578a13f51-1721639069/kenney_casino-audio.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/casino-audio/6a91e7015d-1677590184/preview-2.png"
+    },
+    {
+      "id": "kenney/digital-audio",
+      "slug": "digital-audio",
+      "name": "Digital Audio",
+      "description": "Digital/electronic sound effects — computer beeps, terminal sounds, retro arcade hits.",
+      "asset_type": "audio_sfx",
+      "style": "synthetic",
+      "tags": [
+        "sfx",
+        "audio",
+        "digital",
+        "electronic",
+        "retro",
+        "arcade",
+        "computer",
+        "synthetic"
+      ],
+      "approx_assets": 60,
+      "official_page": "https://kenney.nl/assets/digital-audio",
+      "download_url": "https://kenney.nl/media/pages/assets/digital-audio/7492b26e77-1677590265/kenney_digital-audio.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/digital-audio/9259a924f6-1677590256/preview-3.png"
+    },
+    {
+      "id": "kenney/voiceover-pack",
+      "slug": "voiceover-pack",
+      "name": "Voiceover Pack",
+      "description": "Voiceover sound effects — narrator clips, character barks, status callouts.",
+      "asset_type": "audio_sfx",
+      "style": "natural",
+      "tags": [
+        "sfx",
+        "audio",
+        "voiceover",
+        "voice",
+        "narrator",
+        "barks",
+        "callouts"
+      ],
+      "approx_assets": 90,
+      "official_page": "https://kenney.nl/assets/voiceover-pack",
+      "download_url": "https://kenney.nl/media/pages/assets/voiceover-pack/4da09a643f-1677589897/kenney_voiceover-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/voiceover-pack/60ceeb004b-1677589880/preview-1.png"
     }
   ]
 }
