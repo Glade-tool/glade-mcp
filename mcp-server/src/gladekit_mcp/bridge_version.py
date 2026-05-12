@@ -32,7 +32,7 @@ from . import bridge
 # Bump in lockstep with unity-bridge/package.json. The OSS sync workflow tags
 # the public repo with v{MIN_BRIDGE_VERSION} so the upgrade instruction below
 # resolves to a real release.
-MIN_BRIDGE_VERSION = "0.5.2"
+MIN_BRIDGE_VERSION = "0.6.0"
 
 UPGRADE_INSTRUCTIONS = (
     f"Update via Unity → Window → Package Manager → GladeKit MCP Bridge → Update, "

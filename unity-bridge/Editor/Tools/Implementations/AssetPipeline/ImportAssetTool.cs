@@ -102,15 +102,15 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
                     "about asset_pipeline preprocessing?");
             }
 
-            if (!AssetPipelineGuard.IsResolvedUrlHostAllowed(candidateId, resolvedUrl))
+            string hostRejection = AssetPipelineGuard.DescribeUrlHostRejection(candidateId, resolvedUrl);
+            if (hostRejection != null)
             {
                 return ToolUtils.CreateErrorResponse(
-                    "Resolved URL host is not in the allowed-providers list for " +
-                    $"candidate {candidateId}. This means either (a) the URL was injected " +
-                    "by a client bypassing cloud / MCP preprocessing, or (b) the provider's " +
-                    "official download host has changed and the bridge allowlist in " +
-                    "AssetPipelineGuard.cs needs updating. The bridge will not download " +
-                    "from arbitrary hosts.");
+                    $"Bridge refused the download: {hostRejection}. " +
+                    "This means either (a) the URL was injected by a client bypassing cloud / MCP " +
+                    "preprocessing, or (b) the provider's official download host has changed and the " +
+                    "bridge allowlist in AssetPipelineGuard.cs needs updating. The bridge will not " +
+                    "download from arbitrary hosts.");
             }
 
             // ── Optional import overrides ────────────────────────────────────

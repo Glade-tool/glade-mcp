@@ -21,18 +21,51 @@ namespace GladeAgenticAI.Services
     {
         private const string PrefKey = "GladeAI.AssetPipelineEnabled";
 
-        // Provider → allowed download hostnames (matched case-insensitively).
-        // When a new provider is added to the cloud / MCP orchestrator, add its
-        // host(s) here too — the bridge refuses to download from any host not
-        // in this map even when _resolvedUrl arrives pre-filled. This is the
-        // defense against a client that bypasses cloud / MCP preprocessing and
-        // sends a forged URL directly to localhost:8765.
-        private static readonly Dictionary<string, HashSet<string>> _allowedHostsByProvider =
-            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
+        // Provider → allowed download hosts (exact matches + suffix matches).
+        // Exact matches are the safest tier — e.g. "kenney.nl" matches only
+        // that one host. Suffix matches like ".meshy.ai" trust the entire
+        // subdomain tree of a vendor we already trust at the apex; use them
+        // when the vendor rotates CDN hostnames between regions or releases.
+        // Defense in depth: even if the cloud preprocessor or a forged
+        // _resolvedUrl bypasses the upper layers, the bridge still refuses
+        // to download from anything not listed below.
+        private struct AllowedHosts
+        {
+            public HashSet<string> Exact;
+            public List<string> Suffixes; // each begins with '.', e.g. ".meshy.ai"
+        }
+
+        private static readonly Dictionary<string, AllowedHosts> _allowedHostsByProvider =
+            new Dictionary<string, AllowedHosts>(StringComparer.OrdinalIgnoreCase)
             {
                 {
                     "kenney",
-                    new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "kenney.nl", "www.kenney.nl" }
+                    new AllowedHosts
+                    {
+                        Exact = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "kenney.nl", "www.kenney.nl" },
+                        Suffixes = new List<string>(),
+                    }
+                },
+                {
+                    // Meshy generative 3D. The refined GLB URL is generated
+                    // server-side and may come from any of Meshy's CDN /
+                    // signed-URL hosts — which rotate between releases. We
+                    // trust the entire meshy.ai subdomain tree at the apex
+                    // (we already trust Meshy to generate our user's assets
+                    // with their API key); plus, signed download URLs are
+                    // commonly served from S3 / R2 endpoints owned by Meshy.
+                    "meshy",
+                    new AllowedHosts
+                    {
+                        Exact = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            "meshy.ai",
+                        },
+                        Suffixes = new List<string>
+                        {
+                            ".meshy.ai",
+                        },
+                    }
                 },
             };
 
@@ -70,22 +103,70 @@ namespace GladeAgenticAI.Services
         /// </summary>
         public static bool IsResolvedUrlHostAllowed(string candidateId, string resolvedUrl)
         {
-            if (string.IsNullOrEmpty(candidateId) || string.IsNullOrEmpty(resolvedUrl))
-                return false;
+            return DescribeUrlHostRejection(candidateId, resolvedUrl) == null;
+        }
+
+        /// <summary>
+        /// Returns null if the URL is allowed; otherwise returns a human-readable
+        /// description of why it was rejected (including the actual host so the
+        /// upstream error message can tell the user what to fix). This is the
+        /// authoritative check — <see cref="IsResolvedUrlHostAllowed"/> is a
+        /// thin convenience wrapper.
+        /// </summary>
+        public static string DescribeUrlHostRejection(string candidateId, string resolvedUrl)
+        {
+            if (string.IsNullOrEmpty(candidateId))
+                return "candidateId is empty";
+            if (string.IsNullOrEmpty(resolvedUrl))
+                return "resolvedUrl is empty";
 
             int slash = candidateId.IndexOf('/');
-            if (slash <= 0) return false;
+            if (slash <= 0)
+                return $"candidateId \"{candidateId}\" is missing a provider prefix";
             string provider = candidateId.Substring(0, slash);
 
-            if (!_allowedHostsByProvider.TryGetValue(provider, out var allowedHosts))
-                return false;
+            if (!_allowedHostsByProvider.TryGetValue(provider, out var allowed))
+                return $"provider \"{provider}\" is not in the allowlist (unknown provider)";
 
             if (!Uri.TryCreate(resolvedUrl, UriKind.Absolute, out var uri))
-                return false;
+                return $"resolvedUrl is not a valid absolute URL ({Truncate(resolvedUrl, 80)})";
             if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-                return false;
+                return $"resolvedUrl is not HTTPS (got scheme \"{uri.Scheme}\")";
 
-            return allowedHosts.Contains(uri.Host);
+            string host = uri.Host;
+            if (allowed.Exact != null && allowed.Exact.Contains(host))
+                return null;
+            if (allowed.Suffixes != null)
+            {
+                foreach (var suffix in allowed.Suffixes)
+                {
+                    if (host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                        return null;
+                }
+            }
+
+            string allowedDesc = DescribeAllowed(allowed);
+            return $"host \"{host}\" is not in the allowlist for provider \"{provider}\". Allowed: {allowedDesc}";
+        }
+
+        private static string DescribeAllowed(AllowedHosts allowed)
+        {
+            var parts = new List<string>();
+            if (allowed.Exact != null)
+            {
+                foreach (var h in allowed.Exact) parts.Add(h);
+            }
+            if (allowed.Suffixes != null)
+            {
+                foreach (var s in allowed.Suffixes) parts.Add("*" + s);
+            }
+            return parts.Count == 0 ? "(none)" : string.Join(", ", parts);
+        }
+
+        private static string Truncate(string s, int n)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            return s.Length <= n ? s : s.Substring(0, n) + "…";
         }
 
         /// <summary>
@@ -97,9 +178,12 @@ namespace GladeAgenticAI.Services
         public static IEnumerable<string> AllowedHostsForProvider(string provider)
         {
             if (string.IsNullOrEmpty(provider)) return Array.Empty<string>();
-            return _allowedHostsByProvider.TryGetValue(provider, out var hosts)
-                ? (IEnumerable<string>)hosts
-                : Array.Empty<string>();
+            if (!_allowedHostsByProvider.TryGetValue(provider, out var allowed))
+                return Array.Empty<string>();
+            var result = new List<string>();
+            if (allowed.Exact != null) result.AddRange(allowed.Exact);
+            if (allowed.Suffixes != null) foreach (var s in allowed.Suffixes) result.Add("*" + s);
+            return result;
         }
 
         private static string ToolUtilsErrorString(string message)

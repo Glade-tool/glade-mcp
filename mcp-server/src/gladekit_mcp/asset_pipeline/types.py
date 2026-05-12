@@ -29,6 +29,11 @@ class License(str, Enum):
     CC_BY = "CC-BY-4.0"
     CC_BY_SA = "CC-BY-SA-4.0"
     MIT = "MIT"
+    # User-owned generative output (Meshy etc.). MCP-side has no Meshy
+    # provider registered today — this entry exists for forward-compat with
+    # the cloud Proxy's asset_pipeline (the wire shape includes this license
+    # for assets generated in the Electron app).
+    MESHY_USER_OWNED = "MESHY-USER-OWNED"
     UNKNOWN = "UNKNOWN"
 
     @property
@@ -37,7 +42,13 @@ class License(str, Enum):
 
     @property
     def commercial_ok(self) -> bool:
-        return self in (License.CC0, License.CC_BY, License.CC_BY_SA, License.MIT)
+        return self in (
+            License.CC0,
+            License.CC_BY,
+            License.CC_BY_SA,
+            License.MIT,
+            License.MESHY_USER_OWNED,
+        )
 
 
 def _coerce_enum(value, enum_cls, field_name: str):
