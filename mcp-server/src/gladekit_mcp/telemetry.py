@@ -30,10 +30,9 @@ from typing import Any, Callable, Dict, Optional
 logger = logging.getLogger("gladekit-mcp")
 
 # ── Read-only tool catalog ────────────────────────────────────────────────────
-# Mirrors ``Proxy/app/core/constants.py::READ_ONLY_TOOLS``. Kept as a literal
-# set rather than derived from the schema so the classification stays stable
-# across schema refactors (renaming a tool's category should not silently
-# reclassify it as mutating).
+# Kept as a literal set rather than derived from the schema so the classification
+# stays stable across schema refactors (renaming a tool's category should not
+# silently reclassify it as mutating).
 READ_ONLY_TOOLS: frozenset[str] = frozenset(
     {
         # Asset / material queries

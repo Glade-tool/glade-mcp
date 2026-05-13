@@ -118,8 +118,7 @@ def test_env_var_blank_or_falsey_keeps_category(monkeypatch, val):
 
 
 def test_asset_pipeline_schemas_have_required_tools():
-    """The MCP-side schemas must expose the same three tools as the cloud
-    schemas so the MCP UX matches the Electron UX feature-for-feature."""
+    """The asset pipeline must expose the canonical three tools."""
     _reload_tools_pkg()
     from gladekit_mcp.tools.asset_pipeline import TOOLS
 

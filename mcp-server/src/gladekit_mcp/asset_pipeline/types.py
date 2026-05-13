@@ -29,10 +29,8 @@ class License(str, Enum):
     CC_BY = "CC-BY-4.0"
     CC_BY_SA = "CC-BY-SA-4.0"
     MIT = "MIT"
-    # User-owned generative output (Meshy etc.). MCP-side has no Meshy
-    # provider registered today — this entry exists for forward-compat with
-    # the cloud Proxy's asset_pipeline (the wire shape includes this license
-    # for assets generated in the Electron app).
+    # User-owned generative output (e.g. AI-generated 3D models). Reserved
+    # for future providers — no generative provider is registered today.
     MESHY_USER_OWNED = "MESHY-USER-OWNED"
     UNKNOWN = "UNKNOWN"
 

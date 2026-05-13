@@ -1,7 +1,9 @@
 """MCPEvalCase and MCPEvalResult — the core contracts of the MCP eval harness.
 
-Mirrors the Proxy eval's EvalCase/EvalResult pattern but adapted for the MCP
-protocol path: AI client → MCP server (stdio) → Unity bridge (HTTP).
+Test cases exercise the MCP protocol path: AI client → MCP server (stdio) →
+Unity bridge (HTTP). Each case declares a prompt and an assertion contract
+(required/forbidden tools, parameter checks); the harness runs it against
+a mock bridge and produces a pass/fail result.
 """
 
 from __future__ import annotations

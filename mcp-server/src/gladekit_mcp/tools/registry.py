@@ -226,8 +226,7 @@ def _handle_find_asset_locally(arguments: dict[str, Any]) -> str:
     """Run the bundled asset_pipeline orchestrator locally — no bridge call.
 
     The MCP server hosts its own copy of the Kenney catalog so search works
-    without a cloud round-trip. Identical orchestrator and ranking logic as
-    the Proxy backend.
+    without a network round-trip.
     """
     from ..asset_pipeline import AssetSpec
     from ..asset_pipeline import search as _asset_search

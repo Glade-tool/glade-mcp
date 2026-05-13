@@ -3,12 +3,11 @@ Bridge staleness warning for MCP server users.
 
 The MCP bridge (com.gladekit.mcp-bridge) is installed via UPM git URL. Unity
 caches it once on resolve and never refetches, so users drift backward over
-time as new bridge features ship. The Electron app handles this via an
-in-app banner; pure MCP users (Cursor, Claude Code, Windsurf) have no such UI.
+time as new bridge features ship.
 
-This module fills that gap. On startup and on first tool call, it pings the
-bridge's /api/health endpoint, reads the bridgeVersion field (added in
-bridge v0.4.0), and compares against MIN_BRIDGE_VERSION. When stale, it:
+On startup and on first tool call, this module pings the bridge's
+/api/health endpoint, reads the bridgeVersion field (added in bridge
+v0.4.0), and compares against MIN_BRIDGE_VERSION. When stale, it:
 
   1. Logs a warning to stderr (visible in the MCP debug pane of Cursor /
      Claude Code / Windsurf).
@@ -18,7 +17,7 @@ bridge v0.4.0), and compares against MIN_BRIDGE_VERSION. When stale, it:
 
 The prefix is suppressed after the first emission per process to avoid noise.
 A bridge older than v0.4.0 returns no bridgeVersion field; we treat that as
-stale by definition (anyone on <0.4.0 is missing the session-summary feature).
+stale by definition.
 """
 
 from __future__ import annotations

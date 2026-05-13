@@ -228,15 +228,9 @@ Exit code 1 on any failure, compatible with standard CI gates.
 
 ---
 
-## Relationship to Proxy eval
+## Scope
 
-| | Proxy eval | MCP eval |
-|--|-----------|----------|
-| **Tests** | Cloud backend agentic loop | MCP server + bridge dispatch |
-| **Client** | Simulates Electron app (WebSocket) | Calls MCP server API directly |
-| **AI loop** | Full AI reasoning (sends prompts to LLM) | Tool dispatch only (no LLM) |
-| **Bridge** | Mock tool results in-process | Mock HTTP server on localhost |
-| **Use case** | "Does the AI call the right tools?" | "Does the MCP→bridge path work?" |
-
-Both share the same assertion patterns (required/forbidden/param checks) and
-reporting format for consistency.
+This harness tests the MCP server + bridge dispatch path. It calls the MCP
+server API directly with a mock HTTP bridge — no live LLM is involved. The
+goal is to answer "does the MCP→bridge path work?" — schema validity, tool
+dispatch, argument shaping, and bridge contract conformance.

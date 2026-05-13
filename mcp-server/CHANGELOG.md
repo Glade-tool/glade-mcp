@@ -8,7 +8,7 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ### Fixed
 
-- **MCP-bundled Kenney catalog now ships with working download URLs.** v0.5.1 shipped a catalog with every `download_url` field set to `null`, so MCP `import_asset` calls failed for all 17 packs. The MCP-side catalog is now in lockstep with the cloud-proxy catalog (13 of 17 packs have resolved URLs; the remaining 4 are flagged for the next `scripts/build_kenney_index.py` refresh).
+- **Bundled Kenney catalog now ships with working download URLs.** v0.5.1 shipped a catalog with every `download_url` field set to `null`, so `import_asset` calls failed for all 17 packs. 13 of 17 packs now have resolved URLs; the remaining 4 are flagged for the next `scripts/build_kenney_index.py` refresh.
 - Corrected the catalog `notes` field that incorrectly described the runtime provider as scraping `official_page` at fetch time. The provider reads pre-baked `download_url` values from the catalog; the refresh script (`scripts/build_kenney_index.py`) is the only component that scrapes, and it runs at index-refresh time, not at request time.
 - `_reload_tools_pkg` test helper now also clears the cached `tools` attribute on the parent `gladekit_mcp` package, so the `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE` env-var toggle is actually re-read across test cases.
 
@@ -18,7 +18,7 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
   - `find_asset` — read-only search across asset providers. Returns ranked candidates with name, description, license, license summary, official page, approximate asset count, and a relevance score. Filterable by `asset_type` (`sprite_2d` / `model_3d` / `audio_sfx` / `audio_music` / `animation` / `ui_sprite`), free-text `style` (`pixel art`, `vector`, `low-poly`, `voxel`), explicit `tags`, and `license_constraint`. Runs entirely against the bundled Kenney catalog — works offline.
   - `import_asset` — downloads the resolved asset, extracts (zip) into `Assets/<targetPath>/`, configures Unity import settings for the asset type (`TextureImporter` for sprites with pixel-art-friendly defaults — Sprite mode, Point filter, Uncompressed; `ModelImporter` for 3D; `AudioImporter` for audio), and writes a `.gladekit-asset.json` sidecar with license metadata. Requires explicit `licenseAcknowledged: true`.
   - `list_imported_assets` — read-only audit. Walks `.gladekit-asset.json` sidecars under `Assets/`, returns license counts and attribution-required count. Supports `licenseFilter` to filter by a specific license. Useful before a commercial release.
-- **Bundled orchestrator (`gladekit_mcp.asset_pipeline/`).** Self-contained search and URL resolution — same orchestrator as the GladeKit cloud proxy, mirrored into the MCP package so the asset pipeline works without cloud reachability.
+- **Bundled orchestrator (`gladekit_mcp.asset_pipeline/`).** Self-contained search and URL resolution — the asset pipeline runs entirely inside the MCP server with no external service dependency.
 - **Two layers of toggle for studios with curated-asset workflows:**
   - **MCP server:** set `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE=1` in the server environment. The three tools are stripped from the tool list and dispatch refuses with a clear error.
   - **Unity bridge:** `EditorPrefs["GladeAI.AssetPipelineEnabled"]` (default `true`). Toggleable via `POST /api/settings { "assetPipelineEnabled": false }`. Enforced by `AssetPipelineGuard` on every asset-pipeline tool — defense-in-depth in case a misconfigured client makes it through.
@@ -55,7 +55,7 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ### Notes
 
-- `propose_fix` is intentionally NOT exposed via the MCP server. It is a cloud-side intercept used by the GladeKit desktop app's Live Loop runner; the bridge has no handler for it. External MCP clients should construct fix payloads themselves and dispatch via `apply_queued_fix` directly.
+- `propose_fix` is intentionally NOT exposed via the MCP server — the bridge has no handler for it. MCP clients should construct fix payloads themselves and dispatch via `apply_queued_fix` directly.
 
 ## [0.4.5] - 2026-05-03
 

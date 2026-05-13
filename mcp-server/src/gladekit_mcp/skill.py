@@ -35,7 +35,7 @@ _BEGINNER_THRESHOLD = 0.10
 # Minimum messages before we commit a skill level to disk
 _MIN_MESSAGES = 3
 
-# ── Vocabulary lists (mirrors GladeKit desktop app's SkillCalibrator) ────────
+# ── Vocabulary lists ─────────────────────────────────────────────────────────
 
 _EXPERT_TERMS: frozenset = frozenset(
     {

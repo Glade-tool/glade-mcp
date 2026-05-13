@@ -2,8 +2,8 @@
 Core MCP eval cases — tests the most common tool dispatch paths.
 
 These verify that tools are callable through the MCP server → bridge path
-and return valid results. Mirrors the Proxy eval's top20 suite but focused
-on the MCP protocol layer.
+and return valid results. Covers the everyday surface: GameObjects, scripts,
+components, materials, transforms.
 """
 
 from __future__ import annotations

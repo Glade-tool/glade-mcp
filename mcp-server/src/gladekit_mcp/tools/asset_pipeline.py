@@ -1,10 +1,9 @@
-"""Asset pipeline tool schemas (mirror of Proxy backend).
+"""Asset pipeline tool schemas.
 
 These schemas describe find_asset, import_asset, and list_imported_assets to
-MCP clients (Cursor, Claude Code, Windsurf). The MCP server intercepts
-find_asset and import_asset locally — the orchestrator + Kenney catalog are
-bundled in `gladekit_mcp.asset_pipeline` so MCP doesn't depend on the cloud
-proxy being reachable.
+MCP clients (Cursor, Claude Code, Windsurf). find_asset and import_asset are
+handled locally — the orchestrator and Kenney catalog are bundled in
+`gladekit_mcp.asset_pipeline`, so no external service is required.
 
 Toggle: set GLADEKIT_MCP_DISABLE_ASSET_PIPELINE=1 to suppress these tools
 entirely from the MCP tool list. Useful for studio projects that already

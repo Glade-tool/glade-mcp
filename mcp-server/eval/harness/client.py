@@ -29,7 +29,7 @@ def _compute_quality_score(
     case: MCPEvalCase,
     param_assertion_failures: list[str],
 ) -> int:
-    """Score 0-100 mirroring the Proxy eval's scoring model."""
+    """Score 0-100: full marks on pass, deductions for assertion failures."""
     if not passed:
         return 0
 
