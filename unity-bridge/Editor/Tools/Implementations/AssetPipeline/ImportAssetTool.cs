@@ -92,6 +92,16 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             string resolvedAttribution = TryGetString(args, "_resolvedAttribution");
             string archiveFormat = TryGetString(args, "_resolvedArchiveFormat");
             string fileExtension = TryGetString(args, "_resolvedFileExtension");
+            // Provider id ("meshy" | "kenney" | …) — drives provider-specific importer
+            // presets. Empty for legacy proxies that haven't been redeployed yet;
+            // ConfigureModelImporter then falls back to defaults (matches v0.2 behavior).
+            string resolvedProvider = TryGetString(args, "_resolvedProvider");
+            // Optional: JSON-encoded list of PBR texture URL sets. Populated for
+            // generative providers (Meshy) whose model file doesn't embed textures.
+            // Format: [{"base_color": "...", "metallic": "...", "normal": "...", "roughness": "..."}]
+            // (one entry per material). The bridge downloads each set into a
+            // Textures/ subfolder and binds the maps to the extracted URP material.
+            string resolvedTextureUrlsJson = TryGetString(args, "_resolvedTextureUrls");
 
             if (string.IsNullOrEmpty(resolvedUrl))
             {
@@ -160,13 +170,34 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             }
             SafeDelete(tempFile);
 
+            // ── Download external texture sidecars (Meshy etc.) ──────────────
+            // Generative providers ship the FBX and its textures separately.
+            // Pull them down BEFORE Refresh so Unity's first model import sees
+            // the textures sitting next to the FBX and resolves material refs.
+            // Per-texture failures are logged and skipped — a missing roughness
+            // map shouldn't block the whole import.
+            List<MeshyTexturePaths> meshyTextures = null;
+            if (!string.IsNullOrEmpty(resolvedTextureUrlsJson))
+            {
+                try
+                {
+                    meshyTextures = DownloadProviderTextures(
+                        candidateId, resolvedProvider, targetPath, resolvedTextureUrlsJson, importedFiles);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[GladeKit] Provider texture download partially failed: {e.Message}");
+                }
+            }
+
             // ── Refresh and configure import settings ────────────────────────
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
 
             int configuredCount = 0;
             try
             {
-                configuredCount = ConfigureImportSettings(importedFiles, assetType, importOptions);
+                configuredCount = ConfigureImportSettings(
+                    importedFiles, assetType, importOptions, resolvedProvider, meshyTextures);
             }
             catch (Exception e)
             {
@@ -315,7 +346,11 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
         // ── Type-specific import-settings configuration ──────────────────────
 
         private static int ConfigureImportSettings(
-            List<string> importedFiles, string assetType, Dictionary<string, object> options)
+            List<string> importedFiles,
+            string assetType,
+            Dictionary<string, object> options,
+            string provider,
+            List<MeshyTexturePaths> meshyTextures)
         {
             int configured = 0;
             switch (assetType)
@@ -333,7 +368,7 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
                     foreach (string p in importedFiles)
                     {
                         if (!IsModelFile(p)) continue;
-                        if (ConfigureModelImporter(p, options)) configured++;
+                        if (ConfigureModelImporter(p, options, provider, meshyTextures)) configured++;
                     }
                     break;
 
@@ -387,10 +422,38 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             return true;
         }
 
-        private static bool ConfigureModelImporter(string assetPath, Dictionary<string, object> options)
+        private static bool ConfigureModelImporter(
+            string assetPath,
+            Dictionary<string, object> options,
+            string provider,
+            List<MeshyTexturePaths> meshyTextures)
         {
             var importer = AssetImporter.GetAtPath(assetPath) as ModelImporter;
             if (importer == null) return false;
+
+            bool isMeshy = string.Equals(provider, "meshy", StringComparison.OrdinalIgnoreCase);
+
+            // ── Meshy provider preset ────────────────────────────────────────
+            // Why these defaults: Meshy exports models with a Y-up / +Y-forward
+            // convention that Unity stores as a +90° X rotation on the root node
+            // (model lies face-down without correction). bakeAxisConversion = true
+            // bakes that rotation into the mesh data so prefabs drop in upright.
+            // Materials are forced to External so we have editable .mat assets to
+            // rebind to the downloaded PBR textures — without this Unity creates
+            // read-only embedded materials we can't fix up.
+            if (isMeshy)
+            {
+                importer.bakeAxisConversion = true;
+                importer.useFileScale = true;
+                importer.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
+                // materialLocation is the documented path for emitting standalone
+                // .mat assets next to the FBX. Newer Unity versions surface
+                // SearchAndRemapMaterials as the modern equivalent; the property
+                // still works in Unity 6 and produces the same on-disk layout.
+                #pragma warning disable CS0618
+                importer.materialLocation = ModelImporterMaterialLocation.External;
+                #pragma warning restore CS0618
+            }
 
             if (options != null && options.TryGetValue("scaleFactor", out var sfObj))
             {
@@ -411,7 +474,224 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
 
             EditorUtility.SetDirty(importer);
             importer.SaveAndReimport();
+
+            // ── Post-import: bind Meshy textures to the extracted URP material ─
+            // This runs AFTER the first SaveAndReimport so Unity has already
+            // emitted the external .mat next to the FBX. Each step is wrapped
+            // independently so a missing roughness map still leaves base color
+            // + normal bound (the visual delta the user cares about most).
+            if (isMeshy && meshyTextures != null && meshyTextures.Count > 0)
+            {
+                try
+                {
+                    BindMeshyTexturesToExtractedMaterials(assetPath, meshyTextures);
+                }
+                catch (Exception bindErr)
+                {
+                    Debug.LogWarning($"[GladeKit] Meshy texture binding failed for {assetPath}: {bindErr.Message}");
+                }
+            }
+
             return true;
+        }
+
+        // ── Provider texture downloads + URP material binding ────────────────
+
+        /// <summary>
+        /// Local-disk paths for one PBR texture set after download. Any field
+        /// may be empty if Meshy didn't ship that map or the download failed —
+        /// the binding step checks each independently.
+        /// </summary>
+        private class MeshyTexturePaths
+        {
+            public string BaseColor;
+            public string Metallic;
+            public string Normal;
+            public string Roughness;
+        }
+
+        private static List<MeshyTexturePaths> DownloadProviderTextures(
+            string candidateId,
+            string provider,
+            string targetPath,
+            string texJson,
+            List<string> importedFiles)
+        {
+            var results = new List<MeshyTexturePaths>();
+            if (!string.Equals(provider, "meshy", StringComparison.OrdinalIgnoreCase))
+            {
+                // Future providers can plug in here. v0.2.1 only knows Meshy.
+                return results;
+            }
+
+            if (!ToolUtils.TryParseJsonArrayToList(texJson, out var entries) || entries == null)
+            {
+                Debug.LogWarning($"[GladeKit] _resolvedTextureUrls did not parse as a JSON array — skipping texture download");
+                return results;
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string texFolderRel = targetPath.TrimEnd('/') + "/Textures/";
+            string texFolderAbs = Path.Combine(projectRoot, texFolderRel.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(texFolderAbs);
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (!(entries[i] is Dictionary<string, object> entry)) continue;
+                var paths = new MeshyTexturePaths
+                {
+                    BaseColor = DownloadOneTexture(entry, "base_color", "baseColor", i, candidateId, texFolderRel, texFolderAbs, importedFiles),
+                    Metallic = DownloadOneTexture(entry, "metallic", "metallic", i, candidateId, texFolderRel, texFolderAbs, importedFiles),
+                    Normal = DownloadOneTexture(entry, "normal", "normal", i, candidateId, texFolderRel, texFolderAbs, importedFiles),
+                    Roughness = DownloadOneTexture(entry, "roughness", "roughness", i, candidateId, texFolderRel, texFolderAbs, importedFiles),
+                };
+                results.Add(paths);
+            }
+            return results;
+        }
+
+        private static string DownloadOneTexture(
+            Dictionary<string, object> entry,
+            string urlKey,
+            string nameSlug,
+            int matIndex,
+            string candidateId,
+            string texFolderRel,
+            string texFolderAbs,
+            List<string> importedFiles)
+        {
+            if (!entry.TryGetValue(urlKey, out var urlObj)) return null;
+            string url = urlObj?.ToString();
+            if (string.IsNullOrEmpty(url)) return null;
+
+            // Per-texture host check — same defense as the model URL.
+            string rejection = AssetPipelineGuard.DescribeUrlHostRejection(candidateId, url);
+            if (rejection != null)
+            {
+                Debug.LogWarning($"[GladeKit] Skipping texture {urlKey}: {rejection}");
+                return null;
+            }
+
+            // Canonical filename: meshy_baseColor.png or meshy_baseColor_1.png for
+            // multi-material PBR sets. Extension comes from the URL path; default
+            // to .png for Meshy which always serves PNGs.
+            string ext = TryGetUrlExtension(url) ?? ".png";
+            string suffix = matIndex == 0 ? "" : $"_{matIndex}";
+            string fileName = $"meshy_{nameSlug}{suffix}{ext}";
+            string absPath = Path.Combine(texFolderAbs, fileName);
+            string relPath = texFolderRel + fileName;
+
+            try
+            {
+                DownloadToFile(url, absPath);
+                importedFiles.Add(relPath);
+                return relPath;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[GladeKit] Texture download failed ({urlKey}): {e.Message}");
+                SafeDelete(absPath);
+                return null;
+            }
+        }
+
+        private static string TryGetUrlExtension(string url)
+        {
+            try
+            {
+                var uri = new Uri(url);
+                string ext = Path.GetExtension(uri.AbsolutePath);
+                if (string.IsNullOrEmpty(ext)) return null;
+                // Filter out anything that doesn't look like a real image extension —
+                // Meshy serves .png today, but if a CDN appends a signed-URL token
+                // that looks like an extension we don't want to use it as a filename.
+                ext = ext.ToLowerInvariant();
+                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga") return ext;
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void BindMeshyTexturesToExtractedMaterials(
+            string fbxAssetPath, List<MeshyTexturePaths> meshyTextures)
+        {
+            // The extracted materials live next to the FBX after import. Unity's
+            // default layout is `Assets/<dir>/Materials/<MatName>.mat`, but the
+            // FBX may put them right next to itself if "Materials" subfolder
+            // creation is off. Search both spots and bind any URP/Lit material
+            // we find using meshyTextures[0] (the first PBR set covers the
+            // common single-material case; multi-material variants are v0.2.2).
+            if (meshyTextures.Count == 0) return;
+            var pbr = meshyTextures[0];
+            string fbxDir = Path.GetDirectoryName(fbxAssetPath)?.Replace('\\', '/');
+            if (string.IsNullOrEmpty(fbxDir)) return;
+
+            var searchDirs = new List<string> { fbxDir + "/Materials", fbxDir };
+            var matPaths = new List<string>();
+            foreach (var dir in searchDirs)
+            {
+                string[] guids = AssetDatabase.FindAssets("t:Material", new[] { dir });
+                foreach (var guid in guids)
+                {
+                    string p = AssetDatabase.GUIDToAssetPath(guid);
+                    if (!matPaths.Contains(p)) matPaths.Add(p);
+                }
+            }
+            if (matPaths.Count == 0)
+            {
+                Debug.LogWarning($"[GladeKit] No extracted material found near {fbxAssetPath} to bind Meshy textures.");
+                return;
+            }
+
+            // Fix the normal texture's import type BEFORE assigning it — Unity
+            // refuses to render a non-NormalMap texture in the _BumpMap slot
+            // correctly. Other maps stay as default RGB.
+            if (!string.IsNullOrEmpty(pbr.Normal))
+            {
+                var normTexImporter = AssetImporter.GetAtPath(pbr.Normal) as TextureImporter;
+                if (normTexImporter != null && normTexImporter.textureType != TextureImporterType.NormalMap)
+                {
+                    normTexImporter.textureType = TextureImporterType.NormalMap;
+                    EditorUtility.SetDirty(normTexImporter);
+                    normTexImporter.SaveAndReimport();
+                }
+            }
+
+            foreach (var matPath in matPaths)
+            {
+                var material = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+                if (material == null) continue;
+
+                // Force URP/Lit on the extracted material so the _BaseMap /
+                // _BumpMap properties exist regardless of what shader the FBX
+                // referenced. Skip silently if the URP shader isn't available
+                // (Built-in pipeline projects keep the FBX's default Standard).
+                Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
+                if (urpLit != null && material.shader != urpLit)
+                {
+                    material.shader = urpLit;
+                }
+
+                if (!string.IsNullOrEmpty(pbr.BaseColor))
+                {
+                    var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(pbr.BaseColor);
+                    if (tex != null && material.HasProperty("_BaseMap")) material.SetTexture("_BaseMap", tex);
+                }
+                if (!string.IsNullOrEmpty(pbr.Normal))
+                {
+                    var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(pbr.Normal);
+                    if (tex != null && material.HasProperty("_BumpMap"))
+                    {
+                        material.SetTexture("_BumpMap", tex);
+                        material.EnableKeyword("_NORMALMAP");
+                    }
+                }
+                EditorUtility.SetDirty(material);
+            }
+            AssetDatabase.SaveAssets();
         }
 
         private static bool ConfigureAudioImporter(string assetPath, Dictionary<string, object> options)
