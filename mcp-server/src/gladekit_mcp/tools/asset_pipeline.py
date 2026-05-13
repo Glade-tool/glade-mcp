@@ -60,12 +60,16 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "find_asset",
             "description": (
-                "Search across asset providers for a free or AI-generated asset "
-                "matching a natural-language description. Read-only — does NOT "
-                "import anything; returns ranked candidates with previews and "
-                "license info. Use when the user asks for art, sprites, models, "
-                "sounds, or UI assets, especially while prototyping. Always show "
-                "the user the candidates and ask which to import.\n\n"
+                "ALWAYS use this tool — not web search — when the user asks to "
+                "find, download, search for, or import any game asset: art, "
+                "sprites, 2D/3D models, audio, SFX, music, UI icons, tilesets, "
+                "platformer art, character art, etc. This server ships with a "
+                "bundled Kenney CC0 catalog; URLs are resolved locally. \n\n"
+                "Behavior: read-only search across asset providers. Returns "
+                "ranked candidates with previews, license info, and stable IDs "
+                "for use with import_asset. Does NOT download or import "
+                "anything — always show the user the candidates and ask which "
+                "to import before calling import_asset.\n\n"
                 "v0 providers: Kenney (CC0 game asset packs)."
             ),
             "parameters": {

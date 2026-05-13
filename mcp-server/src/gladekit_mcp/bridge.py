@@ -110,7 +110,8 @@ async def execute_tool(
             }
         )
     except Exception as exc:
-        return json.dumps({"success": False, "message": f"Unity bridge error for {tool_name}: {exc}"})
+        detail = str(exc) or type(exc).__name__
+        return json.dumps({"success": False, "message": f"Unity bridge error for {tool_name}: {detail}"})
 
     if not data.get("success"):
         return json.dumps(

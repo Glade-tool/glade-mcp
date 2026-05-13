@@ -4,6 +4,18 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-05-13
+
+### Fixed
+
+- **Semantic search no longer crashes the server on a broken install env.** `numpy` and `openai` are now lazy-imported inside `search.py` instead of at module load. If either is missing (e.g. a `uv tool install` whose env was never refreshed after a dependency was added, or a platform where numpy fails to build), the MCP server still starts — semantic search auto-disables with a clear stderr warning instead of taking the whole server down with `ModuleNotFoundError: No module named 'numpy'`.
+- **`import_asset` no longer surfaces a false "import failed" error on multi-MB Kenney packs.** The default 30s HTTP timeout was too short for download + extract + per-file Unity importer config + `AssetDatabase.Refresh()`. A per-tool override in the dispatcher now gives `import_asset` 300s, which matches the actual work it does. Previously, the MCP client would time out and report failure even when the Unity bridge eventually completed the import successfully.
+- **Bridge HTTP errors with empty `__str__` now surface the exception class name.** `httpx.ReadTimeout` and `httpx.ConnectError` sometimes raise without a message string, which produced `"Unity bridge error for import_asset: "` with an empty tail. The bridge dispatcher now falls back to the exception type name (`"Unity bridge error for import_asset: ReadTimeout"`) so failures are self-diagnosing.
+
+### Changed
+
+- Tightened the `find_asset` tool description so LLM clients route asset-discovery requests to the bundled CC0 catalog instead of defaulting to web search. No behavioral or schema change — description-only.
+
 ## [0.5.2] - 2026-05-10
 
 ### Fixed

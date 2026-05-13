@@ -19,9 +19,6 @@ import logging
 import os
 from typing import Any
 
-import numpy as _np
-import openai as _openai_module
-
 logger = logging.getLogger("gladekit-mcp")
 
 _EMBEDDING_MODEL = "text-embedding-3-small"
@@ -34,6 +31,39 @@ _embedding_cache: dict[str, list[float]] = {}
 # Shared AsyncOpenAI client — avoids TLS handshake per embed call.
 _openai_client: Any = None
 
+# Lazy-loaded module handles. numpy and openai are declared dependencies, but
+# we import them on first use so a missing/broken install (e.g. numpy failed to
+# build on an unusual platform, or the tool env is stale) only disables
+# semantic search instead of crashing the whole MCP server at import time.
+_np: Any = None
+_openai_module: Any = None
+_lazy_import_error: str | None = None
+
+
+def _ensure_imports() -> bool:
+    """Lazy-import numpy and openai. Returns True on success, False otherwise.
+    Caches the failure reason on _lazy_import_error so callers can log once."""
+    global _np, _openai_module, _lazy_import_error
+    if _np is not None and _openai_module is not None:
+        return True
+    if _lazy_import_error is not None:
+        return False
+    try:
+        import numpy as np_mod
+        import openai as openai_mod
+    except ImportError as exc:
+        _lazy_import_error = str(exc)
+        logger.warning(
+            "Semantic search disabled — optional dependency missing: %s. "
+            "Reinstall with: uv tool install --reinstall gladekit-mcp "
+            "(or pip install --upgrade gladekit-mcp).",
+            exc,
+        )
+        return False
+    _np = np_mod
+    _openai_module = openai_mod
+    return True
+
 
 def _get_openai_client():
     global _openai_client
@@ -43,8 +73,11 @@ def _get_openai_client():
 
 
 def is_available() -> bool:
-    """Return True if semantic search is enabled (OPENAI_API_KEY is set)."""
-    return bool(os.environ.get("OPENAI_API_KEY"))
+    """Return True if semantic search is enabled (OPENAI_API_KEY is set and
+    the optional numpy + openai deps are importable)."""
+    if not os.environ.get("OPENAI_API_KEY"):
+        return False
+    return _ensure_imports()
 
 
 def _hash_content(text: str) -> str:
@@ -123,7 +156,7 @@ async def search_scripts(
         return scored[:top_n]
 
     except Exception as exc:
-        if isinstance(exc, _openai_module.RateLimitError):
+        if _openai_module is not None and isinstance(exc, _openai_module.RateLimitError):
             logger.warning(
                 "OpenAI rate limit hit during script embedding — falling back to "
                 "unranked results. Try again in a moment or reduce search frequency."

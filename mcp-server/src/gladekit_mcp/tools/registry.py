@@ -256,6 +256,15 @@ _CLOUD_INJECTED_ARG_KEYS = frozenset(
 )
 
 
+# Per-tool HTTP timeout overrides (seconds). Tools that do network I/O or
+# heavy Unity work (multi-MB downloads, full-pack imports + AssetDatabase
+# refresh) need longer than the default 30s, otherwise the MCP client times
+# out and surfaces a failure even when the bridge eventually completes.
+_PER_TOOL_TIMEOUTS: dict[str, float] = {
+    "import_asset": 300.0,  # download + extract + per-file Unity importer config
+}
+
+
 def _preprocess_import_asset_args(arguments: dict[str, Any]) -> dict[str, Any] | str:
     """Inject the resolved download URL + license into args for the bridge.
 
@@ -342,7 +351,11 @@ async def dispatch_tool_call(name: str, arguments: dict[str, Any]) -> str:
         )
 
     try:
-        result = await bridge.execute_tool(name, sanitize_args(arguments))
+        timeout = _PER_TOOL_TIMEOUTS.get(name)
+        if timeout is not None:
+            result = await bridge.execute_tool(name, sanitize_args(arguments), timeout=timeout)
+        else:
+            result = await bridge.execute_tool(name, sanitize_args(arguments))
         return result
     except Exception as exc:
         logger.error(f"Tool execution error for {name}: {exc}")
