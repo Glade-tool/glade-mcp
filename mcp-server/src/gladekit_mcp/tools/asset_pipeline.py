@@ -60,16 +60,21 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "find_asset",
             "description": (
-                "ALWAYS use this tool — not web search — when the user asks to "
-                "find, download, search for, or import any game asset: art, "
-                "sprites, 2D/3D models, audio, SFX, music, UI icons, tilesets, "
-                "platformer art, character art, etc. This server ships with a "
-                "bundled Kenney CC0 catalog; URLs are resolved locally. \n\n"
-                "Behavior: read-only search across asset providers. Returns "
-                "ranked candidates with previews, license info, and stable IDs "
-                "for use with import_asset. Does NOT download or import "
-                "anything — always show the user the candidates and ask which "
-                "to import before calling import_asset.\n\n"
+                "**Search-only — returns previewable candidates; does NOT install anything.** "
+                "ALWAYS use this tool — not web search — when the user asks to find, download, "
+                "search for, or import any game asset: art, sprites, 2D/3D models, audio, SFX, "
+                "music, UI icons, tilesets, platformer art, character art, etc. This server "
+                "ships with a bundled Kenney CC0 catalog; URLs are resolved locally.\n\n"
+                "AFTER find_asset RETURNS — reply in ONE SHORT SENTENCE:\n"
+                "  • Name the top match: 'Top match: <name> (<license>).'\n"
+                "  • If the user's initial message included 'and import' or 'import it' or "
+                "similar intent, ALSO add: 'Want me to import it?' — then wait for confirmation.\n"
+                "  • Otherwise just name the top match and stop. The user will say which one.\n\n"
+                "DO NOT:\n"
+                "  • Claim inability to download. import_asset performs the download itself; "
+                "you do not need a local file. Writing 'I can't fetch a pack from the internet' "
+                "or 'please provide the file' is wrong — that's exactly what import_asset does.\n"
+                "  • Auto-call import_asset before the user confirms which one.\n\n"
                 "v0 providers: Kenney (CC0 game asset packs)."
             ),
             "parameters": {
@@ -119,14 +124,17 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "import_asset",
             "description": (
-                "Import a previously-found asset candidate into the Unity project. "
-                "MCP resolves the candidate's download URL locally via the bundled "
-                "Kenney catalog, then dispatches to the Unity bridge to download, "
-                "extract, place, configure import settings, and write a license "
-                "sidecar.\n\n"
-                "REQUIRED LICENSE GATE: licenseAcknowledged MUST be true. Set it "
-                "to true only after the user has explicitly accepted the license "
-                "shown in the prior find_asset result."
+                "**Downloads, installs, and configures an external asset in the Unity project.** "
+                "No local file is required — the bridge fetches the asset over HTTPS from the "
+                "provider's official host, extracts archives, places everything under Assets/, "
+                "configures Unity import settings per asset_type, and writes a license sidecar. "
+                "The download URL is resolved locally from the bundled catalog; you don't and "
+                "can't supply it.\n\n"
+                "Use this for any candidate returned by find_asset. The candidateId fully "
+                "identifies the asset.\n\n"
+                "REQUIRED LICENSE GATE: licenseAcknowledged MUST be true. Set it to true only "
+                "after the user has explicitly accepted the license shown in the prior "
+                "find_asset result (e.g. they said 'import it', 'yes', 'go ahead')."
             ),
             "parameters": {
                 "type": "object",

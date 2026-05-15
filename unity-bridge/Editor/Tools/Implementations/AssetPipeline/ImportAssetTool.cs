@@ -212,6 +212,7 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
                 resolvedAttribution,
                 resolvedUrl,
                 assetType,
+                fileExtension,
                 importedFiles);
 
             AssetDatabase.Refresh();
@@ -721,6 +722,38 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
 
         // ── Sidecar metadata ─────────────────────────────────────────────────
 
+        // Schema v2 (2026-05-14): adds texture_files, material_files,
+        // provider_metadata. v1 readers can ignore the new fields — JSON
+        // is forward-compat by convention. Bumped version so future migrations
+        // have an explicit anchor.
+        private const int SidecarSchemaVersion = 2;
+
+        [Serializable]
+        private class AssetSidecarData
+        {
+            public int schema_version = SidecarSchemaVersion;
+            public string candidate_id = "";
+            public string provider = "";
+            public string license = "";
+            public string attribution_text = "";
+            public string source_url = "";
+            public string imported_at = "";
+            public string asset_type = "";
+            public string target_path = "";
+            public List<string> imported_files = new List<string>();
+            public List<string> texture_files = new List<string>();
+            public List<string> material_files = new List<string>();
+            public AssetSidecarProviderMetadata provider_metadata = new AssetSidecarProviderMetadata();
+        }
+
+        [Serializable]
+        private class AssetSidecarProviderMetadata
+        {
+            // Meshy-only — empty for static-catalog providers (Kenney).
+            public string refined_task_id = "";
+            public string model_format = "";
+        }
+
         private static string WriteSidecar(
             string targetPath,
             string candidateId,
@@ -728,35 +761,71 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             string attribution,
             string sourceUrl,
             string assetType,
+            string fileExtension,
             List<string> importedFiles)
         {
             string sidecarRel = targetPath.TrimEnd('/') + "/.gladekit-asset.json";
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string sidecarAbs = Path.Combine(projectRoot, sidecarRel.Replace('/', Path.DirectorySeparatorChar));
 
-            var sb = new StringBuilder();
-            sb.Append("{\n");
-            sb.Append("  \"schema_version\": 1,\n");
-            sb.Append($"  \"candidate_id\": \"{ToolUtils.EscapeJsonString(candidateId)}\",\n");
-            sb.Append($"  \"provider\": \"{ToolUtils.EscapeJsonString(ProviderFromCandidate(candidateId))}\",\n");
-            sb.Append($"  \"license\": \"{ToolUtils.EscapeJsonString(license ?? "UNKNOWN")}\",\n");
-            sb.Append($"  \"attribution_text\": \"{ToolUtils.EscapeJsonString(attribution ?? "")}\",\n");
-            sb.Append($"  \"source_url\": \"{ToolUtils.EscapeJsonString(sourceUrl ?? "")}\",\n");
-            sb.Append($"  \"imported_at\": \"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}\",\n");
-            sb.Append($"  \"asset_type\": \"{ToolUtils.EscapeJsonString(assetType ?? "")}\",\n");
-            sb.Append($"  \"target_path\": \"{ToolUtils.EscapeJsonString(targetPath)}\",\n");
-            sb.Append("  \"imported_files\": [");
-            for (int i = 0; i < importedFiles.Count; i++)
+            string provider = ProviderFromCandidate(candidateId);
+            var data = new AssetSidecarData
             {
-                if (i > 0) sb.Append(",");
-                sb.Append($"\n    \"{ToolUtils.EscapeJsonString(importedFiles[i])}\"");
+                candidate_id = candidateId ?? "",
+                provider = provider,
+                license = license ?? "UNKNOWN",
+                attribution_text = attribution ?? "",
+                source_url = sourceUrl ?? "",
+                imported_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                asset_type = assetType ?? "",
+                target_path = targetPath ?? "",
+                imported_files = importedFiles ?? new List<string>(),
+            };
+
+            // Partition the imported file list into texture / material / other
+            // so an auditor can see at a glance which files are PBR sidecars
+            // vs the primary asset. Kenney imports leave texture_files /
+            // material_files empty (the .zip contents are the imported_files);
+            // Meshy populates both because we downloaded textures separately
+            // and Unity extracted .mat assets next to the FBX.
+            foreach (string path in data.imported_files)
+            {
+                if (IsTextureFile(path)) data.texture_files.Add(path);
+                else if (IsMaterialFile(path)) data.material_files.Add(path);
             }
-            sb.Append("\n  ]\n");
-            sb.Append("}\n");
+
+            if (string.Equals(provider, "meshy", StringComparison.OrdinalIgnoreCase))
+            {
+                // Candidate id format: "meshy/<refined_task_id>"
+                int slash = (candidateId ?? "").IndexOf('/');
+                data.provider_metadata.refined_task_id = slash > 0
+                    ? candidateId.Substring(slash + 1)
+                    : "";
+                data.provider_metadata.model_format = (fileExtension ?? "").TrimStart('.');
+            }
+
+            // JsonUtility handles all string escaping (quotes, backslashes,
+            // unicode, control chars) — same serializer Unity uses internally
+            // for ScriptableObjects. Replaces the hand-rolled StringBuilder
+            // approach that silently corrupted on a candidate name containing
+            // a literal '"'.
+            string json = JsonUtility.ToJson(data, prettyPrint: true);
 
             Directory.CreateDirectory(Path.GetDirectoryName(sidecarAbs));
-            File.WriteAllText(sidecarAbs, sb.ToString(), Encoding.UTF8);
+            File.WriteAllText(sidecarAbs, json, Encoding.UTF8);
             return sidecarRel;
+        }
+
+        private static bool IsTextureFile(string p)
+        {
+            string ext = Path.GetExtension(p).ToLowerInvariant();
+            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
+                   ext == ".tga" || ext == ".tiff" || ext == ".bmp";
+        }
+
+        private static bool IsMaterialFile(string p)
+        {
+            return Path.GetExtension(p).Equals(".mat", StringComparison.OrdinalIgnoreCase);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────
