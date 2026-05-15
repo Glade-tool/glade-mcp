@@ -707,27 +707,39 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
         }
 
         /// <summary>
-        /// Flatten the per-material PBR texture entries into a linear queue.
-        /// Filters out empty URLs and rejects any URL that fails the bridge's
-        /// host allowlist BEFORE any network work happens.
+        /// Pure-data shape used by <see cref="EnumerateAllowedMeshyTextureUrls"/>.
+        /// Tests assert against this. No file paths — keeps the function
+        /// testable in NUnit without touching disk.
         /// </summary>
-        private static List<MeshyTextureJob> BuildMeshyTextureQueue(
-            string candidateId, string provider, string targetPath, string texJson)
+        internal struct MeshyTextureUrl
         {
-            var jobs = new List<MeshyTextureJob>();
+            public int MatIndex;
+            public string UrlKey;    // base_color | metallic | normal | roughness
+            public string NameSlug;  // baseColor | metallic | normal | roughness
+            public string Url;
+        }
+
+        /// <summary>
+        /// Walk the JSON-encoded PBR texture list, apply the bridge's host
+        /// allowlist to every URL, and return the URLs that survive in
+        /// material-index order. Internal so NUnit Edit Mode tests can reach
+        /// it via InternalsVisibleTo — the regression this exists to catch
+        /// (a Meshy CDN host rotation silently dropping every texture with
+        /// only a Debug.LogWarning) is a silent-failure path: the model would
+        /// import looking gray, with no exception or error envelope to flag.
+        /// </summary>
+        internal static List<MeshyTextureUrl> EnumerateAllowedMeshyTextureUrls(
+            string candidateId, string provider, string texJson)
+        {
+            var urls = new List<MeshyTextureUrl>();
             if (!string.Equals(provider, "meshy", StringComparison.OrdinalIgnoreCase))
-                return jobs; // Future providers plug in here. v0.2.1 only knows Meshy.
+                return urls; // Future providers plug in here. v0.2.1 only knows Meshy.
 
             if (!ToolUtils.TryParseJsonArrayToList(texJson, out var entries) || entries == null)
             {
                 Debug.LogWarning("[GladeKit] _resolvedTextureUrls did not parse as a JSON array — skipping texture download");
-                return jobs;
+                return urls;
             }
-
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            string texFolderRel = targetPath.TrimEnd('/') + "/Textures/";
-            string texFolderAbs = Path.Combine(projectRoot, texFolderRel.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(texFolderAbs);
 
             var spec = new (string urlKey, string nameSlug)[]
             {
@@ -752,23 +764,54 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
                         Debug.LogWarning($"[GladeKit] Skipping texture {urlKey}: {rejection}");
                         continue;
                     }
-
-                    // Canonical filename: meshy_baseColor.png or meshy_baseColor_1.png for
-                    // multi-material PBR sets. Extension comes from the URL path; default
-                    // to .png for Meshy which always serves PNGs.
-                    string ext = TryGetUrlExtension(url) ?? ".png";
-                    string suffix = i == 0 ? "" : $"_{i}";
-                    string fileName = $"meshy_{nameSlug}{suffix}{ext}";
-                    jobs.Add(new MeshyTextureJob
+                    urls.Add(new MeshyTextureUrl
                     {
                         MatIndex = i,
                         UrlKey = urlKey,
                         NameSlug = nameSlug,
                         Url = url,
-                        AbsPath = Path.Combine(texFolderAbs, fileName),
-                        RelPath = texFolderRel + fileName,
                     });
                 }
+            }
+            return urls;
+        }
+
+        /// <summary>
+        /// Flatten the per-material PBR texture entries into a linear queue.
+        /// Filters out empty URLs and rejects any URL that fails the bridge's
+        /// host allowlist BEFORE any network work happens — that filtering
+        /// lives in <see cref="EnumerateAllowedMeshyTextureUrls"/> so it can
+        /// be unit-tested without filesystem side effects.
+        /// </summary>
+        private static List<MeshyTextureJob> BuildMeshyTextureQueue(
+            string candidateId, string provider, string targetPath, string texJson)
+        {
+            var allowed = EnumerateAllowedMeshyTextureUrls(candidateId, provider, texJson);
+            var jobs = new List<MeshyTextureJob>();
+            if (allowed.Count == 0) return jobs;
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string texFolderRel = targetPath.TrimEnd('/') + "/Textures/";
+            string texFolderAbs = Path.Combine(projectRoot, texFolderRel.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(texFolderAbs);
+
+            foreach (var u in allowed)
+            {
+                // Canonical filename: meshy_baseColor.png or meshy_baseColor_1.png for
+                // multi-material PBR sets. Extension comes from the URL path; default
+                // to .png for Meshy which always serves PNGs.
+                string ext = TryGetUrlExtension(u.Url) ?? ".png";
+                string suffix = u.MatIndex == 0 ? "" : $"_{u.MatIndex}";
+                string fileName = $"meshy_{u.NameSlug}{suffix}{ext}";
+                jobs.Add(new MeshyTextureJob
+                {
+                    MatIndex = u.MatIndex,
+                    UrlKey = u.UrlKey,
+                    NameSlug = u.NameSlug,
+                    Url = u.Url,
+                    AbsPath = Path.Combine(texFolderAbs, fileName),
+                    RelPath = texFolderRel + fileName,
+                });
             }
             return jobs;
         }
