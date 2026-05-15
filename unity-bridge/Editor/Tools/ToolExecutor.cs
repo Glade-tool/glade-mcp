@@ -85,5 +85,57 @@ namespace GladeAgenticAI.Services
                 return ToolUtils.CreateErrorResponse($"Execution failed: {e.Message}");
             }
         }
+
+        /// <summary>
+        /// Try to begin an async tool invocation. Returns a populated
+        /// <see cref="AsyncBeginResult"/> if the resolved tool implements
+        /// <see cref="IAsyncTool"/>; returns null if the tool isn't async or
+        /// doesn't exist (caller should fall through to <see cref="ExecuteTool"/>
+        /// for the sync path).
+        ///
+        /// <para>
+        /// Demo-path rejection and arg parsing happen here exactly as in
+        /// <see cref="ExecuteTool"/> — when a demo path is blocked, the
+        /// returned result has <c>Handle</c> = null and <c>ImmediateResult</c>
+        /// populated with the same error envelope sync callers would see.
+        /// This keeps the security gate in one place.
+        /// </para>
+        /// </summary>
+        public static AsyncBeginResult TryBeginAsync(string toolName, string argumentsJson)
+        {
+            EnsureRegistry();
+            var tool = _registry.GetTool(toolName);
+            if (!(tool is IAsyncTool asyncTool)) return null;
+
+            try
+            {
+                var args = ToolUtils.ParseJsonToDict(argumentsJson);
+                var demoErr = RejectIfAnyArgPathIsDemoDisallowed(args);
+                if (demoErr != null) return new AsyncBeginResult { ImmediateResult = demoErr };
+
+                var handle = asyncTool.BeginExecute(args);
+                return new AsyncBeginResult { Handle = handle };
+            }
+            catch (Exception e)
+            {
+                return new AsyncBeginResult
+                {
+                    ImmediateResult = ToolUtils.CreateErrorResponse($"Execution failed: {e.Message}")
+                };
+            }
+        }
+
+        public sealed class AsyncBeginResult
+        {
+            /// <summary>Non-null when the tool started async work; bridge should poll.</summary>
+            public IAsyncToolHandle Handle;
+
+            /// <summary>
+            /// Non-null when validation rejected the call before async work began
+            /// (demo-path block, arg parse failure). Bridge should send this as
+            /// the response immediately, no polling needed.
+            /// </summary>
+            public string ImmediateResult;
+        }
     }
 }

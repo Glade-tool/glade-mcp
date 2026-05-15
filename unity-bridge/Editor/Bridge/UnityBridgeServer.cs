@@ -42,6 +42,32 @@ namespace GladeAgenticAI.Bridge
         private static int _toolCallCount = 0;
         private static string _lastToolCalled = null;
 
+        // ── Async tool dispatch ──────────────────────────────────────────────
+        //
+        // Tools that implement IAsyncTool yield back to the Editor between
+        // phases (typically across network waits). For those, HandleToolExecute
+        // calls BeginExecute, parks the HttpListenerContext + handle in
+        // _pendingAsync, and returns from ProcessRequests so the Editor can
+        // paint. Each subsequent EditorApplication.update tick re-enters
+        // PollPendingAsync, which calls Handle.PollResult() on every pending
+        // call — when one returns non-null, the response is sent and the
+        // pending entry is removed.
+        //
+        // 300s deadline parallels the MCP-side per-tool HTTP timeout for
+        // import_asset (mcp-server/src/gladekit_mcp/registry.py). Anything
+        // longer is dead inventory — the upstream caller has already given up.
+        private const double AsyncToolDeadlineSeconds = 300.0;
+
+        private sealed class PendingAsyncCall
+        {
+            public HttpListenerContext Context;
+            public IAsyncToolHandle Handle;
+            public string ToolName;
+            public DateTime Deadline;
+        }
+
+        private static readonly List<PendingAsyncCall> _pendingAsync = new List<PendingAsyncCall>();
+
         /// <summary>Whether the bridge HTTP server is currently running.</summary>
         public static bool IsRunning => _isRunning;
 
@@ -115,6 +141,15 @@ namespace GladeAgenticAI.Bridge
             _listener?.Close();
             _listener = null;
 
+            // Drop any in-flight async tool handles. Don't try to send a
+            // graceful error to the client — at this point we may be in
+            // shutdown / domain-reload territory and the listener is gone.
+            foreach (var pending in _pendingAsync)
+            {
+                try { pending.Handle.Dispose(); } catch { /* ignore */ }
+            }
+            _pendingAsync.Clear();
+
             Debug.Log("[UnityBridge] Server stopped");
         }
 
@@ -182,18 +217,88 @@ namespace GladeAgenticAI.Bridge
             List<HttpListenerContext> toProcess = null;
             lock (_requestQueue)
             {
-                if (_requestQueue.Count == 0)
-                    return;
-                toProcess = new List<HttpListenerContext>(_requestQueue.Count);
-                while (_requestQueue.Count > 0)
+                if (_requestQueue.Count > 0)
                 {
-                    toProcess.Add(_requestQueue.Dequeue());
+                    toProcess = new List<HttpListenerContext>(_requestQueue.Count);
+                    while (_requestQueue.Count > 0)
+                    {
+                        toProcess.Add(_requestQueue.Dequeue());
+                    }
                 }
             }
 
-            foreach (var context in toProcess)
+            if (toProcess != null)
             {
-                HandleRequest(context);
+                foreach (var context in toProcess)
+                {
+                    HandleRequest(context);
+                }
+            }
+
+            // Drain completed async tool calls. Runs every tick — cheap when
+            // _pendingAsync is empty (the common case).
+            PollPendingAsync();
+        }
+
+        /// <summary>
+        /// One pass over pending IAsyncTool handles. Sends the response for
+        /// any that completed (or timed out) and removes them from the list.
+        /// Called from <see cref="ProcessRequests"/> on the Unity main thread.
+        /// </summary>
+        private static void PollPendingAsync()
+        {
+            if (_pendingAsync.Count == 0) return;
+
+            // Iterate backwards so in-place removal is safe.
+            for (int i = _pendingAsync.Count - 1; i >= 0; i--)
+            {
+                var pending = _pendingAsync[i];
+                string result = null;
+                bool deadlineHit = DateTime.UtcNow > pending.Deadline;
+
+                try
+                {
+                    result = deadlineHit
+                        ? ToolUtils.CreateErrorResponse(
+                            $"Tool {pending.ToolName} exceeded async deadline of {AsyncToolDeadlineSeconds:F0}s")
+                        : pending.Handle.PollResult();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[UnityBridge] Async tool '{pending.ToolName}' threw during poll: {e}");
+                    result = ToolUtils.CreateErrorResponse($"Async tool '{pending.ToolName}' faulted: {e.Message}");
+                }
+
+                if (result == null) continue; // still working
+
+                try { pending.Handle.Dispose(); } catch { /* best-effort cleanup */ }
+
+                _toolCallCount++;
+                _lastToolCalled = pending.ToolName;
+                // SessionTracker uses the original args; we don't have them here
+                // (parsed inside ToolExecutor.TryBeginAsync). Recording the result
+                // without args is still useful for the activity feed.
+                SessionTracker.Record(pending.ToolName, "{}", result);
+
+                var toolResponse = new ToolExecuteResponse
+                {
+                    success = true,
+                    result = result,
+                    requiresCompilation = ToolRequiresCompilation(pending.ToolName),
+                    compilationCount = ToolRequiresCompilation(pending.ToolName) ? _compilationCount : -1,
+                    error = null,
+                };
+
+                try
+                {
+                    SendJson(pending.Context.Response, toolResponse);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[UnityBridge] Failed to send async tool response for '{pending.ToolName}': {e.Message}");
+                }
+
+                _pendingAsync.RemoveAt(i);
             }
         }
 
@@ -498,7 +603,47 @@ namespace GladeAgenticAI.Bridge
                     return;
                 }
 
-                // Execute the tool
+                // ── Async dispatch path ──────────────────────────────────
+                // Tools implementing IAsyncTool yield back to the Editor's
+                // update loop between phases — typically across a network
+                // wait. The response is sent later by PollPendingAsync once
+                // the handle reports completion. Returning here keeps the
+                // HttpListenerContext alive (HttpListener doesn't close the
+                // connection until response.Close() is called).
+                var asyncBegin = ToolExecutor.TryBeginAsync(request.toolName, request.arguments);
+                if (asyncBegin != null)
+                {
+                    if (asyncBegin.ImmediateResult != null)
+                    {
+                        // Validation rejected before any async work began —
+                        // record + send synchronously, same shape as the sync
+                        // path below.
+                        _toolCallCount++;
+                        _lastToolCalled = request.toolName;
+                        SessionTracker.Record(request.toolName, request.arguments, asyncBegin.ImmediateResult);
+                        var rejectedResponse = new ToolExecuteResponse
+                        {
+                            success = true,
+                            result = asyncBegin.ImmediateResult,
+                            requiresCompilation = false,
+                            compilationCount = -1,
+                            error = null,
+                        };
+                        SendJson(context.Response, rejectedResponse);
+                        return;
+                    }
+
+                    _pendingAsync.Add(new PendingAsyncCall
+                    {
+                        Context = context,
+                        Handle = asyncBegin.Handle,
+                        ToolName = request.toolName,
+                        Deadline = DateTime.UtcNow.AddSeconds(AsyncToolDeadlineSeconds),
+                    });
+                    return;
+                }
+
+                // ── Sync dispatch path (unchanged) ───────────────────────
                 string result = ToolExecutor.ExecuteTool(request.toolName, request.arguments);
                 _toolCallCount++;
                 _lastToolCalled = request.toolName;

@@ -7,84 +7,122 @@ using System.Text;
 using System.Threading;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Networking;
+using GladeAgenticAI.Core.Tools;
 using GladeAgenticAI.Services;
 
 namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
 {
     /// <summary>
-    /// Downloads an external asset (resolved cloud-side), places it under
+    /// Downloads an external asset (URL resolved by an upstream
+    /// <c>asset_pipeline</c> preprocessor), places it under
     /// <c>Assets/&lt;targetPath&gt;/</c>, configures Unity import settings for the
     /// asset type, and writes a <c>.gladekit-asset.json</c> sidecar with license
     /// + attribution metadata for later audit.
     ///
-    /// Args (cloud-injected unless marked LLM):
-    ///   candidateId         (LLM)     stable id from find_asset, e.g. "kenney/tiny-town"
-    ///   targetPath          (LLM)     destination folder under Assets/, e.g. "Assets/Sprites/tiny-town/"
-    ///   licenseAcknowledged (LLM)     must be true; license gate
-    ///   _resolvedUrl        (cloud)   direct download URL (LLM never sees this)
-    ///   _resolvedLicense    (cloud)   normalized license code, e.g. "CC0-1.0"
-    ///   _resolvedAttribution(cloud)   attribution string (recorded in sidecar)
-    ///   _resolvedArchiveFormat (cloud) "zip" | null  (only zip supported in v0)
-    ///   _resolvedFileExtension (cloud) for single-file: ".png" / ".wav" / ".fbx"
-    ///   assetType           (LLM)     one of sprite_2d, model_3d, audio_sfx, ui_sprite, audio_music
-    ///   importOptions       (LLM)     optional asset-type-specific overrides
+    /// Args (preprocessor-injected unless marked LLM):
+    ///   candidateId         (LLM)          stable id from find_asset, e.g. "kenney/tiny-town"
+    ///   targetPath          (LLM)          destination folder under Assets/, e.g. "Assets/Sprites/tiny-town/"
+    ///   licenseAcknowledged (LLM)          must be true; license gate
+    ///   _resolvedUrl        (preprocessor) direct download URL (LLM never sees this)
+    ///   _resolvedLicense    (preprocessor) normalized license code, e.g. "CC0-1.0"
+    ///   _resolvedAttribution(preprocessor) attribution string (recorded in sidecar)
+    ///   _resolvedArchiveFormat (preprocessor) "zip" | null  (only zip supported in v0)
+    ///   _resolvedFileExtension (preprocessor) for single-file: ".png" / ".wav" / ".fbx"
+    ///   assetType           (LLM)          one of sprite_2d, model_3d, audio_sfx, ui_sprite, audio_music
+    ///   importOptions       (LLM)          optional asset-type-specific overrides
     ///
-    /// Security — the underscore-prefixed fields MUST be set by the cloud
-    /// (or MCP) preprocessor, not by the LLM. The cloud schema for import_asset
-    /// does not document them. Three defense layers guard the download:
-    ///   1. Cloud/MCP preprocessors strip caller-supplied underscore-prefixed
-    ///      fields before resolving against the trusted catalog.
+    /// Security — the underscore-prefixed fields MUST be set by the
+    /// asset_pipeline preprocessor on the calling client, not by the LLM.
+    /// The tool schema exposed to the model does not document them. Three
+    /// defense layers guard the download:
+    ///   1. The client-side preprocessor strips any caller-supplied
+    ///      underscore-prefixed fields before resolving against the trusted
+    ///      catalog.
     ///   2. The bridge refuses calls with an empty _resolvedUrl (preprocessor
     ///      didn't run).
     ///   3. The bridge validates _resolvedUrl's host against
     ///      AssetPipelineGuard.IsResolvedUrlHostAllowed for the candidate's
-    ///      provider prefix — so even a client bypassing both preprocessors
+    ///      provider prefix — so even a client bypassing its own preprocessor
     ///      can't smuggle in an arbitrary download URL.
     /// </summary>
-    public class ImportAssetTool : ITool
+    public class ImportAssetTool : IAsyncTool
     {
         public string Name => "import_asset";
 
-        // 60s timeout matches the cloud-side budget for a single tool round-trip.
-        // Most Kenney packs are 1-15MB and download in <5s on broadband.
+        // 60s timeout matches the typical per-tool HTTP budget for an MCP
+        // client round-trip. Most Kenney packs are 1-15MB and download in
+        // <5s on broadband.
         private const int DownloadTimeoutSeconds = 60;
 
         // Cap to avoid a runaway download claiming gigabytes of disk before we notice.
         // Largest legitimate Kenney pack is ~120MB (full 3D voxel sets); cap at 250MB.
         private const long MaxDownloadBytes = 250L * 1024L * 1024L;
 
+        /// <summary>
+        /// Sync fallback for callers that bypass the async dispatch path
+        /// (notably <c>batch_execute</c>). Runs the same state machine but
+        /// polls in a tight loop — the Editor freezes for the duration, same
+        /// as the legacy implementation. Single-call dispatch via
+        /// <c>HandleToolExecute</c> takes the async path through
+        /// <see cref="BeginExecute"/> and the Editor stays responsive.
+        /// </summary>
         public string Execute(Dictionary<string, object> args)
         {
+            var handle = BeginExecute(args);
+            try
+            {
+                while (true)
+                {
+                    string result = handle.PollResult();
+                    if (result != null) return result;
+                    Thread.Sleep(50);
+                }
+            }
+            finally
+            {
+                handle.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Validate args + preprocessor-injected fields synchronously, then
+        /// hand control to <see cref="ImportAssetHandle"/>. The bridge polls
+        /// the returned handle each <c>EditorApplication.update</c> tick so
+        /// the Editor pump runs between network polls — no Editor freeze.
+        /// Any validation failure short-circuits via a pre-completed handle
+        /// whose first <c>PollResult</c> returns the error envelope.
+        /// </summary>
+        public IAsyncToolHandle BeginExecute(Dictionary<string, object> args)
+        {
             string disabled = AssetPipelineGuard.RejectIfDisabled();
-            if (disabled != null) return disabled;
+            if (disabled != null) return ImportAssetHandle.Failed(disabled);
 
             if (args == null)
-                return ToolUtils.CreateErrorResponse("args required");
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse("args required"));
 
             // ── LLM-supplied fields ──────────────────────────────────────────
             string candidateId = TryGetString(args, "candidateId");
             if (string.IsNullOrEmpty(candidateId))
-                return ToolUtils.CreateErrorResponse("candidateId is required");
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse("candidateId is required"));
 
             bool licenseAck = ToolUtils.ParseBool(args.TryGetValue("licenseAcknowledged", out var lao) ? lao : null);
             if (!licenseAck)
             {
-                return ToolUtils.CreateErrorResponse(
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse(
                     "licenseAcknowledged must be true. The user must confirm they accept " +
-                    "the asset's license (shown in the find_asset preview) before import.");
+                    "the asset's license (shown in the find_asset preview) before import."));
             }
 
             string assetType = TryGetString(args, "assetType");
             if (string.IsNullOrEmpty(assetType))
-                return ToolUtils.CreateErrorResponse("assetType is required");
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse("assetType is required"));
 
             string targetPath = TryGetString(args, "targetPath");
             if (string.IsNullOrEmpty(targetPath))
                 targetPath = DefaultTargetPath(assetType, candidateId);
             targetPath = NormalizeTargetPath(targetPath);
             if (!targetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-                return ToolUtils.CreateErrorResponse("targetPath must start with 'Assets/'");
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse("targetPath must start with 'Assets/'"));
 
             // ── Cloud-injected fields ────────────────────────────────────────
             string resolvedUrl = TryGetString(args, "_resolvedUrl");
@@ -105,22 +143,25 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
 
             if (string.IsNullOrEmpty(resolvedUrl))
             {
-                return ToolUtils.CreateErrorResponse(
-                    "Resolved download URL missing — the cloud proxy did not preprocess " +
-                    "this import_asset call. Did you call find_asset first via the cloud, " +
-                    "or are you running the bridge against a stale proxy that doesn't know " +
-                    "about asset_pipeline preprocessing?");
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse(
+                    "Resolved download URL missing — the asset_pipeline preprocessor did " +
+                    "not run before this import_asset call reached the bridge. Either call " +
+                    "find_asset first (which produces the candidateId), or check that the " +
+                    "MCP server / client invoking the bridge supports asset_pipeline " +
+                    "preprocessing (com.gladekit.mcp-bridge requires a matching gladekit-mcp " +
+                    "version)."));
             }
 
             string hostRejection = AssetPipelineGuard.DescribeUrlHostRejection(candidateId, resolvedUrl);
             if (hostRejection != null)
             {
-                return ToolUtils.CreateErrorResponse(
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse(
                     $"Bridge refused the download: {hostRejection}. " +
-                    "This means either (a) the URL was injected by a client bypassing cloud / MCP " +
-                    "preprocessing, or (b) the provider's official download host has changed and the " +
-                    "bridge allowlist in AssetPipelineGuard.cs needs updating. The bridge will not " +
-                    "download from arbitrary hosts.");
+                    "This means either (a) the URL was injected by a client bypassing its " +
+                    "own asset_pipeline preprocessor, or (b) the provider's official " +
+                    "download host has changed and the bridge allowlist in " +
+                    "AssetPipelineGuard.cs needs updating. The bridge will not download " +
+                    "from arbitrary hosts."));
             }
 
             // ── Optional import overrides ────────────────────────────────────
@@ -135,159 +176,30 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             }
             catch (Exception e)
             {
-                return ToolUtils.CreateErrorResponse($"Failed to create target folder {targetPath}: {e.Message}");
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse(
+                    $"Failed to create target folder {targetPath}: {e.Message}"));
             }
 
-            // ── Download to a temp file ──────────────────────────────────────
             string tempFile = Path.Combine(
                 Path.GetTempPath(),
                 $"gladekit-asset-{Guid.NewGuid():N}{(archiveFormat == "zip" ? ".zip" : (fileExtension ?? ""))}");
 
-            long downloadedBytes;
-            try
-            {
-                downloadedBytes = DownloadToFile(resolvedUrl, tempFile);
-            }
-            catch (Exception e)
-            {
-                SafeDelete(tempFile);
-                return ToolUtils.CreateErrorResponse($"Download failed: {e.Message}");
-            }
-
-            // ── Extract / place ──────────────────────────────────────────────
-            List<string> importedFiles;
-            try
-            {
-                if (archiveFormat == "zip")
-                    importedFiles = ExtractZipToProject(tempFile, targetPath);
-                else
-                    importedFiles = PlaceSingleFileInProject(tempFile, targetPath, candidateId, fileExtension);
-            }
-            catch (Exception e)
-            {
-                SafeDelete(tempFile);
-                return ToolUtils.CreateErrorResponse($"Failed to install asset into project: {e.Message}");
-            }
-            SafeDelete(tempFile);
-
-            // ── Download external texture sidecars (Meshy etc.) ──────────────
-            // Generative providers ship the FBX and its textures separately.
-            // Pull them down BEFORE Refresh so Unity's first model import sees
-            // the textures sitting next to the FBX and resolves material refs.
-            // Per-texture failures are logged and skipped — a missing roughness
-            // map shouldn't block the whole import.
-            List<MeshyTexturePaths> meshyTextures = null;
-            if (!string.IsNullOrEmpty(resolvedTextureUrlsJson))
-            {
-                try
-                {
-                    meshyTextures = DownloadProviderTextures(
-                        candidateId, resolvedProvider, targetPath, resolvedTextureUrlsJson, importedFiles);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogWarning($"[GladeKit] Provider texture download partially failed: {e.Message}");
-                }
-            }
-
-            // ── Refresh and configure import settings ────────────────────────
-            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-
-            int configuredCount = 0;
-            try
-            {
-                configuredCount = ConfigureImportSettings(
-                    importedFiles, assetType, importOptions, resolvedProvider, meshyTextures);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[GladeKit] Asset import settings partially failed: {e.Message}");
-            }
-
-            // ── Write sidecar metadata ───────────────────────────────────────
-            string sidecarPath = WriteSidecar(
-                targetPath,
-                candidateId,
-                resolvedLicense,
-                resolvedAttribution,
-                resolvedUrl,
-                assetType,
-                fileExtension,
-                importedFiles);
-
-            AssetDatabase.Refresh();
-
-            var extras = new Dictionary<string, object>
-            {
-                { "candidateId", candidateId },
-                { "targetPath", targetPath },
-                { "license", resolvedLicense ?? "UNKNOWN" },
-                { "attribution", resolvedAttribution ?? "" },
-                { "downloadedBytes", downloadedBytes },
-                { "importedFileCount", importedFiles.Count },
-                { "importedFiles", importedFiles.Take(50).ToList() }, // cap to keep the response bounded
-                { "importedFilesTruncated", importedFiles.Count > 50 },
-                { "configuredImportSettings", configuredCount },
-                { "sidecarPath", sidecarPath },
-            };
-
-            return ToolUtils.CreateSuccessResponse(
-                $"Imported {importedFiles.Count} file(s) from {candidateId} to {targetPath}",
-                extras);
+            return new ImportAssetHandle(
+                candidateId: candidateId,
+                targetPath: targetPath,
+                assetType: assetType,
+                resolvedUrl: resolvedUrl,
+                resolvedLicense: resolvedLicense,
+                resolvedAttribution: resolvedAttribution,
+                archiveFormat: archiveFormat,
+                fileExtension: fileExtension,
+                resolvedProvider: resolvedProvider,
+                resolvedTextureUrlsJson: resolvedTextureUrlsJson,
+                importOptions: importOptions,
+                tempFile: tempFile);
         }
 
         // ── Download ─────────────────────────────────────────────────────────
-
-        private static long DownloadToFile(string url, string destPath)
-        {
-            // UnityWebRequest is the Unity-idiomatic, guaranteed-available HTTP
-            // client (no asmdef gymnastics for System.Net.Http). DownloadHandlerFile
-            // streams directly to disk so a large pack doesn't sit in RAM.
-            // Sync wait via tight isDone polling — the Editor freezes briefly.
-            // v1 should move to a coroutine + polling pattern so the UI stays live.
-            using (var request = UnityWebRequest.Get(url))
-            {
-                request.downloadHandler = new DownloadHandlerFile(destPath) { removeFileOnAbort = true };
-                request.timeout = DownloadTimeoutSeconds;
-
-                var op = request.SendWebRequest();
-                long deadline = Environment.TickCount + (DownloadTimeoutSeconds * 1000);
-                while (!op.isDone)
-                {
-                    if (Environment.TickCount > deadline)
-                    {
-                        request.Abort();
-                        throw new TimeoutException(
-                            $"Download exceeded {DownloadTimeoutSeconds}s timeout: {url}");
-                    }
-                    // Brief yield so the editor isn't 100% spinning.
-                    Thread.Sleep(50);
-                }
-
-#if UNITY_2020_2_OR_NEWER
-                if (request.result != UnityWebRequest.Result.Success)
-                {
-                    throw new InvalidOperationException(
-                        $"Download failed: {request.error} (response {request.responseCode})");
-                }
-#else
-                if (request.isHttpError || request.isNetworkError)
-                {
-                    throw new InvalidOperationException(
-                        $"Download failed: {request.error} (response {request.responseCode})");
-                }
-#endif
-
-                long size = new FileInfo(destPath).Length;
-                if (size > MaxDownloadBytes)
-                {
-                    SafeDelete(destPath);
-                    throw new InvalidOperationException(
-                        $"Download size {size} exceeds cap of {MaxDownloadBytes} bytes");
-                }
-                return size;
-            }
-        }
 
         // ── Extraction / placement ───────────────────────────────────────────
 
@@ -511,24 +423,305 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             public string Roughness;
         }
 
-        private static List<MeshyTexturePaths> DownloadProviderTextures(
-            string candidateId,
-            string provider,
-            string targetPath,
-            string texJson,
-            List<string> importedFiles)
+        /// <summary>
+        /// One texture-download work item produced by <see cref="BuildMeshyTextureQueue"/>.
+        /// Drained one-by-one by the state machine so each network wait yields
+        /// back to the Editor between polls.
+        /// </summary>
+        private class MeshyTextureJob
         {
-            var results = new List<MeshyTexturePaths>();
-            if (!string.Equals(provider, "meshy", StringComparison.OrdinalIgnoreCase))
+            public int MatIndex;
+            public string UrlKey;       // "base_color" | "metallic" | "normal" | "roughness"
+            public string NameSlug;     // "baseColor" | "metallic" | "normal" | "roughness"
+            public string Url;
+            public string AbsPath;
+            public string RelPath;
+        }
+
+        // ── Async state machine ──────────────────────────────────────────────
+
+        /// <summary>
+        /// State machine that runs the import asynchronously. Each
+        /// <see cref="PollResult"/> call advances at most one phase. Network
+        /// phases (model download, texture downloads) return null until the
+        /// underlying <see cref="EditorAsyncDownload"/> reports IsDone — so
+        /// the Editor's update loop keeps running between polls and the UI
+        /// stays responsive. Synchronous phases (extract zip, configure
+        /// importers, write sidecar) complete in one tick. Errors fold into
+        /// a sticky final envelope via <see cref="Failed"/>.
+        /// </summary>
+        private sealed class ImportAssetHandle : IAsyncToolHandle
+        {
+            private enum Stage
             {
-                // Future providers can plug in here. v0.2.1 only knows Meshy.
-                return results;
+                StartingDownload,
+                DownloadingModel,
+                ExtractingAndPlacing,
+                StartingTexture,
+                DownloadingTexture,
+                ImportingAndConfiguring,
+                WritingSidecar,
+                Done,
             }
+
+            // Inputs (constant after construction)
+            private readonly string _candidateId, _targetPath, _assetType, _resolvedUrl,
+                _resolvedLicense, _resolvedAttribution, _archiveFormat, _fileExtension,
+                _resolvedProvider, _resolvedTextureUrlsJson, _tempFile;
+            private readonly Dictionary<string, object> _importOptions;
+
+            // Running state
+            private Stage _stage = Stage.StartingDownload;
+            private string _finalResult; // sticky — once set, subsequent polls return this verbatim
+            private EditorAsyncDownload _modelDownload;
+            private long _modelDownloadedBytes;
+            private List<string> _importedFiles;
+            private List<MeshyTextureJob> _textureQueue;
+            private int _textureCursor;
+            private EditorAsyncDownload _currentTextureDownload;
+            private List<MeshyTexturePaths> _meshyTextures;
+            private int _configuredCount;
+            private string _sidecarPath;
+
+            public ImportAssetHandle(
+                string candidateId, string targetPath, string assetType, string resolvedUrl,
+                string resolvedLicense, string resolvedAttribution, string archiveFormat,
+                string fileExtension, string resolvedProvider, string resolvedTextureUrlsJson,
+                Dictionary<string, object> importOptions, string tempFile)
+            {
+                _candidateId = candidateId;
+                _targetPath = targetPath;
+                _assetType = assetType;
+                _resolvedUrl = resolvedUrl;
+                _resolvedLicense = resolvedLicense;
+                _resolvedAttribution = resolvedAttribution;
+                _archiveFormat = archiveFormat;
+                _fileExtension = fileExtension;
+                _resolvedProvider = resolvedProvider;
+                _resolvedTextureUrlsJson = resolvedTextureUrlsJson;
+                _importOptions = importOptions;
+                _tempFile = tempFile;
+            }
+
+            /// <summary>Pre-completed handle whose first poll returns the given error envelope.</summary>
+            public static ImportAssetHandle Failed(string errorEnvelope)
+            {
+                var h = new ImportAssetHandle(null, null, null, null, null, null, null, null, null, null, null, null);
+                h._finalResult = errorEnvelope;
+                h._stage = Stage.Done;
+                return h;
+            }
+
+            public string Phase
+            {
+                get
+                {
+                    switch (_stage)
+                    {
+                        case Stage.StartingDownload:
+                        case Stage.DownloadingModel: return "downloading";
+                        case Stage.ExtractingAndPlacing: return "extracting";
+                        case Stage.StartingTexture:
+                        case Stage.DownloadingTexture: return "downloading_textures";
+                        case Stage.ImportingAndConfiguring: return "importing";
+                        case Stage.WritingSidecar: return "writing_sidecar";
+                        case Stage.Done: return "done";
+                        default: return "unknown";
+                    }
+                }
+            }
+
+            public float? Progress
+            {
+                get
+                {
+                    if (_stage == Stage.DownloadingModel) return _modelDownload?.Progress;
+                    if (_stage == Stage.DownloadingTexture) return _currentTextureDownload?.Progress;
+                    return null;
+                }
+            }
+
+            public string PollResult()
+            {
+                if (_finalResult != null) return _finalResult;
+                try
+                {
+                    return Advance();
+                }
+                catch (Exception e)
+                {
+                    SafeDelete(_tempFile);
+                    return Fail($"Import failed: {e.Message}");
+                }
+            }
+
+            private string Advance()
+            {
+                switch (_stage)
+                {
+                    case Stage.StartingDownload:
+                        _modelDownload = new EditorAsyncDownload(_resolvedUrl, _tempFile, DownloadTimeoutSeconds, MaxDownloadBytes);
+                        _stage = Stage.DownloadingModel;
+                        return null;
+
+                    case Stage.DownloadingModel:
+                        if (!_modelDownload.IsDone) return null;
+                        string dlErr = _modelDownload.Error;
+                        if (dlErr != null)
+                        {
+                            _modelDownload.Dispose();
+                            _modelDownload = null;
+                            SafeDelete(_tempFile);
+                            return Fail($"Download failed: {dlErr}");
+                        }
+                        _modelDownloadedBytes = _modelDownload.FinalSize;
+                        _modelDownload.Dispose();
+                        _modelDownload = null;
+                        _stage = Stage.ExtractingAndPlacing;
+                        return null;
+
+                    case Stage.ExtractingAndPlacing:
+                        try
+                        {
+                            _importedFiles = _archiveFormat == "zip"
+                                ? ExtractZipToProject(_tempFile, _targetPath)
+                                : PlaceSingleFileInProject(_tempFile, _targetPath, _candidateId, _fileExtension);
+                        }
+                        catch (Exception e)
+                        {
+                            SafeDelete(_tempFile);
+                            return Fail($"Failed to install asset into project: {e.Message}");
+                        }
+                        SafeDelete(_tempFile);
+                        _meshyTextures = new List<MeshyTexturePaths>();
+                        if (!string.IsNullOrEmpty(_resolvedTextureUrlsJson))
+                        {
+                            try
+                            {
+                                _textureQueue = BuildMeshyTextureQueue(_candidateId, _resolvedProvider, _targetPath, _resolvedTextureUrlsJson);
+                            }
+                            catch (Exception e)
+                            {
+                                Debug.LogWarning($"[GladeKit] Provider texture queue build failed: {e.Message}");
+                                _textureQueue = null;
+                            }
+                        }
+                        _stage = Stage.StartingTexture;
+                        return null;
+
+                    case Stage.StartingTexture:
+                        if (_textureQueue == null || _textureCursor >= _textureQueue.Count)
+                        {
+                            _stage = Stage.ImportingAndConfiguring;
+                            return null;
+                        }
+                        var job = _textureQueue[_textureCursor];
+                        _currentTextureDownload = new EditorAsyncDownload(job.Url, job.AbsPath, DownloadTimeoutSeconds, MaxDownloadBytes);
+                        _stage = Stage.DownloadingTexture;
+                        return null;
+
+                    case Stage.DownloadingTexture:
+                        if (!_currentTextureDownload.IsDone) return null;
+                        var jobNow = _textureQueue[_textureCursor];
+                        string texErr = _currentTextureDownload.Error;
+                        _currentTextureDownload.Dispose();
+                        _currentTextureDownload = null;
+                        if (texErr != null)
+                        {
+                            // Per-texture failure: log + skip, don't abort the whole import.
+                            // A missing roughness map shouldn't kill a model that has base
+                            // color + normal — matches pre-state-machine behavior.
+                            Debug.LogWarning($"[GladeKit] Texture download failed ({jobNow.UrlKey}): {texErr}");
+                            SafeDelete(jobNow.AbsPath);
+                        }
+                        else
+                        {
+                            _importedFiles.Add(jobNow.RelPath);
+                            RecordTexturePath(_meshyTextures, jobNow.MatIndex, jobNow.UrlKey, jobNow.RelPath);
+                        }
+                        _textureCursor++;
+                        _stage = Stage.StartingTexture;
+                        return null;
+
+                    case Stage.ImportingAndConfiguring:
+                        AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                        try
+                        {
+                            _configuredCount = ConfigureImportSettings(
+                                _importedFiles, _assetType, _importOptions, _resolvedProvider, _meshyTextures);
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogWarning($"[GladeKit] Asset import settings partially failed: {e.Message}");
+                        }
+                        _stage = Stage.WritingSidecar;
+                        return null;
+
+                    case Stage.WritingSidecar:
+                        _sidecarPath = WriteSidecar(
+                            _targetPath, _candidateId, _resolvedLicense, _resolvedAttribution,
+                            _resolvedUrl, _assetType, _fileExtension, _importedFiles);
+                        AssetDatabase.Refresh();
+                        var extras = new Dictionary<string, object>
+                        {
+                            { "candidateId", _candidateId },
+                            { "targetPath", _targetPath },
+                            { "license", _resolvedLicense ?? "UNKNOWN" },
+                            { "attribution", _resolvedAttribution ?? "" },
+                            { "downloadedBytes", _modelDownloadedBytes },
+                            { "importedFileCount", _importedFiles.Count },
+                            { "importedFiles", _importedFiles.Take(50).ToList() },
+                            { "importedFilesTruncated", _importedFiles.Count > 50 },
+                            { "configuredImportSettings", _configuredCount },
+                            { "sidecarPath", _sidecarPath },
+                        };
+                        _finalResult = ToolUtils.CreateSuccessResponse(
+                            $"Imported {_importedFiles.Count} file(s) from {_candidateId} to {_targetPath}",
+                            extras);
+                        _stage = Stage.Done;
+                        return _finalResult;
+
+                    case Stage.Done:
+                        return _finalResult;
+
+                    default:
+                        return Fail("Unknown import stage");
+                }
+            }
+
+            private string Fail(string msg)
+            {
+                _finalResult = ToolUtils.CreateErrorResponse(msg);
+                _stage = Stage.Done;
+                return _finalResult;
+            }
+
+            public void Dispose()
+            {
+                try { _modelDownload?.Dispose(); } catch { /* ignore */ }
+                _modelDownload = null;
+                try { _currentTextureDownload?.Dispose(); } catch { /* ignore */ }
+                _currentTextureDownload = null;
+                SafeDelete(_tempFile);
+            }
+        }
+
+        /// <summary>
+        /// Flatten the per-material PBR texture entries into a linear queue.
+        /// Filters out empty URLs and rejects any URL that fails the bridge's
+        /// host allowlist BEFORE any network work happens.
+        /// </summary>
+        private static List<MeshyTextureJob> BuildMeshyTextureQueue(
+            string candidateId, string provider, string targetPath, string texJson)
+        {
+            var jobs = new List<MeshyTextureJob>();
+            if (!string.Equals(provider, "meshy", StringComparison.OrdinalIgnoreCase))
+                return jobs; // Future providers plug in here. v0.2.1 only knows Meshy.
 
             if (!ToolUtils.TryParseJsonArrayToList(texJson, out var entries) || entries == null)
             {
-                Debug.LogWarning($"[GladeKit] _resolvedTextureUrls did not parse as a JSON array — skipping texture download");
-                return results;
+                Debug.LogWarning("[GladeKit] _resolvedTextureUrls did not parse as a JSON array — skipping texture download");
+                return jobs;
             }
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
@@ -536,63 +729,68 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             string texFolderAbs = Path.Combine(projectRoot, texFolderRel.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(texFolderAbs);
 
+            var spec = new (string urlKey, string nameSlug)[]
+            {
+                ("base_color", "baseColor"),
+                ("metallic",   "metallic"),
+                ("normal",     "normal"),
+                ("roughness",  "roughness"),
+            };
+
             for (int i = 0; i < entries.Count; i++)
             {
                 if (!(entries[i] is Dictionary<string, object> entry)) continue;
-                var paths = new MeshyTexturePaths
+                foreach (var (urlKey, nameSlug) in spec)
                 {
-                    BaseColor = DownloadOneTexture(entry, "base_color", "baseColor", i, candidateId, texFolderRel, texFolderAbs, importedFiles),
-                    Metallic = DownloadOneTexture(entry, "metallic", "metallic", i, candidateId, texFolderRel, texFolderAbs, importedFiles),
-                    Normal = DownloadOneTexture(entry, "normal", "normal", i, candidateId, texFolderRel, texFolderAbs, importedFiles),
-                    Roughness = DownloadOneTexture(entry, "roughness", "roughness", i, candidateId, texFolderRel, texFolderAbs, importedFiles),
-                };
-                results.Add(paths);
+                    if (!entry.TryGetValue(urlKey, out var urlObj)) continue;
+                    string url = urlObj?.ToString();
+                    if (string.IsNullOrEmpty(url)) continue;
+
+                    string rejection = AssetPipelineGuard.DescribeUrlHostRejection(candidateId, url);
+                    if (rejection != null)
+                    {
+                        Debug.LogWarning($"[GladeKit] Skipping texture {urlKey}: {rejection}");
+                        continue;
+                    }
+
+                    // Canonical filename: meshy_baseColor.png or meshy_baseColor_1.png for
+                    // multi-material PBR sets. Extension comes from the URL path; default
+                    // to .png for Meshy which always serves PNGs.
+                    string ext = TryGetUrlExtension(url) ?? ".png";
+                    string suffix = i == 0 ? "" : $"_{i}";
+                    string fileName = $"meshy_{nameSlug}{suffix}{ext}";
+                    jobs.Add(new MeshyTextureJob
+                    {
+                        MatIndex = i,
+                        UrlKey = urlKey,
+                        NameSlug = nameSlug,
+                        Url = url,
+                        AbsPath = Path.Combine(texFolderAbs, fileName),
+                        RelPath = texFolderRel + fileName,
+                    });
+                }
             }
-            return results;
+            return jobs;
         }
 
-        private static string DownloadOneTexture(
-            Dictionary<string, object> entry,
-            string urlKey,
-            string nameSlug,
-            int matIndex,
-            string candidateId,
-            string texFolderRel,
-            string texFolderAbs,
-            List<string> importedFiles)
+        /// <summary>
+        /// Record a successfully-downloaded texture against its material's
+        /// <see cref="MeshyTexturePaths"/>, padding the list out to
+        /// <paramref name="matIndex"/> so material indices stay aligned with
+        /// the upstream entry order. Matches the per-material allocation
+        /// behavior of the pre-state-machine code.
+        /// </summary>
+        private static void RecordTexturePath(
+            List<MeshyTexturePaths> list, int matIndex, string urlKey, string relPath)
         {
-            if (!entry.TryGetValue(urlKey, out var urlObj)) return null;
-            string url = urlObj?.ToString();
-            if (string.IsNullOrEmpty(url)) return null;
-
-            // Per-texture host check — same defense as the model URL.
-            string rejection = AssetPipelineGuard.DescribeUrlHostRejection(candidateId, url);
-            if (rejection != null)
+            while (list.Count <= matIndex) list.Add(new MeshyTexturePaths());
+            var entry = list[matIndex];
+            switch (urlKey)
             {
-                Debug.LogWarning($"[GladeKit] Skipping texture {urlKey}: {rejection}");
-                return null;
-            }
-
-            // Canonical filename: meshy_baseColor.png or meshy_baseColor_1.png for
-            // multi-material PBR sets. Extension comes from the URL path; default
-            // to .png for Meshy which always serves PNGs.
-            string ext = TryGetUrlExtension(url) ?? ".png";
-            string suffix = matIndex == 0 ? "" : $"_{matIndex}";
-            string fileName = $"meshy_{nameSlug}{suffix}{ext}";
-            string absPath = Path.Combine(texFolderAbs, fileName);
-            string relPath = texFolderRel + fileName;
-
-            try
-            {
-                DownloadToFile(url, absPath);
-                importedFiles.Add(relPath);
-                return relPath;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[GladeKit] Texture download failed ({urlKey}): {e.Message}");
-                SafeDelete(absPath);
-                return null;
+                case "base_color": entry.BaseColor = relPath; break;
+                case "metallic":   entry.Metallic = relPath;  break;
+                case "normal":     entry.Normal = relPath;    break;
+                case "roughness":  entry.Roughness = relPath; break;
             }
         }
 

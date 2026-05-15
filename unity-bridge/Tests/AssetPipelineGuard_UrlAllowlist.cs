@@ -3,14 +3,14 @@ using GladeAgenticAI.Services;
 
 namespace GladeAgenticAI.Tests
 {
-    /// Bridge-side hardening: even when a client bypasses both the cloud and
-    /// MCP preprocessors and sends import_asset directly to localhost:8765
-    /// with a forged _resolvedUrl, the bridge must refuse to download from a
-    /// host that isn't in the per-provider allowlist.
+    /// Bridge-side hardening: even when a client bypasses its own
+    /// asset_pipeline preprocessor and sends import_asset directly to
+    /// localhost:8765 with a forged _resolvedUrl, the bridge must refuse to
+    /// download from a host that isn't in the per-provider allowlist.
     ///
-    /// The cloud and MCP preprocessors strip+overwrite _resolvedUrl already
-    /// (see Proxy/tests/test_asset_pipeline.py and mcp-server/tests/...). This
-    /// suite covers the *third* layer: AssetPipelineGuard.IsResolvedUrlHostAllowed.
+    /// Client-side preprocessors strip+overwrite _resolvedUrl already (the
+    /// MCP server's coverage lives in mcp-server/tests/). This suite covers
+    /// the *third* layer: AssetPipelineGuard.IsResolvedUrlHostAllowed.
     public class AssetPipelineGuard_UrlAllowlist
     {
         // ── Happy path ──────────────────────────────────────────────────────────
@@ -44,8 +44,9 @@ namespace GladeAgenticAI.Tests
         [Test]
         public void Rejects_ForgedEvilHost_OnKenneyCandidate()
         {
-            // Threat: client bypasses cloud/MCP, sends import_asset directly to
-            // the bridge with an arbitrary _resolvedUrl. Bridge must refuse.
+            // Threat: a client bypasses its own asset_pipeline preprocessor
+            // and sends import_asset directly to the bridge with an arbitrary
+            // _resolvedUrl. Bridge must refuse.
             Assert.IsFalse(AssetPipelineGuard.IsResolvedUrlHostAllowed(
                 "kenney/tiny-town",
                 "https://evil.example.com/malware.zip"));

@@ -10,9 +10,9 @@ namespace GladeAgenticAI.Services
     /// existing projects can turn it off so the agent never downloads external
     /// assets.
     ///
-    /// Defense in depth — even if the cloud sent a request despite the schemas
-    /// being filtered out, every asset-pipeline tool checks this guard and
-    /// returns a clear error when disabled.
+    /// Defense in depth — even if a client sent a request despite the schemas
+    /// being filtered out at the preprocessor layer, every asset-pipeline tool
+    /// checks this guard and returns a clear error when disabled.
     ///
     /// EditorPrefs key:  GladeAI.AssetPipelineEnabled (default true)
     /// HTTP toggle:      POST /api/settings { "assetPipelineEnabled": bool }
@@ -26,9 +26,9 @@ namespace GladeAgenticAI.Services
         // that one host. Suffix matches like ".meshy.ai" trust the entire
         // subdomain tree of a vendor we already trust at the apex; use them
         // when the vendor rotates CDN hostnames between regions or releases.
-        // Defense in depth: even if the cloud preprocessor or a forged
-        // _resolvedUrl bypasses the upper layers, the bridge still refuses
-        // to download from anything not listed below.
+        // Defense in depth: even if the client-side preprocessor is bypassed
+        // or a forged _resolvedUrl slips past the upper layers, the bridge
+        // still refuses to download from anything not listed below.
         private struct AllowedHosts
         {
             public HashSet<string> Exact;
@@ -96,10 +96,10 @@ namespace GladeAgenticAI.Services
         /// <summary>
         /// True iff <paramref name="resolvedUrl"/> is an https URL whose host is
         /// in the allowlist for the provider implied by <paramref name="candidateId"/>
-        /// (the prefix before the first '/'). The cloud and MCP preprocessors
-        /// resolve URLs from a trusted catalog; this is a third-layer check so
-        /// that even a client bypassing both preprocessors can't smuggle in an
-        /// arbitrary download URL.
+        /// (the prefix before the first '/'). The asset_pipeline preprocessor on
+        /// the calling client resolves URLs from a trusted catalog; this is a
+        /// third-layer check so that even a client bypassing its own
+        /// preprocessor can't smuggle in an arbitrary download URL.
         /// </summary>
         public static bool IsResolvedUrlHostAllowed(string candidateId, string resolvedUrl)
         {
