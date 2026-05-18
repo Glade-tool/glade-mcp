@@ -540,13 +540,13 @@ namespace GladeAgenticAI.Bridge
 
         /// <summary>
         /// Handle GET /api/async/progress — read-only snapshot of every
-        /// in-flight IAsyncTool call. Polled by the renderer at ~1Hz while
-        /// dispatching a long-running tool (most importantly import_asset)
-        /// so the user sees a live phase + percent strip instead of a silent
-        /// connection during a 120 MB download. The endpoint is intentionally
-        /// independent of the tool_call_id machinery: the renderer matches
-        /// by toolName + position, which is sufficient given the realistic
-        /// case is one import_asset in flight at a time.
+        /// in-flight IAsyncTool call. Intended to be polled at ~1Hz by a
+        /// client while dispatching a long-running tool (e.g. import_asset)
+        /// so the user sees a live phase + percent indicator rather than a
+        /// silent connection during a large download. The response is
+        /// independent of any per-call id: clients match entries by
+        /// toolName + position, which is sufficient given the typical case
+        /// is one async tool in flight at a time.
         /// </summary>
         private static void HandleAsyncProgress(HttpListenerContext context)
         {

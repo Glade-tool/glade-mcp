@@ -14,7 +14,7 @@ namespace GladeAgenticAI.Tests
     /// in the helper so it can be tested without spinning up an HttpListener
     /// or a real IAsyncTool implementation.
     ///
-    /// These tests pin the contract the renderer relies on:
+    /// These tests pin the contract that consumers of the endpoint rely on:
     ///   - `hasProgress = false` ⇒ progress sentinel value, never trusted as a real percent
     ///   - null Phase normalises to empty string (JsonUtility shape needs non-null)
     ///   - a misbehaving handle never aborts the whole snapshot
@@ -93,8 +93,9 @@ namespace GladeAgenticAI.Tests
         public void NullProgress_FlagsIndeterminateWithSentinel()
         {
             // Critical contract: when progress is unknown the bridge must
-            // signal it explicitly. Renderer treats `progress = -1` as a
-            // marquee bar — only safe because `hasProgress = false`.
+            // signal it explicitly. Clients treat `progress = -1` as a
+            // marquee/indeterminate state — only safe because
+            // `hasProgress = false`.
             var handle = new FakeHandle { PhaseValue = "extracting", ProgressValue = null };
             var entries = UnityBridgeServer.BuildAsyncProgressSnapshot(
                 One("import_asset", handle, DateTime.UtcNow),
@@ -121,7 +122,7 @@ namespace GladeAgenticAI.Tests
         [Test]
         public void PhaseGetterThrows_YieldsIndeterminateNotException()
         {
-            // The endpoint is a heartbeat — if it ever throws, the renderer's
+            // The endpoint is a heartbeat — if it ever throws, the client's
             // poll loop is what notices and goes silent. Tolerate misbehavior
             // by reporting indeterminate, not aborting.
             var handle = new FakeHandle { ThrowOnPhase = true, ProgressValue = 0.5f };
@@ -176,9 +177,9 @@ namespace GladeAgenticAI.Tests
         [Test]
         public void MultipleInFlight_PreservesOrder()
         {
-            // The renderer matches by toolName + position; order from the
-            // bridge must be insert-order so the first import_asset call
-            // resolves to the first card in the chat.
+            // Clients match by toolName + position, so the bridge must
+            // preserve insert-order — the first import_asset call must
+            // resolve to the first in-flight entry.
             var now = DateTime.UtcNow;
             var inputs = new List<(string, IAsyncToolHandle, DateTime)>
             {
@@ -198,9 +199,9 @@ namespace GladeAgenticAI.Tests
         public void ProgressClampNotEnforced_RawValuePassedThrough()
         {
             // Documenting intentional behavior: the bridge ships the raw
-            // float so the renderer can decide how to clamp (UI applies
-            // min/max in the bar width style). Don't change this without
-            // updating the renderer's clamp on the same commit.
+            // float so each client decides how to clamp (typically the
+            // UI applies min/max when computing bar width). Changing this
+            // to clamp server-side is a contract change for every client.
             var handle = new FakeHandle { PhaseValue = "downloading", ProgressValue = 1.42f };
             var entries = UnityBridgeServer.BuildAsyncProgressSnapshot(
                 One("import_asset", handle, DateTime.UtcNow),
@@ -225,7 +226,7 @@ namespace GladeAgenticAI.Tests
                 One("import_asset", new FakeHandle { PhaseValue = "x" }, future),
                 now);
 
-            // Document current behavior: negative is possible. Renderer
+            // Document current behavior: negative is possible. Clients
             // should treat this as ~0.
             Assert.That(entries[0].elapsedSeconds, Is.LessThanOrEqualTo(0f));
         }
