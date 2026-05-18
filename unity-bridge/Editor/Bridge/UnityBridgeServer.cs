@@ -64,6 +64,7 @@ namespace GladeAgenticAI.Bridge
             public IAsyncToolHandle Handle;
             public string ToolName;
             public DateTime Deadline;
+            public DateTime StartedAt;
         }
 
         private static readonly List<PendingAsyncCall> _pendingAsync = new List<PendingAsyncCall>();
@@ -401,6 +402,10 @@ namespace GladeAgenticAI.Bridge
                 {
                     HandleToolsList(context);
                 }
+                else if (path == "/api/async/progress" && method == "GET")
+                {
+                    HandleAsyncProgress(context);
+                }
                 else
                 {
                     SendError(response, 404, "Not Found");
@@ -534,6 +539,75 @@ namespace GladeAgenticAI.Bridge
         }
 
         /// <summary>
+        /// Handle GET /api/async/progress — read-only snapshot of every
+        /// in-flight IAsyncTool call. Polled by the renderer at ~1Hz while
+        /// dispatching a long-running tool (most importantly import_asset)
+        /// so the user sees a live phase + percent strip instead of a silent
+        /// connection during a 120 MB download. The endpoint is intentionally
+        /// independent of the tool_call_id machinery: the renderer matches
+        /// by toolName + position, which is sufficient given the realistic
+        /// case is one import_asset in flight at a time.
+        /// </summary>
+        private static void HandleAsyncProgress(HttpListenerContext context)
+        {
+            var now = DateTime.UtcNow;
+            var snapshots = new List<(string toolName, IAsyncToolHandle handle, DateTime startedAt)>(_pendingAsync.Count);
+            foreach (var pending in _pendingAsync)
+            {
+                snapshots.Add((pending.ToolName, pending.Handle, pending.StartedAt));
+            }
+            var entries = BuildAsyncProgressSnapshot(snapshots, now);
+            SendJson(context.Response, new AsyncProgressResponse { inFlight = entries });
+        }
+
+        /// <summary>
+        /// Pure-data shaper for the /api/async/progress response. Extracted
+        /// from the route handler so it can be unit-tested without spinning
+        /// up an HttpListener. Tolerant of misbehaving handles — any tool
+        /// whose Phase/Progress getter throws is reported with a sentinel
+        /// indeterminate entry rather than aborting the whole snapshot.
+        /// </summary>
+        internal static AsyncProgressEntry[] BuildAsyncProgressSnapshot(
+            IReadOnlyList<(string toolName, IAsyncToolHandle handle, DateTime startedAt)> snapshots,
+            DateTime now)
+        {
+            var entries = new AsyncProgressEntry[snapshots.Count];
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                var (toolName, handle, startedAt) = snapshots[i];
+                string phase = "";
+                float progress = -1f;
+                bool hasProgress = false;
+                try
+                {
+                    phase = handle?.Phase ?? "";
+                    var p = handle?.Progress;
+                    if (p.HasValue)
+                    {
+                        hasProgress = true;
+                        progress = p.Value;
+                    }
+                }
+                catch (Exception e)
+                {
+                    // Never let a misbehaving tool getter break the endpoint —
+                    // the whole point is to be a heartbeat while work is alive.
+                    Debug.LogWarning($"[UnityBridge] Async tool '{toolName}' threw during progress read: {e.Message}");
+                }
+
+                entries[i] = new AsyncProgressEntry
+                {
+                    toolName = toolName ?? "",
+                    phase = phase,
+                    progress = progress,
+                    hasProgress = hasProgress,
+                    elapsedSeconds = (float)(now - startedAt).TotalSeconds,
+                };
+            }
+            return entries;
+        }
+
+        /// <summary>
         /// Handle GET /api/tools/list
         /// </summary>
         private static void HandleToolsList(HttpListenerContext context)
@@ -633,12 +707,14 @@ namespace GladeAgenticAI.Bridge
                         return;
                     }
 
+                    var now = DateTime.UtcNow;
                     _pendingAsync.Add(new PendingAsyncCall
                     {
                         Context = context,
                         Handle = asyncBegin.Handle,
                         ToolName = request.toolName,
-                        Deadline = DateTime.UtcNow.AddSeconds(AsyncToolDeadlineSeconds),
+                        Deadline = now.AddSeconds(AsyncToolDeadlineSeconds),
+                        StartedAt = now,
                     });
                     return;
                 }
