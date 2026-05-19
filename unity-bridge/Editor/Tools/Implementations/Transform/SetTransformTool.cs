@@ -5,69 +5,83 @@ using GladeAgenticAI.Core.Tools;
 
 namespace GladeAgenticAI.Core.Tools.Implementations.Transform
 {
-    public class SetTransformTool : ITool
+    /// <summary>
+    /// Shared implementation for set_transform and set_local_transform. The two
+    /// tools differ only in whether they operate on world-space transform
+    /// properties (position/rotation) or local-space ones (localPosition/
+    /// localRotation). Scale is always local in Unity, so both share that path.
+    ///
+    /// Centralizing this logic eliminates the ~150 lines of near-duplicate code
+    /// that previously lived in SetTransformTool + SetLocalTransformTool. Bug
+    /// fixes to the operation dispatch ("set"/"add"/"multiply") now happen in
+    /// one place.
+    /// </summary>
+    internal static class TransformToolCore
     {
-        public string Name => "set_transform";
-
-        public string Execute(Dictionary<string, object> args)
+        public static string Execute(Dictionary<string, object> args, bool isLocal, string toolDisplay)
         {
-            string gameObjectPath = args.ContainsKey("gameObjectPath") ? args["gameObjectPath"]?.ToString() : "";
+            string gameObjectPath = ToolUtils.GetStringArg(args, "gameObjectPath");
             UnityEngine.GameObject obj = ToolUtils.FindGameObjectByPath(gameObjectPath);
             if (obj == null)
                 return ToolUtils.CreateErrorResponse($"GameObject '{gameObjectPath}' not found");
 
-            // Capture previous state BEFORE modification
-            var prevPos = obj.transform.position;
-            var prevRot = obj.transform.rotation.eulerAngles;
-            var prevScale = obj.transform.localScale;
+            UnityEngine.Transform t = obj.transform;
 
-            string operation = args.ContainsKey("operation") ? args["operation"]?.ToString() : "set";
+            // Capture previous state for revert
+            Vector3 prevPos = isLocal ? t.localPosition : t.position;
+            Vector3 prevRot = isLocal ? t.localRotation.eulerAngles : t.rotation.eulerAngles;
+            Vector3 prevScale = t.localScale;
 
-            if (args.ContainsKey("position"))
+            string operation = ToolUtils.GetStringArg(args, "operation", "set");
+
+            Undo.RecordObject(t, $"{toolDisplay}: {gameObjectPath}");
+
+            if (ToolUtils.HasArg(args, "position"))
             {
-                var pos = ToolUtils.ParseVector3(args["position"].ToString());
-                if (operation == "add")
-                    obj.transform.position += pos;
-                else if (operation == "multiply")
+                Vector3 pos = ToolUtils.ParseVector3(args["position"].ToString());
+                Vector3 current = isLocal ? t.localPosition : t.position;
+                Vector3 next = operation switch
                 {
-                    var current = obj.transform.position;
-                    obj.transform.position = new Vector3(current.x * pos.x, current.y * pos.y, current.z * pos.z);
-                }
-                else
-                    obj.transform.position = pos;
+                    "add" => current + pos,
+                    "multiply" => new Vector3(current.x * pos.x, current.y * pos.y, current.z * pos.z),
+                    _ => pos
+                };
+                if (isLocal) t.localPosition = next; else t.position = next;
             }
 
-            if (args.ContainsKey("rotation"))
+            if (ToolUtils.HasArg(args, "rotation"))
             {
-                var rot = ToolUtils.ParseVector3(args["rotation"].ToString());
-                var eulerRot = Quaternion.Euler(rot);
+                Vector3 rot = ToolUtils.ParseVector3(args["rotation"].ToString());
+                Quaternion eulerRot = Quaternion.Euler(rot);
                 if (operation == "add")
-                    obj.transform.rotation *= eulerRot;
+                {
+                    if (isLocal) t.localRotation *= eulerRot;
+                    else t.rotation *= eulerRot;
+                }
                 else if (operation == "multiply")
                 {
-                    var current = obj.transform.rotation.eulerAngles;
-                    var newRot = new Vector3(current.x * rot.x, current.y * rot.y, current.z * rot.z);
-                    obj.transform.rotation = Quaternion.Euler(newRot);
+                    Vector3 current = isLocal ? t.localRotation.eulerAngles : t.rotation.eulerAngles;
+                    Quaternion next = Quaternion.Euler(current.x * rot.x, current.y * rot.y, current.z * rot.z);
+                    if (isLocal) t.localRotation = next; else t.rotation = next;
                 }
                 else
-                    obj.transform.rotation = eulerRot;
-            }
-
-            if (args.ContainsKey("scale"))
-            {
-                var scale = ToolUtils.ParseVector3(args["scale"].ToString());
-                if (operation == "add")
-                    obj.transform.localScale += scale;
-                else if (operation == "multiply")
                 {
-                    var current = obj.transform.localScale;
-                    obj.transform.localScale = new Vector3(current.x * scale.x, current.y * scale.y, current.z * scale.z);
+                    if (isLocal) t.localRotation = eulerRot; else t.rotation = eulerRot;
                 }
-                else
-                    obj.transform.localScale = scale;
             }
 
-            // Return previous state in response for revert capability
+            if (ToolUtils.HasArg(args, "scale"))
+            {
+                Vector3 scale = ToolUtils.ParseVector3(args["scale"].ToString());
+                Vector3 current = t.localScale;
+                t.localScale = operation switch
+                {
+                    "add" => current + scale,
+                    "multiply" => new Vector3(current.x * scale.x, current.y * scale.y, current.z * scale.z),
+                    _ => scale
+                };
+            }
+
             var extras = new Dictionary<string, object>
             {
                 ["previousState"] = new Dictionary<string, object>
@@ -75,11 +89,24 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Transform
                     ["position"] = $"{prevPos.x},{prevPos.y},{prevPos.z}",
                     ["rotation"] = $"{prevRot.x},{prevRot.y},{prevRot.z}",
                     ["scale"] = $"{prevScale.x},{prevScale.y},{prevScale.z}",
-                    ["isLocal"] = false
+                    ["isLocal"] = isLocal
                 }
             };
 
-            return ToolUtils.CreateSuccessResponse($"Updated transform for '{gameObjectPath}' (operation: {operation})", extras);
+            string scopeLabel = isLocal ? "local transform" : "transform";
+            return ToolUtils.CreateSuccessResponse(
+                $"Updated {scopeLabel} for '{gameObjectPath}' (operation: {operation})",
+                extras);
+        }
+    }
+
+    public class SetTransformTool : ITool
+    {
+        public string Name => "set_transform";
+
+        public string Execute(Dictionary<string, object> args)
+        {
+            return TransformToolCore.Execute(args, isLocal: false, toolDisplay: "Set Transform");
         }
     }
 }

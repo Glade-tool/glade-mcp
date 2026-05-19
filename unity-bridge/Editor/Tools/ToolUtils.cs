@@ -984,6 +984,117 @@ namespace GladeAgenticAI.Core.Tools
             return false;
         }
 
+        // ----- Argument extraction helpers -----
+        // These replace the ~200 hand-rolled `args.ContainsKey(k) ? args[k]?.ToString() : ""`
+        // patterns scattered across tool implementations. Centralizing here makes
+        // numeric coercion consistent: AI providers send ints as int, floats as
+        // float, but JSON round-trips can convert numbers to string.
+
+        /// <summary>True when args has the key with a non-null value.</summary>
+        public static bool HasArg(Dictionary<string, object> args, string key)
+        {
+            return args != null && args.ContainsKey(key) && args[key] != null;
+        }
+
+        /// <summary>Extracts a string arg. Returns default when missing or null.</summary>
+        public static string GetStringArg(Dictionary<string, object> args, string key, string defaultValue = "")
+        {
+            if (!HasArg(args, key)) return defaultValue;
+            return args[key].ToString();
+        }
+
+        /// <summary>
+        /// Extracts an int arg, coercing from int, long, float, double, or string.
+        /// Returns default when missing or unparseable.
+        /// </summary>
+        public static int GetIntArg(Dictionary<string, object> args, string key, int defaultValue = 0)
+        {
+            if (!HasArg(args, key)) return defaultValue;
+            object v = args[key];
+            if (v is int i) return i;
+            if (v is long l) return (int)l;
+            if (v is float f) return (int)f;
+            if (v is double d) return (int)d;
+            if (int.TryParse(v.ToString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int parsed))
+                return parsed;
+            if (float.TryParse(v.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float fp))
+                return (int)fp;
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Extracts a float arg, coercing from int, long, float, double, or string.
+        /// Returns default when missing or unparseable.
+        /// </summary>
+        public static float GetFloatArg(Dictionary<string, object> args, string key, float defaultValue = 0f)
+        {
+            if (!HasArg(args, key)) return defaultValue;
+            object v = args[key];
+            if (v is float f) return f;
+            if (v is double d) return (float)d;
+            if (v is int i) return i;
+            if (v is long l) return l;
+            if (float.TryParse(v.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float parsed))
+                return parsed;
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Extracts a bool arg with the same coercion rules as ParseBool.
+        /// Returns default when missing.
+        /// </summary>
+        public static bool GetBoolArg(Dictionary<string, object> args, string key, bool defaultValue = false)
+        {
+            if (!HasArg(args, key)) return defaultValue;
+            object v = args[key];
+            if (v is bool b) return b;
+            if (bool.TryParse(v.ToString(), out bool parsed)) return parsed;
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Validates that all required keys exist in args with non-null, non-empty-string values.
+        /// Returns null if all present; otherwise returns a ready-to-return CreateErrorResponse JSON.
+        /// Usage:  var err = ToolUtils.ValidateRequiredArgs(args, "gameObjectPath", "componentType");
+        ///         if (err != null) return err;
+        /// </summary>
+        public static string ValidateRequiredArgs(Dictionary<string, object> args, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (!HasArg(args, key))
+                    return CreateErrorResponse($"{key} is required");
+                if (args[key] is string s && string.IsNullOrEmpty(s))
+                    return CreateErrorResponse($"{key} is required");
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Records an undo step, marks the asset dirty, and saves the asset database.
+        /// Use after mutating any asset (Material, ScriptableObject, AnimatorController, etc.).
+        /// Centralizing this trio prevents the "forgot SaveAssets" bug that silently
+        /// drops changes when Unity closes without an explicit save.
+        /// </summary>
+        public static void RecordAndSaveAsset(UnityEngine.Object asset, string undoLabel)
+        {
+            if (asset == null) return;
+            if (!string.IsNullOrEmpty(undoLabel))
+                Undo.RecordObject(asset, undoLabel);
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// Convenience overload of NormalizeAssetPath that returns just the resolved path
+        /// without the actualPath out-param. Use when callers don't need to differentiate
+        /// "exact match" from "case-corrected match".
+        /// </summary>
+        public static string NormalizeAssetPath(string assetPath)
+        {
+            return NormalizeAssetPath(assetPath, out _);
+        }
+
         public static int ParseLayerMask(object value)
         {
             if (value == null) return ~0;
