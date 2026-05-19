@@ -124,15 +124,19 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             if (!targetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
                 return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse("targetPath must start with 'Assets/'"));
 
-            // ── Cloud-injected fields ────────────────────────────────────────
+            // ── Client-resolved fields ───────────────────────────────────────
+            // The caller (an MCP client or other orchestrator) populates these
+            // `_resolved*` keys after looking the candidate up in its catalog
+            // / provider index. The bridge never resolves URLs itself — it only
+            // accepts URLs that pass `AssetPipelineGuard.DescribeUrlHostRejection`.
             string resolvedUrl = TryGetString(args, "_resolvedUrl");
             string resolvedLicense = TryGetString(args, "_resolvedLicense");
             string resolvedAttribution = TryGetString(args, "_resolvedAttribution");
             string archiveFormat = TryGetString(args, "_resolvedArchiveFormat");
             string fileExtension = TryGetString(args, "_resolvedFileExtension");
             // Provider id ("meshy" | "kenney" | …) — drives provider-specific importer
-            // presets. Empty for legacy proxies that haven't been redeployed yet;
-            // ConfigureModelImporter then falls back to defaults (matches v0.2 behavior).
+            // presets. Empty when the client doesn't supply it; ConfigureModelImporter
+            // falls back to format-only defaults.
             string resolvedProvider = TryGetString(args, "_resolvedProvider");
             // Optional: JSON-encoded list of PBR texture URL sets. Populated for
             // generative providers (Meshy) whose model file doesn't embed textures.
@@ -1009,6 +1013,41 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string sidecarAbs = Path.Combine(projectRoot, sidecarRel.Replace('/', Path.DirectorySeparatorChar));
 
+            string json = BuildSidecarJson(
+                targetPath: targetPath,
+                candidateId: candidateId,
+                license: license,
+                attribution: attribution,
+                sourceUrl: sourceUrl,
+                assetType: assetType,
+                fileExtension: fileExtension,
+                importedFiles: importedFiles,
+                importedAt: DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+
+            Directory.CreateDirectory(Path.GetDirectoryName(sidecarAbs));
+            File.WriteAllText(sidecarAbs, json, Encoding.UTF8);
+            return sidecarRel;
+        }
+
+        /// <summary>
+        /// Pure sidecar-JSON builder. Filesystem-free and timestamp-free
+        /// (caller supplies <paramref name="importedAt"/>) so unit tests can
+        /// assert exact byte output without monkeypatching the clock or
+        /// dataPath. JsonUtility handles every string-escape rule (quotes,
+        /// backslashes, control chars, unicode); this helper exists purely
+        /// to make those guarantees testable from the NUnit suite.
+        /// </summary>
+        internal static string BuildSidecarJson(
+            string targetPath,
+            string candidateId,
+            string license,
+            string attribution,
+            string sourceUrl,
+            string assetType,
+            string fileExtension,
+            List<string> importedFiles,
+            string importedAt)
+        {
             string provider = ProviderFromCandidate(candidateId);
             var data = new AssetSidecarData
             {
@@ -1017,7 +1056,7 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
                 license = license ?? "UNKNOWN",
                 attribution_text = attribution ?? "",
                 source_url = sourceUrl ?? "",
-                imported_at = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                imported_at = importedAt ?? "",
                 asset_type = assetType ?? "",
                 target_path = targetPath ?? "",
                 imported_files = importedFiles ?? new List<string>(),
@@ -1050,11 +1089,7 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             // for ScriptableObjects. Replaces the hand-rolled StringBuilder
             // approach that silently corrupted on a candidate name containing
             // a literal '"'.
-            string json = JsonUtility.ToJson(data, prettyPrint: true);
-
-            Directory.CreateDirectory(Path.GetDirectoryName(sidecarAbs));
-            File.WriteAllText(sidecarAbs, json, Encoding.UTF8);
-            return sidecarRel;
+            return JsonUtility.ToJson(data, prettyPrint: true);
         }
 
         private static bool IsTextureFile(string p)
