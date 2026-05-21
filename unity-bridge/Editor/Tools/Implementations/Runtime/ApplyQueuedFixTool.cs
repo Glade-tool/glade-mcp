@@ -22,6 +22,14 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
     ///     entries. Each is dispatched via ToolExecutor.ExecuteTool — so
     ///     they share the same DemoAssetsGuard and SessionTracker hooks
     ///     as direct tool calls.
+    ///   expectedFileHashes (object, optional): map of asset-path → SHA-256
+    ///     hex digest captured by the cloud at propose time. The bridge
+    ///     verifies each entry against the file's current on-disk hash
+    ///     before dispatching any change. If ANY mismatch, the apply is
+    ///     refused with details so the caller can re-investigate rather
+    ///     than silently overwriting user edits. Pass null/omit to skip
+    ///     the check (e.g., for non-file-touching proposals or when the
+    ///     cloud couldn't capture a baseline).
     ///
     /// Apply semantics:
     ///   - All changes attempted in order. First-error does NOT short-circuit
@@ -34,6 +42,11 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
     ///     marks the apply <c>success: false</c> and records that on the
     ///     tracker so a retry returns the failed-state record (NOT a free
     ///     re-execute — failure is a final state for v1).
+    ///   - File-hash drift detection happens BEFORE any change runs — a
+    ///     mismatch fails the whole apply atomically (zero changes land).
+    ///   - postApplyCursor is captured BEFORE dispatch so callers can poll
+    ///     <c>get_runtime_events(sinceCursor=...)</c> after a brief delay
+    ///     to surface any compile errors triggered by the apply.
     /// </summary>
     public class ApplyQueuedFixTool : ITool
     {
@@ -86,6 +99,71 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
             }
             if (changesList == null || changesList.Count == 0)
                 return ToolUtils.CreateErrorResponse("changes array is required and must be non-empty");
+
+            // Hash-drift check (Live Loop critical gap fix, 2026-05-21).
+            // If the cloud captured per-file hashes at propose time, verify
+            // them against on-disk state BEFORE running any change. A single
+            // drift fails the whole apply — protects against overwriting
+            // user edits that landed between propose and apply.
+            Dictionary<string, object> expectedHashes = null;
+            if (args.TryGetValue("expectedFileHashes", out var hashesObj))
+            {
+                if (hashesObj is Dictionary<string, object> alreadyDict)
+                    expectedHashes = alreadyDict;
+                else if (hashesObj is string rawHashes)
+                    expectedHashes = ToolUtils.ParseJsonToDict(rawHashes);
+            }
+            if (expectedHashes != null && expectedHashes.Count > 0)
+            {
+                var driftDetails = new List<Dictionary<string, object>>();
+                foreach (var kv in expectedHashes)
+                {
+                    string path = kv.Key;
+                    string expected = kv.Value?.ToString();
+                    if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(expected))
+                        continue;
+                    string actual = ToolUtils.ComputeFileSha256(path);
+                    // actual == null means file missing or unreadable; we
+                    // treat that as drift because the AI's plan assumed
+                    // the file existed in a specific state.
+                    bool drifted = actual == null
+                        || !string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+                    if (drifted)
+                    {
+                        driftDetails.Add(new Dictionary<string, object>
+                        {
+                            { "scriptPath", path },
+                            { "expectedHash", expected },
+                            { "actualHash", actual ?? "<missing or unreadable>" },
+                        });
+                    }
+                }
+                if (driftDetails.Count > 0)
+                {
+                    var driftExtras = new Dictionary<string, object>
+                    {
+                        { "alreadyApplied", false },
+                        { "success", false },
+                        { "hashMismatch", true },
+                        { "driftedFiles", driftDetails },
+                        { "proposalId", proposalId },
+                    };
+                    string fileList = string.Join(", ",
+                        driftDetails.ConvertAll(d => d["scriptPath"].ToString()));
+                    return ToolUtils.CreateErrorResponse(
+                        $"Apply refused — {driftDetails.Count} file(s) changed since the proposal was generated: {fileList}. "
+                        + "Re-investigate (the proposal may overwrite recent edits) or retry without expectedFileHashes to force-apply.",
+                        driftExtras);
+                }
+            }
+
+            // Snapshot the runtime-log cursor BEFORE any change runs so the
+            // caller can poll get_runtime_events(sinceCursor=postApplyCursor)
+            // after a brief delay to surface compile errors triggered by the
+            // apply. Capturing pre-dispatch (not post-dispatch) is intentional:
+            // a fix that compiles slowly may produce errors AFTER our return,
+            // and the cursor needs to predate them.
+            long postApplyCursor = RuntimeLogStream.LatestCursor();
 
             var perResults = new List<Dictionary<string, object>>();
             int successCount = 0;
@@ -169,6 +247,10 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
                 { "successCount", successCount },
                 { "failCount", failCount },
                 { "results", perResults },
+                // Cursor caller polls against to surface compile errors
+                // triggered by this apply. Snapshot pre-dispatch so the
+                // window covers any errors fired during AssetDatabase.Refresh.
+                { "postApplyCursor", postApplyCursor },
             };
 
             string topMsg = overallSuccess

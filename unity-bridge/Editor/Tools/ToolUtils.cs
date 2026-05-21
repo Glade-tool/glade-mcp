@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -1569,6 +1571,48 @@ namespace GladeAgenticAI.Core.Tools
                     return $"\"{EscapeJsonString(prop.enumNames[prop.enumValueIndex])}\"";
                 default:
                     return $"\"{EscapeJsonString(prop.displayName)}\"";
+            }
+        }
+
+        /// <summary>
+        /// SHA-256 hex digest of an Assets-rooted file's UTF-8 text. Used by
+        /// the Live Loop apply path to detect drift between "what the AI
+        /// read via get_script_content" and "what's on disk at apply time" —
+        /// if the user edited the file in their IDE between the proposal
+        /// arriving and clicking Apply, we want to surface that rather than
+        /// silently overwriting their edits.
+        ///
+        /// Hashes the text contents (not raw bytes) so the result matches
+        /// a cloud-side hash of the same string returned by GetScriptContent.
+        /// Returns null if the file does not exist or cannot be read —
+        /// callers treat null as "skip the check for this path" (the cloud
+        /// passes an expected hash only when it actually captured one from
+        /// a prior get_script_content).
+        /// </summary>
+        public static string ComputeFileSha256(string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath)) return null;
+            try
+            {
+                string text = File.ReadAllText(assetPath, Encoding.UTF8);
+                using (var sha = SHA256.Create())
+                {
+                    byte[] bytes = Encoding.UTF8.GetBytes(text);
+                    byte[] hash = sha.ComputeHash(bytes);
+                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+            }
+            catch (FileNotFoundException)
+            {
+                return null;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return null;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
     }
