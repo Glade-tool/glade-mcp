@@ -112,6 +112,33 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "reset_eval_state",
+            "description": "Per-trial reset for evaluation harnesses. Destroys non-essential root GameObjects in the active scene (keeps Main Camera + Directional Light), deletes a caller-specified glob of scripts under Assets/Scripts/ ONLY, and clears the in-memory session mutation log used by the modify_script safety gate. Intended for eval/automation use, not interactive sessions — running this against a user's working scene without their instruction would destroy unsaved work.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "scriptsGlob": {
+                        "type": "string",
+                        "description": "Comma-separated glob patterns under Assets/Scripts/ to delete (e.g. 'Assets/Scripts/ThirdPerson*.cs,Assets/Scripts/CameraFollow*.cs'). Filename glob only — '*' matches anything except path separators; '**' is not supported. Patterns OUTSIDE Assets/Scripts/ are rejected for safety. Empty (default) deletes nothing.",
+                    },
+                    "clearScene": {
+                        "type": "boolean",
+                        "description": "Destroy root GameObjects in the active scene except Main Camera + Directional Light. Default true.",
+                        "default": True,
+                    },
+                    "clearSession": {
+                        "type": "boolean",
+                        "description": "Reset SessionTracker timeline so the per-trial slate is clean (relevant for safety checks like ModifyScriptTool's session-aware gate). Default true.",
+                        "default": True,
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "think",
             "description": "Reason about a complex multi-step task before executing it. Use to plan what objects/assets/scripts to create, in what order (scripts before add_component), and what positions/configurations are needed. Does not modify anything.",
             "parameters": {

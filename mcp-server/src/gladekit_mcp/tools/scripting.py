@@ -49,7 +49,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "modify_script",
-            "description": "Modify an existing text-based asset file (.cs, .shader, .compute, etc.). File MUST exist in the project — verify in Unity context first. Provide the complete file content including all existing code.",
+            "description": "Modify an existing text-based asset file (.cs, .shader, .compute, etc.). File MUST exist in the project — verify in Unity context first. Provide the complete file content including all existing code. SAFETY: the bridge refuses modify_script against scripts the agentic loop did NOT create in this session unless confirmExistingFileModification=true is set. Set the flag ONLY when the user explicitly named the file (e.g. 'update PlayerMovement.cs') or used language like 'extend' / 'modify the existing X'. Absent that signal, do NOT set the flag and do NOT call modify_script — call create_script with a new path for fresh-scaffold prompts.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -60,6 +60,10 @@ TOOLS: List[Dict] = [
                     "scriptContent": {
                         "type": "string",
                         "description": "Complete modified file content. MUST include ALL existing code from the context, then ADD your changes. Never remove existing fields, methods, or functionality. For .cs files: complete C# script code. For .shader files: complete HLSL/CG shader code.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set to true ONLY when the user explicitly named the file to extend or modify (e.g. 'update PlayerMovement.cs', 'extend the existing HealthSystem'). Required for any modify_script against a script not created via create_script in the current session. Defaults to false. Setting this without explicit user authorization risks corrupting real project code.",
                     },
                 },
                 "required": ["scriptPath", "scriptContent"],

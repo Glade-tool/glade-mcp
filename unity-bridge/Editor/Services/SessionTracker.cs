@@ -203,6 +203,51 @@ namespace GladeAgenticAI.Services
         }
 
         /// <summary>
+        /// Was this script path created by a successful create_script call
+        /// earlier in the current Unity session? Used by ModifyScriptTool
+        /// as a session-aware safety check that gates modify_script against
+        /// pre-existing project scripts — protects user code against AI
+        /// clients that misread "scaffold a new system" prompts as
+        /// "extend an existing one" prompts.
+        ///
+        /// Path comparison is case-insensitive and tolerates the "Assets/"
+        /// prefix being present or absent on either side (callers may use
+        /// either convention).
+        ///
+        /// Returns false for the empty/null path. Returns false if the
+        /// session timeline has been Reset() since the create_script call.
+        /// </summary>
+        public static bool WasScriptCreatedThisSession(string scriptPath)
+        {
+            if (string.IsNullOrEmpty(scriptPath)) return false;
+            string normalized = NormalizeScriptPath(scriptPath);
+            lock (_lock)
+            {
+                for (int i = _timeline.Count - 1; i >= 0; i--)
+                {
+                    var record = _timeline[i];
+                    if (!record.Success) continue;
+                    if (!string.Equals(record.Tool, "create_script", StringComparison.OrdinalIgnoreCase)) continue;
+                    string target = NormalizeScriptPath(record.Target ?? string.Empty);
+                    if (string.Equals(target, normalized, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        private static string NormalizeScriptPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            string trimmed = path.Replace('\\', '/');
+            return trimmed.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                ? trimmed
+                : "Assets/" + trimmed;
+        }
+
+        /// <summary>
         /// Reset the session log. Called only via menu item or test setup.
         /// </summary>
         public static void Reset()

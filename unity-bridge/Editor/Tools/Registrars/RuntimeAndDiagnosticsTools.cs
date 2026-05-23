@@ -1,3 +1,4 @@
+using GladeAgenticAI.Core.Tools.Implementations.Diagnostics;
 using GladeAgenticAI.Core.Tools.Implementations.Profiler;
 using GladeAgenticAI.Core.Tools.Implementations.Runtime;
 
@@ -23,6 +24,9 @@ namespace GladeAgenticAI.Services
             Register(new GetRuntimeEventsTool());
             Register(new GetPlayModeStateTool());
             Register(new ApplyQueuedFixTool());
+
+            // Diagnostics — eval/automation tooling
+            Register(new ResetEvalStateTool());
         }
     }
 }
