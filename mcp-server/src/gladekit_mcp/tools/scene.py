@@ -39,7 +39,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_game_object",
-            "description": "Create a new empty GameObject in the scene",
+            "description": "Create an EMPTY GameObject with no mesh, no collider, no visual representation — only a Transform. Use ONLY for invisible logic-only nodes / hierarchy parents (e.g. 'GameManager', 'EnemySpawner', empty pivots). For ANY visible scene object (player capsule, enemy, prop, platform, ground), use create_primitive instead — create_game_object on a visible object produces an invisible Transform with no body and the user will see nothing in the Game view.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -57,7 +57,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_primitive",
-            "description": "Create a primitive GameObject (Cube, Sphere, Capsule, Cylinder, Plane, Quad) at origin with default material. Always follow up with set_transform for positioning and create_material + assign_material_to_renderer for colors.",
+            "description": "Create a VISIBLE primitive GameObject (Cube, Sphere, Capsule, Cylinder, Plane, Quad) at origin — comes with MeshFilter + MeshRenderer + Collider attached so it shows up in the Game view immediately. Use this for ANY visible scene object: player capsules, enemies, platforms, props, ground planes, level geometry. Do NOT use create_game_object for visible objects — that produces an empty invisible Transform. Follow up with set_transform for non-origin positioning and create_material + assign_material_to_renderer for non-default colors.",
             "parameters": {
                 "type": "object",
                 "properties": {
