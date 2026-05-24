@@ -8,7 +8,7 @@
   "license_summary": "Public domain. No attribution required for any use, including commercial. Crediting 'Kenney.nl' is appreciated but not required.",
   "attribution_required": false,
   "attribution_recommended": "Kenney.nl",
-  "indexed_at": "2026-05-15",
+  "indexed_at": "2026-05-24",
   "indexing_strategy": "hand_curated_seed_v0_1",
   "notes": "Hand-curated seed list of widely-used Kenney packs. Per-pack download_url + thumbnail_url values are pre-baked into this catalog by scripts/build_kenney_index.py (Kenney rotates both the download zip's random-id segment and the og:image's random-id segment when packs update). Refresh quarterly or when a user reports a stale download. Dead packs (Kenney occasionally retires/renames without redirect) are purged by the indexer; commit the resulting diff after each refresh. Coverage target for v0.1: 35-40 packs spanning sprite_2d (platformer, top-down, UI, pixel), model_3d (kits, characters, vehicles), and audio_sfx (UI, impact, sci-fi, RPG).",
   "packs": [
@@ -30,9 +30,9 @@
       ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/pixel-platformer",
-      "download_url": "https://kenney.nl/media/pages/assets/pixel-platformer/bef991136c-1696667883/kenney_pixel-platformer.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/pixel-platformer/f1edd7a868-1696667860/samplea.png",
-      "url_fingerprint": "440d8df755ca"
+      "download_url": "https://kenney.nl/media/pages/assets/pixel-platformer/33bb4921eb-1696667883/kenney_pixel-platformer.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/pixel-platformer/bf585643f0-1696667860/samplea.png",
+      "url_fingerprint": "54f4449aea6c"
     },
     {
       "id": "kenney/platformer-art-pixel",
@@ -55,9 +55,9 @@
       ],
       "approx_assets": 900,
       "official_page": "https://kenney.nl/assets/platformer-art-pixel",
-      "download_url": "https://kenney.nl/media/pages/assets/platformer-art-pixel/25ea8359e9-1774772636/kenney_platformer-art-pixel.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/platformer-art-pixel/642389b026-1677696731/sample.png",
-      "url_fingerprint": "7865c57c083a"
+      "download_url": "https://kenney.nl/media/pages/assets/platformer-art-pixel/7a87f3ab92-1774772636/kenney_platformer-art-pixel.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/platformer-art-pixel/e0ce345e1d-1677696731/sample.png",
+      "url_fingerprint": "4383875feb0f"
     },
     {
       "id": "kenney/1-bit-pack",
@@ -77,9 +77,9 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/1-bit-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/1-bit-pack/f41b6925f0-1677578516/kenney_1-bit-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/1-bit-pack/fda061c324-1677578508/sample_fantasy.png",
-      "url_fingerprint": "e78b5f1d28ab"
+      "download_url": "https://kenney.nl/media/pages/assets/1-bit-pack/aa867a1f37-1677578516/kenney_1-bit-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/1-bit-pack/263abe0f15-1677578508/sample_fantasy.png",
+      "url_fingerprint": "23b58bbef8d0"
     },
     {
       "id": "kenney/monochrome-rpg",
@@ -99,9 +99,9 @@
       ],
       "approx_assets": 130,
       "official_page": "https://kenney.nl/assets/monochrome-rpg",
-      "download_url": "https://kenney.nl/media/pages/assets/monochrome-rpg/f05d9b5c5b-1674742619/kenney_monochrome-rpg.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/monochrome-rpg/41151fda79-1674742616/sample.png",
-      "url_fingerprint": "852231e3a1c2"
+      "download_url": "https://kenney.nl/media/pages/assets/monochrome-rpg/03f49efc13-1674742619/kenney_monochrome-rpg.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/monochrome-rpg/eec112fdaa-1674742616/sample.png",
+      "url_fingerprint": "01ad8b41a9a1"
     },
     {
       "id": "kenney/tiny-town",
@@ -123,9 +123,9 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/tiny-town",
-      "download_url": "https://kenney.nl/media/pages/assets/tiny-town/5e46f9e551-1735736916/kenney_tiny-town.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/tiny-town/1c57d72b26-1674742338/sample.png",
-      "url_fingerprint": "05cc18f4c295"
+      "download_url": "https://kenney.nl/media/pages/assets/tiny-town/a415fbeb49-1735736916/kenney_tiny-town.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/tiny-town/e241a9f6c0-1674742338/sample.png",
+      "url_fingerprint": "a44d3d34e796"
     },
     {
       "id": "kenney/tiny-dungeon",
@@ -146,9 +146,9 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/tiny-dungeon",
-      "download_url": "https://kenney.nl/media/pages/assets/tiny-dungeon/b56d7a13e3-1674742415/kenney_tiny-dungeon.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/tiny-dungeon/331078e148-1674742412/sample.png",
-      "url_fingerprint": "edddb42de973"
+      "download_url": "https://kenney.nl/media/pages/assets/tiny-dungeon/f8422efb44-1674742415/kenney_tiny-dungeon.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/tiny-dungeon/8c4f705db0-1674742412/sample.png",
+      "url_fingerprint": "d94037ce0f5c"
     },
     {
       "id": "kenney/roguelike-rpg-pack",
@@ -170,9 +170,9 @@
       ],
       "approx_assets": 1700,
       "official_page": "https://kenney.nl/assets/roguelike-rpg-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/roguelike-rpg-pack/1cb71b28fb-1677697420/kenney_roguelike-rpg-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/roguelike-rpg-pack/7fa8ea469e-1677697411/sample1.png",
-      "url_fingerprint": "4b48e39b0148"
+      "download_url": "https://kenney.nl/media/pages/assets/roguelike-rpg-pack/12c03cd78b-1677697420/kenney_roguelike-rpg-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/roguelike-rpg-pack/6b88b8d663-1677697411/sample1.png",
+      "url_fingerprint": "d0e444b4b407"
     },
     {
       "id": "kenney/roguelike-modern-city",
@@ -194,9 +194,9 @@
       ],
       "approx_assets": 1036,
       "official_page": "https://kenney.nl/assets/roguelike-modern-city",
-      "download_url": "https://kenney.nl/media/pages/assets/roguelike-modern-city/2c69d77360-1677694743/kenney_roguelike-modern-city.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/roguelike-modern-city/511a3682cf-1677694738/sample.png",
-      "url_fingerprint": "68e29e8622b4"
+      "download_url": "https://kenney.nl/media/pages/assets/roguelike-modern-city/0ff3dfff2b-1677694743/kenney_roguelike-modern-city.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/roguelike-modern-city/69c121b8ae-1677694738/sample.png",
+      "url_fingerprint": "37b1fd43e283"
     },
     {
       "id": "kenney/space-shooter-extension",
@@ -217,9 +217,9 @@
       ],
       "approx_assets": 270,
       "official_page": "https://kenney.nl/assets/space-shooter-extension",
-      "download_url": "https://kenney.nl/media/pages/assets/space-shooter-extension/9a8d3c431c-1677693518/kenney_space-shooter-extension.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/space-shooter-extension/4a86b6525d-1677693514/sample.png",
-      "url_fingerprint": "d05955701efe"
+      "download_url": "https://kenney.nl/media/pages/assets/space-shooter-extension/d0bd70032c-1677693518/kenney_space-shooter-extension.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/space-shooter-extension/9187f6d608-1677693514/sample.png",
+      "url_fingerprint": "a922d4249537"
     },
     {
       "id": "kenney/simple-space",
@@ -239,9 +239,9 @@
       ],
       "approx_assets": 48,
       "official_page": "https://kenney.nl/assets/simple-space",
-      "download_url": "https://kenney.nl/media/pages/assets/simple-space/f694a6eca6-1677578143/kenney_simple-space.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/simple-space/7e8b2171fb-1677578140/sample.png",
-      "url_fingerprint": "d2797b2fdd44"
+      "download_url": "https://kenney.nl/media/pages/assets/simple-space/b9b0968a6b-1677578143/kenney_simple-space.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/simple-space/489b432d65-1677578140/sample.png",
+      "url_fingerprint": "57c9c147564c"
     },
     {
       "id": "kenney/shape-characters",
@@ -261,9 +261,9 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/shape-characters",
-      "download_url": "https://kenney.nl/media/pages/assets/shape-characters/10e737ac29-1698339465/kenney_shape-characters.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/shape-characters/81b9e106b6-1698339460/sample.png",
-      "url_fingerprint": "bd7af4bc51de"
+      "download_url": "https://kenney.nl/media/pages/assets/shape-characters/c016420b08-1698339465/kenney_shape-characters.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/shape-characters/f7aa93d6d0-1698339460/sample.png",
+      "url_fingerprint": "4759bbf74ce9"
     },
     {
       "id": "kenney/puzzle-pack-2",
@@ -283,9 +283,9 @@
       ],
       "approx_assets": 795,
       "official_page": "https://kenney.nl/assets/puzzle-pack-2",
-      "download_url": "https://kenney.nl/media/pages/assets/puzzle-pack-2/848ff5c698-1677667476/kenney_puzzle-pack-2.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/puzzle-pack-2/019f174dcc-1677667469/sample1.png",
-      "url_fingerprint": "565bcb367b47"
+      "download_url": "https://kenney.nl/media/pages/assets/puzzle-pack-2/2b69820372-1677667476/kenney_puzzle-pack-2.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/puzzle-pack-2/8b9c51463a-1677667469/sample1.png",
+      "url_fingerprint": "4a1892cb4aaf"
     },
     {
       "id": "kenney/particle-pack",
@@ -305,9 +305,9 @@
       ],
       "approx_assets": 80,
       "official_page": "https://kenney.nl/assets/particle-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/particle-pack/1dd3d4cbe2-1677578741/kenney_particle-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/particle-pack/f4b578ccc9-1677578655/preview.png",
-      "url_fingerprint": "ce7c4a3ca121"
+      "download_url": "https://kenney.nl/media/pages/assets/particle-pack/f8fe0f8cb8-1677578741/kenney_particle-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/particle-pack/d50c7fc9b6-1677578655/preview.png",
+      "url_fingerprint": "cfaff7ad77a0"
     },
     {
       "id": "kenney/ui-pack",
@@ -327,9 +327,9 @@
       ],
       "approx_assets": 400,
       "official_page": "https://kenney.nl/assets/ui-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/ui-pack/af874291da-1718203990/kenney_ui-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/ui-pack/c2809d88f0-1718203984/sample.png",
-      "url_fingerprint": "950a0f55f8fe"
+      "download_url": "https://kenney.nl/media/pages/assets/ui-pack/f651646eab-1718203990/kenney_ui-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/ui-pack/249266460a-1718203984/sample.png",
+      "url_fingerprint": "1284dbb2b4b4"
     },
     {
       "id": "kenney/ui-pack-rpg-expansion",
@@ -350,9 +350,9 @@
       ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/ui-pack-rpg-expansion",
-      "download_url": "https://kenney.nl/media/pages/assets/ui-pack-rpg-expansion/b1e1f298c6-1677661824/kenney_ui-pack-rpg-expansion.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/ui-pack-rpg-expansion/8b93ae5ca6-1677661820/sample.png",
-      "url_fingerprint": "4367c9ad1f2b"
+      "download_url": "https://kenney.nl/media/pages/assets/ui-pack-rpg-expansion/7ec4a46657-1677661824/kenney_ui-pack-rpg-expansion.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/ui-pack-rpg-expansion/3cbd16d800-1677661820/sample.png",
+      "url_fingerprint": "0b343915acac"
     },
     {
       "id": "kenney/game-icons",
@@ -371,9 +371,9 @@
       ],
       "approx_assets": 200,
       "official_page": "https://kenney.nl/assets/game-icons",
-      "download_url": "https://kenney.nl/media/pages/assets/game-icons/94af1f5c0b-1677661579/kenney_game-icons.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/game-icons/9081d21fd8-1677661575/preview.png",
-      "url_fingerprint": "7491adeebabe"
+      "download_url": "https://kenney.nl/media/pages/assets/game-icons/1ebf9c14af-1677661579/kenney_game-icons.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/game-icons/349f36a54d-1677661575/preview.png",
+      "url_fingerprint": "17620c73b845"
     },
     {
       "id": "kenney/voxel-pack",
@@ -393,9 +393,9 @@
       ],
       "approx_assets": 350,
       "official_page": "https://kenney.nl/assets/voxel-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/voxel-pack/ee6f21f078-1677662501/kenney_voxel-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/voxel-pack/1f57e1c461-1677662495/sample_2d.png",
-      "url_fingerprint": "d1cb6ec4fcc9"
+      "download_url": "https://kenney.nl/media/pages/assets/voxel-pack/a3a73d0ff7-1677662501/kenney_voxel-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/voxel-pack/52a25234a4-1677662495/sample_2d.png",
+      "url_fingerprint": "1ef9f543bae8"
     },
     {
       "id": "kenney/mini-dungeon",
@@ -416,9 +416,9 @@
       ],
       "approx_assets": 80,
       "official_page": "https://kenney.nl/assets/mini-dungeon",
-      "download_url": "https://kenney.nl/media/pages/assets/mini-dungeon/2de2de674e-1771249391/kenney_mini-dungeon.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/mini-dungeon/7212f8ae8b-1771249373/sample.png",
-      "url_fingerprint": "3f17ee7b1510"
+      "download_url": "https://kenney.nl/media/pages/assets/mini-dungeon/6cd72dc849-1771249391/kenney_mini-dungeon.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/mini-dungeon/5b23e91c6e-1771249373/sample.png",
+      "url_fingerprint": "3ab5a4d43ff6"
     },
     {
       "id": "kenney/survival-kit",
@@ -438,9 +438,9 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/survival-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/survival-kit/750a1eb3f9-1712149243/kenney_survival-kit.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/survival-kit/25f7570cf5-1712149236/sample.png",
-      "url_fingerprint": "d98e8c7cd3c9"
+      "download_url": "https://kenney.nl/media/pages/assets/survival-kit/4065a8185b-1712149243/kenney_survival-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/survival-kit/4c1d761236-1712149236/sample.png",
+      "url_fingerprint": "dd6cbe4f986f"
     },
     {
       "id": "kenney/animal-pack",
@@ -459,9 +459,9 @@
       ],
       "approx_assets": 80,
       "official_page": "https://kenney.nl/assets/animal-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/animal-pack/f6c9bf503d-1677669996/kenney_animal-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/animal-pack/a1e85a8ce8-1677669990/preview.png",
-      "url_fingerprint": "d0e77c187f60"
+      "download_url": "https://kenney.nl/media/pages/assets/animal-pack/480cf9f223-1677669996/kenney_animal-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/animal-pack/3562615d13-1677669990/preview.png",
+      "url_fingerprint": "b78a96a75241"
     },
     {
       "id": "kenney/nature-kit",
@@ -483,9 +483,9 @@
       ],
       "approx_assets": 330,
       "official_page": "https://kenney.nl/assets/nature-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/nature-kit/8334871c74-1677698939/kenney_nature-kit.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/nature-kit/b154f66add-1677698896/sample.png",
-      "url_fingerprint": "72e08452b8aa"
+      "download_url": "https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/nature-kit/656a90532f-1677698896/sample.png",
+      "url_fingerprint": "e1603874e3fb"
     },
     {
       "id": "kenney/city-kit-suburban",
@@ -506,9 +506,9 @@
       ],
       "approx_assets": 40,
       "official_page": "https://kenney.nl/assets/city-kit-suburban",
-      "download_url": "https://kenney.nl/media/pages/assets/city-kit-suburban/167f6dbc31-1745479373/kenney_city-kit-suburban_20.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/city-kit-suburban/32ed30a7a3-1745479402/sample.png",
-      "url_fingerprint": "c91dcb04e3de"
+      "download_url": "https://kenney.nl/media/pages/assets/city-kit-suburban/2c871b7af2-1745479373/kenney_city-kit-suburban_20.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/city-kit-suburban/8c3d4e93a3-1745479402/sample.png",
+      "url_fingerprint": "6a623990598f"
     },
     {
       "id": "kenney/city-kit-commercial",
@@ -530,9 +530,9 @@
       ],
       "approx_assets": 50,
       "official_page": "https://kenney.nl/assets/city-kit-commercial",
-      "download_url": "https://kenney.nl/media/pages/assets/city-kit-commercial/16eb35d771-1753115042/kenney_city-kit-commercial_2.1.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/city-kit-commercial/44aa3589e4-1747481474/sample.png",
-      "url_fingerprint": "f749b90a1c88"
+      "download_url": "https://kenney.nl/media/pages/assets/city-kit-commercial/a742d900eb-1753115042/kenney_city-kit-commercial_2.1.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/city-kit-commercial/ca60ea54ef-1747481474/sample.png",
+      "url_fingerprint": "502f0596b07b"
     },
     {
       "id": "kenney/modular-buildings",
@@ -553,9 +553,9 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/modular-buildings",
-      "download_url": "https://kenney.nl/media/pages/assets/modular-buildings/b7b9013fa2-1707397411/kenney_modular-buildings.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/modular-buildings/c3dc169249-1707397438/sample.png",
-      "url_fingerprint": "09a09a3f37b5"
+      "download_url": "https://kenney.nl/media/pages/assets/modular-buildings/3253b4219a-1707397411/kenney_modular-buildings.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/modular-buildings/cbda060603-1707397438/sample.png",
+      "url_fingerprint": "8df1dfcc8017"
     },
     {
       "id": "kenney/space-kit",
@@ -575,9 +575,9 @@
       ],
       "approx_assets": 150,
       "official_page": "https://kenney.nl/assets/space-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/space-kit/cceeafbd0c-1677698978/kenney_space-kit.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/space-kit/50f16c7294-1677698968/sample.png",
-      "url_fingerprint": "a6a29097d41e"
+      "download_url": "https://kenney.nl/media/pages/assets/space-kit/20874c75ac-1677698978/kenney_space-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/space-kit/28e67de6d9-1677698968/sample.png",
+      "url_fingerprint": "caf093017970"
     },
     {
       "id": "kenney/platformer-kit",
@@ -597,9 +597,9 @@
       ],
       "approx_assets": 150,
       "official_page": "https://kenney.nl/assets/platformer-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/platformer-kit/9fd25e14aa-1775122253/kenney_platformer-kit.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/platformer-kit/bc4001651f-1775122247/sample.png",
-      "url_fingerprint": "b09a55939cae"
+      "download_url": "https://kenney.nl/media/pages/assets/platformer-kit/1585cf62b4-1775122253/kenney_platformer-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/platformer-kit/12fa6cafde-1775122247/sample.png",
+      "url_fingerprint": "883c5eec584e"
     },
     {
       "id": "kenney/fantasy-town-kit",
@@ -620,9 +620,9 @@
       ],
       "approx_assets": 160,
       "official_page": "https://kenney.nl/assets/fantasy-town-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/fantasy-town-kit/40ed2a2d51-1754222374/kenney_fantasy-town-kit_2.0.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/fantasy-town-kit/df49f1779e-1754222363/sample.png",
-      "url_fingerprint": "99d41793eaf0"
+      "download_url": "https://kenney.nl/media/pages/assets/fantasy-town-kit/efe948d309-1754222374/kenney_fantasy-town-kit_2.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/fantasy-town-kit/c13eafebab-1754222363/sample.png",
+      "url_fingerprint": "7726e6f54ebd"
     },
     {
       "id": "kenney/medieval-rts",
@@ -643,9 +643,9 @@
       ],
       "approx_assets": 120,
       "official_page": "https://kenney.nl/assets/medieval-rts",
-      "download_url": "https://kenney.nl/media/pages/assets/medieval-rts/4e1b27c3ec-1677693589/kenney_medieval-rts.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/medieval-rts/1eaa1df4ef-1677693585/sample.png",
-      "url_fingerprint": "861297e7320d"
+      "download_url": "https://kenney.nl/media/pages/assets/medieval-rts/0863f2c62a-1677693589/kenney_medieval-rts.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/medieval-rts/fdf8b5d6e5-1677693585/sample.png",
+      "url_fingerprint": "f6182279b5e0"
     },
     {
       "id": "kenney/pirate-pack",
@@ -665,9 +665,9 @@
       ],
       "approx_assets": 190,
       "official_page": "https://kenney.nl/assets/pirate-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/pirate-pack/74634a27df-1677579020/kenney_pirate-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/pirate-pack/3e65e641ed-1677579015/sample.png",
-      "url_fingerprint": "295c22213879"
+      "download_url": "https://kenney.nl/media/pages/assets/pirate-pack/8574474ce6-1677579020/kenney_pirate-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/pirate-pack/872e1ae7d4-1677579015/sample.png",
+      "url_fingerprint": "5924c3c3886e"
     },
     {
       "id": "kenney/racing-pack",
@@ -687,9 +687,9 @@
       ],
       "approx_assets": 420,
       "official_page": "https://kenney.nl/assets/racing-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/racing-pack/b27a2ace7a-1677662443/kenney_racing-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/racing-pack/be31af41a1-1677662439/sample.png",
-      "url_fingerprint": "f3a7bd87cd62"
+      "download_url": "https://kenney.nl/media/pages/assets/racing-pack/c4cd68480a-1677662443/kenney_racing-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/racing-pack/a747dc19d4-1677662439/sample.png",
+      "url_fingerprint": "b81e04aa4059"
     },
     {
       "id": "kenney/rolling-ball-assets",
@@ -709,9 +709,9 @@
       ],
       "approx_assets": 60,
       "official_page": "https://kenney.nl/assets/rolling-ball-assets",
-      "download_url": "https://kenney.nl/media/pages/assets/rolling-ball-assets/2f4cda9784-1677495701/kenney_rolling-ball-assets.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/rolling-ball-assets/8985e8ce1f-1677495687/sample.png",
-      "url_fingerprint": "1bcd48cce42f"
+      "download_url": "https://kenney.nl/media/pages/assets/rolling-ball-assets/26fead26a1-1677495701/kenney_rolling-ball-assets.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/rolling-ball-assets/41181d8cea-1677495687/sample.png",
+      "url_fingerprint": "4b6748f28f46"
     },
     {
       "id": "kenney/interface-sounds",
@@ -731,9 +731,9 @@
       ],
       "approx_assets": 50,
       "official_page": "https://kenney.nl/assets/interface-sounds",
-      "download_url": "https://kenney.nl/media/pages/assets/interface-sounds/d23a84242e-1677589452/kenney_interface-sounds.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/interface-sounds/f00aa25562-1677589445/preview_interface.png",
-      "url_fingerprint": "6056650fc77e"
+      "download_url": "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/interface-sounds/428fc5f14c-1677589445/preview_interface.png",
+      "url_fingerprint": "784377a87f83"
     },
     {
       "id": "kenney/impact-sounds",
@@ -754,9 +754,9 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/impact-sounds",
-      "download_url": "https://kenney.nl/media/pages/assets/impact-sounds/8aa7b545c9-1677589768/kenney_impact-sounds.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/impact-sounds/be93a2a5d7-1677589720/audio_impact.png",
-      "url_fingerprint": "1c14f3acd377"
+      "download_url": "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/impact-sounds/37d145475f-1677589720/audio_impact.png",
+      "url_fingerprint": "459999b782e2"
     },
     {
       "id": "kenney/sci-fi-sounds",
@@ -777,9 +777,9 @@
       ],
       "approx_assets": 40,
       "official_page": "https://kenney.nl/assets/sci-fi-sounds",
-      "download_url": "https://kenney.nl/media/pages/assets/sci-fi-sounds/e3af5f7ed7-1677589334/kenney_sci-fi-sounds.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/sci-fi-sounds/3198e7f901-1677589328/audiopreview_scifi.png",
-      "url_fingerprint": "7f09102e5752"
+      "download_url": "https://kenney.nl/media/pages/assets/sci-fi-sounds/6b296f9ecf-1677589334/kenney_sci-fi-sounds.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/sci-fi-sounds/112ea5fed7-1677589328/audiopreview_scifi.png",
+      "url_fingerprint": "1e0181b4451c"
     },
     {
       "id": "kenney/rpg-audio",
@@ -800,9 +800,9 @@
       ],
       "approx_assets": 50,
       "official_page": "https://kenney.nl/assets/rpg-audio",
-      "download_url": "https://kenney.nl/media/pages/assets/rpg-audio/706161bc16-1677590336/kenney_rpg-audio.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/rpg-audio/6667ff35f6-1677590326/preview-4.png",
-      "url_fingerprint": "b33c419e0fa9"
+      "download_url": "https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/rpg-audio/ce8569f2f8-1677590326/preview-4.png",
+      "url_fingerprint": "70443bb57690"
     },
     {
       "id": "kenney/casino-audio",
@@ -822,9 +822,9 @@
       ],
       "approx_assets": 50,
       "official_page": "https://kenney.nl/assets/casino-audio",
-      "download_url": "https://kenney.nl/media/pages/assets/casino-audio/f578a13f51-1721639069/kenney_casino-audio.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/casino-audio/6a91e7015d-1677590184/preview-2.png",
-      "url_fingerprint": "47ce98480e08"
+      "download_url": "https://kenney.nl/media/pages/assets/casino-audio/2472606a04-1721639069/kenney_casino-audio.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/casino-audio/225669dbea-1677590184/preview-2.png",
+      "url_fingerprint": "9eaf5a8510dd"
     },
     {
       "id": "kenney/digital-audio",
@@ -845,9 +845,9 @@
       ],
       "approx_assets": 60,
       "official_page": "https://kenney.nl/assets/digital-audio",
-      "download_url": "https://kenney.nl/media/pages/assets/digital-audio/7492b26e77-1677590265/kenney_digital-audio.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/digital-audio/9259a924f6-1677590256/preview-3.png",
-      "url_fingerprint": "2cef58f05d47"
+      "download_url": "https://kenney.nl/media/pages/assets/digital-audio/216eac4753-1677590265/kenney_digital-audio.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/digital-audio/f240714ae3-1677590256/preview-3.png",
+      "url_fingerprint": "54c67c4ef9e0"
     },
     {
       "id": "kenney/voiceover-pack",
@@ -867,9 +867,9 @@
       ],
       "approx_assets": 90,
       "official_page": "https://kenney.nl/assets/voiceover-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/voiceover-pack/4da09a643f-1677589897/kenney_voiceover-pack.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/voiceover-pack/60ceeb004b-1677589880/preview-1.png",
-      "url_fingerprint": "0de73b9fb7b5"
+      "download_url": "https://kenney.nl/media/pages/assets/voiceover-pack/3f7f168698-1677589897/kenney_voiceover-pack.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/voiceover-pack/c0acda5198-1677589880/preview-1.png",
+      "url_fingerprint": "946366fa822c"
     },
     {
       "id": "kenney/music-jingles",
@@ -889,9 +889,9 @@
       ],
       "approx_assets": 85,
       "official_page": "https://kenney.nl/assets/music-jingles",
-      "download_url": "https://kenney.nl/media/pages/assets/music-jingles/4f5dd770b7-1677590399/kenney_music-jingles.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/music-jingles/71c1053f2d-1677590390/preview-5.png",
-      "url_fingerprint": "494cb673dc85"
+      "download_url": "https://kenney.nl/media/pages/assets/music-jingles/f37e530b9e-1677590399/kenney_music-jingles.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/music-jingles/ef8668e122-1677590390/preview-5.png",
+      "url_fingerprint": "ff9d57c471c3"
     },
     {
       "id": "kenney/isometric-miniature-prototype",
@@ -912,9 +912,9 @@
       ],
       "approx_assets": 60,
       "official_page": "https://kenney.nl/assets/isometric-miniature-prototype",
-      "download_url": "https://kenney.nl/media/pages/assets/isometric-miniature-prototype/ef609d4a8b-1674932174/kenney_isometric-miniature-prototype.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/isometric-miniature-prototype/8e09ce09d3-1674932123/sample.png",
-      "url_fingerprint": "a3f695b58c31"
+      "download_url": "https://kenney.nl/media/pages/assets/isometric-miniature-prototype/8c46fe34a0-1674932174/kenney_isometric-miniature-prototype.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/isometric-miniature-prototype/a3dd150426-1674932123/sample.png",
+      "url_fingerprint": "f68b4701b55d"
     },
     {
       "id": "kenney/new-platformer-pack",
@@ -935,9 +935,9 @@
       ],
       "approx_assets": 440,
       "official_page": "https://kenney.nl/assets/new-platformer-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/new-platformer-pack/6328d78a60-1764756702/kenney_new-platformer-pack-1.1.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/new-platformer-pack/dd87396174-1746559490/sample-a.png",
-      "url_fingerprint": "409eab78370f"
+      "download_url": "https://kenney.nl/media/pages/assets/new-platformer-pack/1896103897-1764756702/kenney_new-platformer-pack-1.1.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/new-platformer-pack/85e6d78737-1746559490/sample-a.png",
+      "url_fingerprint": "d94a8b30d8d1"
     },
     {
       "id": "kenney/desert-shooter-pack",
@@ -958,9 +958,9 @@
       ],
       "approx_assets": 500,
       "official_page": "https://kenney.nl/assets/desert-shooter-pack",
-      "download_url": "https://kenney.nl/media/pages/assets/desert-shooter-pack/0e33923dc7-1758814247/kenney_desert-shooter-pack_1.0.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/desert-shooter-pack/93710e4aa2-1758814237/sample-a.png",
-      "url_fingerprint": "6a23cc668b80"
+      "download_url": "https://kenney.nl/media/pages/assets/desert-shooter-pack/ca69c66653-1758814247/kenney_desert-shooter-pack_1.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/desert-shooter-pack/a6ead20778-1758814237/sample-a.png",
+      "url_fingerprint": "2b26a5259c4b"
     },
     {
       "id": "kenney/light-masks",
@@ -980,9 +980,9 @@
       ],
       "approx_assets": 150,
       "official_page": "https://kenney.nl/assets/light-masks",
-      "download_url": "https://kenney.nl/media/pages/assets/light-masks/721303e893-1775631687/kenney_light-masks-1.0.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/light-masks/326a36c708-1775631590/preview.png",
-      "url_fingerprint": "beb38c56b49f"
+      "download_url": "https://kenney.nl/media/pages/assets/light-masks/6530e254f9-1775631687/kenney_light-masks-1.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/light-masks/718ab296a1-1775631590/preview.png",
+      "url_fingerprint": "521170e4e4db"
     },
     {
       "id": "kenney/mobile-controls",
@@ -1002,9 +1002,9 @@
       ],
       "approx_assets": 900,
       "official_page": "https://kenney.nl/assets/mobile-controls",
-      "download_url": "https://kenney.nl/media/pages/assets/mobile-controls/b58fa096c2-1754738457/mobile-controls-1.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/mobile-controls/ebef636cfa-1754738447/sample.png",
-      "url_fingerprint": "66daf0c0eb3b"
+      "download_url": "https://kenney.nl/media/pages/assets/mobile-controls/0d047b3be4-1754738457/mobile-controls-1.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/mobile-controls/616d64eeba-1754738447/sample.png",
+      "url_fingerprint": "0a8bdcc726b7"
     },
     {
       "id": "kenney/input-prompts",
@@ -1025,9 +1025,9 @@
       ],
       "approx_assets": 1500,
       "official_page": "https://kenney.nl/assets/input-prompts",
-      "download_url": "https://kenney.nl/media/pages/assets/input-prompts/a80bce2f9b-1777890371/kenney_input-prompts_1.5.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/input-prompts/2db0ebc8a5-1744026983/preview-xbox-series.png",
-      "url_fingerprint": "2cc4c2067ac2"
+      "download_url": "https://kenney.nl/media/pages/assets/input-prompts/8de120163f-1777890371/kenney_input-prompts_1.5.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/input-prompts/521ca9b941-1744026983/preview-xbox-series.png",
+      "url_fingerprint": "4231650580d0"
     },
     {
       "id": "kenney/cube-pets",
@@ -1047,9 +1047,9 @@
       ],
       "approx_assets": 24,
       "official_page": "https://kenney.nl/assets/cube-pets",
-      "download_url": "https://kenney.nl/media/pages/assets/cube-pets/4b4a36cfae-1774520254/kenney_cube-pets_1.0.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/cube-pets/32cfd5f2f6-1774520248/preview.png",
-      "url_fingerprint": "11600ff97184"
+      "download_url": "https://kenney.nl/media/pages/assets/cube-pets/44e58e945f-1774520254/kenney_cube-pets_1.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/cube-pets/c97e02d815-1774520248/preview.png",
+      "url_fingerprint": "27b13b66c789"
     },
     {
       "id": "kenney/graveyard-kit",
@@ -1070,9 +1070,9 @@
       ],
       "approx_assets": 90,
       "official_page": "https://kenney.nl/assets/graveyard-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/graveyard-kit/bb13ecc2b6-1760691807/kenney_graveyard-kit_5.0.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/graveyard-kit/3c3e603633-1760691801/sample.png",
-      "url_fingerprint": "cd94f28f3ff2"
+      "download_url": "https://kenney.nl/media/pages/assets/graveyard-kit/ba8d4b4517-1760691807/kenney_graveyard-kit_5.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/graveyard-kit/9f3be82eb6-1760691801/sample.png",
+      "url_fingerprint": "d8d51473400f"
     },
     {
       "id": "kenney/modular-dungeon-kit",
@@ -1092,9 +1092,9 @@
       ],
       "approx_assets": 40,
       "official_page": "https://kenney.nl/assets/modular-dungeon-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/modular-dungeon-kit/efafc29c9b-1771926065/kenney_modular-dungeon-kit_1.0.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/modular-dungeon-kit/d35193f35d-1771926047/sample.png",
-      "url_fingerprint": "5a37c51c41a9"
+      "download_url": "https://kenney.nl/media/pages/assets/modular-dungeon-kit/7bed87605b-1771926065/kenney_modular-dungeon-kit_1.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/modular-dungeon-kit/fe4b7d1cba-1771926047/sample.png",
+      "url_fingerprint": "6bfc7390e201"
     },
     {
       "id": "kenney/factory-kit",
@@ -1114,9 +1114,9 @@
       ],
       "approx_assets": 140,
       "official_page": "https://kenney.nl/assets/factory-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/factory-kit/e82b4f86b8-1777639602/kenney_factory-kit_3.0.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/factory-kit/9d2a460709-1777639590/sample.png",
-      "url_fingerprint": "2849c1aa4767"
+      "download_url": "https://kenney.nl/media/pages/assets/factory-kit/edaac9d4f6-1777639602/kenney_factory-kit_3.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/factory-kit/7e1e831724-1777639590/sample.png",
+      "url_fingerprint": "7ed896acbb6b"
     },
     {
       "id": "kenney/car-kit",
@@ -1135,9 +1135,9 @@
       ],
       "approx_assets": 45,
       "official_page": "https://kenney.nl/assets/car-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/car-kit/a9b1e99e92-1775131960/kenney_car-kit.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/car-kit/59e3bdfadd-1775131953/preview.png",
-      "url_fingerprint": "bf3ce0d7eece"
+      "download_url": "https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/car-kit/81f9d77bc7-1775131953/preview.png",
+      "url_fingerprint": "4fbd7ccc37c3"
     },
     {
       "id": "kenney/modular-space-kit",
@@ -1158,9 +1158,9 @@
       ],
       "approx_assets": 40,
       "official_page": "https://kenney.nl/assets/modular-space-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/modular-space-kit/13f81361ae-1771146076/kenney_modular-space-kit_1.0.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/modular-space-kit/8997ab3143-1771146082/sample.png",
-      "url_fingerprint": "d58491869e89"
+      "download_url": "https://kenney.nl/media/pages/assets/modular-space-kit/8261428a47-1771146076/kenney_modular-space-kit_1.0.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/modular-space-kit/0d6aef3da9-1771146082/sample.png",
+      "url_fingerprint": "8bee9e465e21"
     },
     {
       "id": "kenney/holiday-kit",
@@ -1180,9 +1180,9 @@
       ],
       "approx_assets": 100,
       "official_page": "https://kenney.nl/assets/holiday-kit",
-      "download_url": "https://kenney.nl/media/pages/assets/holiday-kit/3398f4ba17-1733923970/kenney_holiday-kit.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/holiday-kit/ada4ffe2bf-1733923964/sample.png",
-      "url_fingerprint": "1c42e8fdb653"
+      "download_url": "https://kenney.nl/media/pages/assets/holiday-kit/3976a6496a-1733923970/kenney_holiday-kit.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/holiday-kit/2e8f59c1ab-1733923964/sample.png",
+      "url_fingerprint": "b94eff6c608a"
     },
     {
       "id": "kenney/voiceover-pack-fighter",
@@ -1203,9 +1203,9 @@
       ],
       "approx_assets": 45,
       "official_page": "https://kenney.nl/assets/voiceover-pack-fighter",
-      "download_url": "https://kenney.nl/media/pages/assets/voiceover-pack-fighter/fdf3a1e023-1677589837/kenney_voiceover-pack-fighter.zip",
-      "thumbnail_url": "https://kenney.nl/media/pages/assets/voiceover-pack-fighter/1786dfe1cc-1677589824/preview.png",
-      "url_fingerprint": "f94350c0fa52"
+      "download_url": "https://kenney.nl/media/pages/assets/voiceover-pack-fighter/6ceb77c6f1-1677589837/kenney_voiceover-pack-fighter.zip",
+      "thumbnail_url": "https://kenney.nl/media/pages/assets/voiceover-pack-fighter/3ba8f3be6e-1677589824/preview.png",
+      "url_fingerprint": "f47594fe4d4a"
     }
   ]
 }
