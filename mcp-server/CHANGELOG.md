@@ -4,6 +4,14 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-05-28
+
+### Fixed
+
+- **0.6.7 bridge install fails to compile in fresh UPM clients.** The two new files (`BridgeDiagnostics.cs`, `BridgeDiagnostics_RingBuffer.cs`) shipped without their `.meta` siblings. Unity's PackageCache is immutable, so missing meta files cause the assets to be silently dropped on import — the `BridgeDiagnostics` type ceases to exist and `GladeKitMCPWindow.cs` fails with CS0246. Adds the meta files. No other changes from 0.6.7.
+
+## [0.6.7] - 2026-05-28
+
 ### Fixed
 
 - **`compile_scripts` no longer surfaces a false `ReadTimeout` and wedge the bridge on large projects.** On projects with thousands of assets or pending imports, the bridge's `AssetDatabase.Refresh()` call inside `compile_scripts` can block the Unity main thread for well past the default 30s HTTP timeout. The MCP client would surface `Unity bridge error for compile_scripts: ReadTimeout`, then every retry would queue behind the still-running Refresh and time out the same way — making the bridge appear permanently stuck until the Editor was restarted. A per-tool override in the dispatcher now gives `compile_scripts` 180s, which matches the actual cost on a cold scene-open without removing the finite ceiling.
