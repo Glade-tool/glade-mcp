@@ -118,13 +118,15 @@ namespace GladeAgenticAI.Bridge
                     Name = "UnityBridgeServer"
                 };
                 _listenerThread.Start();
-                
+
                 Debug.Log($"[UnityBridge] ✅ Server started successfully on {BaseUrl}");
                 Debug.Log($"[UnityBridge] 📋 Ready to accept requests. Tools list endpoint: {BaseUrl}api/tools/list");
+                BridgeDiagnostics.Info("StartServer", $"Bridge started on {BaseUrl}");
             }
             catch (Exception e)
             {
                 Debug.LogError($"[UnityBridge] Failed to start server: {e.Message}");
+                BridgeDiagnostics.Error("StartServer", $"Failed to start: {e.Message}");
                 _isRunning = false;
             }
         }
@@ -145,13 +147,44 @@ namespace GladeAgenticAI.Bridge
             // Drop any in-flight async tool handles. Don't try to send a
             // graceful error to the client — at this point we may be in
             // shutdown / domain-reload territory and the listener is gone.
+            int dropped = _pendingAsync.Count;
             foreach (var pending in _pendingAsync)
             {
                 try { pending.Handle.Dispose(); } catch { /* ignore */ }
             }
             _pendingAsync.Clear();
 
+            // Drain any queued requests waiting on the main thread. Without
+            // this, a Restart leaves stale HttpListenerContext handles that
+            // belong to a dead listener — the next ProcessRequests tick would
+            // try to write to a closed stream and log a confusing error.
+            int queued = 0;
+            lock (_requestQueue)
+            {
+                queued = _requestQueue.Count;
+                while (_requestQueue.Count > 0)
+                {
+                    var ctx = _requestQueue.Dequeue();
+                    try { ctx.Response.Abort(); } catch { /* listener already closed */ }
+                }
+            }
+
             Debug.Log("[UnityBridge] Server stopped");
+            BridgeDiagnostics.Info(
+                "StopServer",
+                $"Bridge stopped (dropped {dropped} async, {queued} queued)");
+        }
+
+        /// <summary>
+        /// Stop and restart the bridge in one call. Exists so users can
+        /// recover from a wedged state (e.g. after a long AssetDatabase.Refresh
+        /// that timed out the MCP client) without restarting Unity.
+        /// </summary>
+        public static void RestartServer()
+        {
+            BridgeDiagnostics.Info("RestartServer", "Restart requested");
+            StopServer();
+            StartServer();
         }
 
         /// <summary>
@@ -267,7 +300,15 @@ namespace GladeAgenticAI.Bridge
                 catch (Exception e)
                 {
                     Debug.LogError($"[UnityBridge] Async tool '{pending.ToolName}' threw during poll: {e}");
+                    BridgeDiagnostics.Error(pending.ToolName, $"async fault: {e.Message}");
                     result = ToolUtils.CreateErrorResponse($"Async tool '{pending.ToolName}' faulted: {e.Message}");
+                }
+
+                if (deadlineHit && result != null)
+                {
+                    BridgeDiagnostics.Warn(
+                        pending.ToolName,
+                        $"async deadline {AsyncToolDeadlineSeconds:F0}s exceeded");
                 }
 
                 if (result == null) continue; // still working
@@ -414,6 +455,7 @@ namespace GladeAgenticAI.Bridge
             catch (Exception e)
             {
                 Debug.LogError($"[UnityBridge] Error handling request: {e}");
+                BridgeDiagnostics.Error("HandleRequest", $"{path}: {e.Message}");
                 SendError(response, 500, $"Internal Server Error: {e.Message}");
             }
         }
@@ -742,6 +784,7 @@ namespace GladeAgenticAI.Bridge
             catch (Exception e)
             {
                 Debug.LogError($"[UnityBridge] Tool execution error: {e}");
+                BridgeDiagnostics.Error("tool_execute", e.Message);
                 var errorResponse = new ToolExecuteResponse
                 {
                     success = false,
@@ -851,6 +894,7 @@ namespace GladeAgenticAI.Bridge
                     {
                         toolResult.success = false;
                         toolResult.error = e.Message;
+                        BridgeDiagnostics.Error(call.toolName ?? "batch_item", e.Message);
                     }
 
                     results[i] = toolResult;

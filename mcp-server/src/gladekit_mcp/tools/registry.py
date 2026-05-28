@@ -262,6 +262,15 @@ _CLOUD_INJECTED_ARG_KEYS = frozenset(
 # out and surfaces a failure even when the bridge eventually completes.
 _PER_TOOL_TIMEOUTS: dict[str, float] = {
     "import_asset": 300.0,  # download + extract + per-file Unity importer config
+    # compile_scripts triggers AssetDatabase.Refresh() on the Unity main thread
+    # when no compile is already running. On large projects (thousands of
+    # assets, pending texture imports, generated code) Refresh can block well
+    # past the default 30s — the bridge can't even acknowledge the request
+    # until the main thread yields, so the client surfaces ReadTimeout and the
+    # follow-up retry stacks behind the still-running Refresh. 180s gives the
+    # main thread room to finish even on a cold scene-open, while still
+    # keeping a finite ceiling so a truly hung Editor surfaces a real error.
+    "compile_scripts": 180.0,
 }
 
 

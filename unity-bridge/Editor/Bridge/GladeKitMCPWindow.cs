@@ -18,9 +18,11 @@ namespace GladeAgenticAI.Bridge
         private GUIStyle _headerStyle;
         private GUIStyle _helpBoxStyle;
         private GUIStyle _timelineStyle;
+        private GUIStyle _diagnosticsLineStyle;
         private bool _stylesInitialized;
         private bool _showSetup;
         private bool _showActivityTimeline = true;
+        private bool _showDiagnostics = true;
         private Vector2 _scrollPos;
 
         [MenuItem("Window/GladeKit MCP")]
@@ -59,6 +61,11 @@ namespace GladeAgenticAI.Bridge
                 wordWrap = true,
                 richText = true,
             };
+            _diagnosticsLineStyle = new GUIStyle(EditorStyles.miniLabel)
+            {
+                wordWrap = true,
+                richText = true,
+            };
             _stylesInitialized = true;
         }
 
@@ -79,6 +86,8 @@ namespace GladeAgenticAI.Bridge
             DrawToolStats();
             EditorGUILayout.Space(8);
             DrawSessionActivity();
+            EditorGUILayout.Space(8);
+            DrawDiagnostics();
             EditorGUILayout.Space(12);
             DrawSetupHelp();
 
@@ -100,6 +109,11 @@ namespace GladeAgenticAI.Bridge
 
                 if (running)
                 {
+                    // Restart drains in-flight async handles and queued requests
+                    // via StopServer() before rebinding — see UnityBridgeServer
+                    // for the cleanup contract.
+                    if (GUILayout.Button("Restart", GUILayout.Width(60)))
+                        UnityBridgeServer.RestartServer();
                     if (GUILayout.Button("Stop", GUILayout.Width(50)))
                         UnityBridgeServer.StopServer();
                 }
@@ -237,6 +251,95 @@ namespace GladeAgenticAI.Bridge
             if (seconds < 60) return $"{seconds}s";
             if (seconds < 3600) return $"{seconds / 60}m {seconds % 60}s";
             return $"{seconds / 3600}h {(seconds % 3600) / 60}m";
+        }
+
+        /// <summary>
+        /// Render the bridge diagnostics panel — last ~50 server-lifecycle and
+        /// fault events captured by <see cref="BridgeDiagnostics"/>. Intended
+        /// to make ReadTimeout / wedged-bridge incidents self-diagnosing
+        /// without forcing the user to scrape the Console.
+        /// </summary>
+        private void DrawDiagnostics()
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("Bridge Diagnostics", EditorStyles.boldLabel);
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("Clear", EditorStyles.miniButton, GUILayout.Width(50)))
+                {
+                    if (EditorUtility.DisplayDialog("Clear Bridge Diagnostics",
+                        "Drop all recorded bridge events?", "Clear", "Cancel"))
+                    {
+                        BridgeDiagnostics.Clear();
+                    }
+                }
+            }
+
+            var (errors, warnings, infos) = BridgeDiagnostics.SeverityCounts();
+            EditorGUILayout.LabelField(
+                $"Errors: {errors}    Warnings: {warnings}    Info: {infos}");
+
+            var entries = BridgeDiagnostics.SnapshotNewestFirst();
+
+            if (entries.Count == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "No bridge events yet. Restart events, request errors, and tool faults will appear here.",
+                    MessageType.None);
+                return;
+            }
+
+            EditorGUILayout.Space(2);
+            _showDiagnostics = EditorGUILayout.Foldout(
+                _showDiagnostics,
+                $"Recent ({entries.Count})",
+                true);
+
+            if (!_showDiagnostics) return;
+
+            DateTime nowUtc = DateTime.UtcNow;
+            foreach (var entry in entries)
+            {
+                string color = SeverityHex(entry.Level);
+                string glyph = SeverityGlyph(entry.Level);
+                string ago = FormatAgo(nowUtc - entry.Timestamp);
+                string localTime = entry.Timestamp.ToLocalTime().ToString("HH:mm:ss");
+                string message = entry.Message ?? "";
+                if (message.Length > 240) message = message.Substring(0, 237) + "...";
+                EditorGUILayout.LabelField(
+                    $"<color={color}>{glyph} {localTime} ({ago})  {entry.Source}: {message}</color>",
+                    _diagnosticsLineStyle);
+            }
+        }
+
+        private static string SeverityHex(BridgeDiagnostics.Severity level)
+        {
+            switch (level)
+            {
+                case BridgeDiagnostics.Severity.Error: return "#d05656";
+                case BridgeDiagnostics.Severity.Warning: return "#d0a050";
+                default: return "#9a9a9a";
+            }
+        }
+
+        private static string SeverityGlyph(BridgeDiagnostics.Severity level)
+        {
+            switch (level)
+            {
+                case BridgeDiagnostics.Severity.Error: return "x";
+                case BridgeDiagnostics.Severity.Warning: return "!";
+                default: return "i";
+            }
+        }
+
+        private static string FormatAgo(TimeSpan delta)
+        {
+            double s = delta.TotalSeconds;
+            if (s < 0) s = 0;
+            if (s < 60) return $"{(int)s}s ago";
+            if (s < 3600) return $"{(int)(s / 60)}m ago";
+            if (s < 86400) return $"{(int)(s / 3600)}h ago";
+            return $"{(int)(s / 86400)}d ago";
         }
 
         private void DrawSetupHelp()

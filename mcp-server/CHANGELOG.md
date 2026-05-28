@@ -4,6 +4,15 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+### Fixed
+
+- **`compile_scripts` no longer surfaces a false `ReadTimeout` and wedge the bridge on large projects.** On projects with thousands of assets or pending imports, the bridge's `AssetDatabase.Refresh()` call inside `compile_scripts` can block the Unity main thread for well past the default 30s HTTP timeout. The MCP client would surface `Unity bridge error for compile_scripts: ReadTimeout`, then every retry would queue behind the still-running Refresh and time out the same way — making the bridge appear permanently stuck until the Editor was restarted. A per-tool override in the dispatcher now gives `compile_scripts` 180s, which matches the actual cost on a cold scene-open without removing the finite ceiling.
+
+### Added
+
+- **`Restart` button in `Window > GladeKit MCP`.** Stops and restarts the bridge HTTP server in one click — drains any in-flight async tool handles and queued requests before rebinding to `localhost:8765`. Use this when the bridge appears unresponsive instead of restarting the entire Unity Editor.
+- **Bridge Diagnostics panel in `Window > GladeKit MCP`.** A 50-entry ring buffer of bridge lifecycle and fault events (server start/stop/restart, HTTP request errors, tool execution faults, async-deadline hits) rendered newest-first with absolute and relative timestamps. Makes wedged-bridge incidents self-diagnosing without scraping the Unity Console. Cleared on Editor domain reload — fresh sessions start clean.
+
 ## [0.6.1] - 2026-05-13
 
 ### Fixed
