@@ -1,11 +1,22 @@
 """
-HTTP client for the Unity bridge server (localhost:8765).
+Bridge clients for the GladeKit editor bridges. Dual-protocol:
 
-The Unity bridge runs inside the Unity Editor and exposes:
-  GET  /api/health             — liveness check
-  POST /api/tools/execute      — run a named tool with JSON args
-  POST /api/context/gather     — gather scene + project context
-  GET  /api/compilation/status — check if Unity is compiling
+  Unity    — HTTP client for the Unity bridge server (localhost:8765)
+             /api/health, /api/tools/execute, /api/context/gather,
+             /api/compilation/status, /api/batch
+  Godot    — WebSocket client for the Godot bridge server (localhost:8766)
+             ws://...:8766/ with endpoint envelope {id, endpoint, toolName, arguments}
+
+Unity is the legacy path and stays byte-identical for backward compatibility.
+Godot was added in v0.3.0 of the Godot bridge (Phase 4 of multi-engine work).
+Engine selection happens at the registry layer via a one-shot health probe;
+the bridge module itself exposes parallel `_unity` / `_godot` namespaces and
+a thin dispatcher routes based on the detected bridge kind.
+
+Environment overrides:
+  UNITY_BRIDGE_URL              — base HTTP URL for the Unity bridge
+  GODOT_BRIDGE_URL              — base WS URL for the Godot bridge
+  GLADEKIT_MCP_FORCE_ENGINE     — skip probe, force 'unity' or 'godot'
 """
 
 from __future__ import annotations
@@ -13,20 +24,32 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import uuid
 from typing import Any, Optional
 
 import httpx
 
 DEFAULT_BRIDGE_URL = os.environ.get("UNITY_BRIDGE_URL", "http://localhost:8765")
+DEFAULT_GODOT_BRIDGE_URL = os.environ.get("GODOT_BRIDGE_URL", "ws://localhost:8766/")
 
 TOOL_EXECUTE_TIMEOUT = 30.0
 CONTEXT_GATHER_TIMEOUT = 20.0
 COMPILATION_WAIT_TIMEOUT = 90.0
 COMPILATION_POLL_INTERVAL = 1.5
 
+# Godot bridge timeouts. Health and tools/list answer on the bridge's
+# worker thread (sub-10ms p99). tools/execute hits the main thread —
+# 30s matches Unity's tool budget so per-call behavior is consistent.
+GODOT_HEALTH_TIMEOUT = 5.0
+GODOT_TOOL_EXECUTE_TIMEOUT = 30.0
+
 
 class UnityBridgeError(Exception):
     """Raised when the Unity bridge is unreachable or returns an unexpected error."""
+
+
+class GodotBridgeError(Exception):
+    """Raised when the Godot bridge is unreachable or returns an unexpected error."""
 
 
 # Shared HTTP client — keepalive connections avoid the TCP-connect tax on every
@@ -256,3 +279,199 @@ async def _wait_for_compilation(
             pass
         await asyncio.sleep(COMPILATION_POLL_INTERVAL)
         elapsed += COMPILATION_POLL_INTERVAL
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Godot bridge — WebSocket client
+# ════════════════════════════════════════════════════════════════════════════
+#
+# Wire protocol (per godot-bridge/README.md):
+#   Request:  {"id": str, "endpoint": "health"|"tools/list"|"tools/execute"
+#                                      |"diagnostics/recent_errors",
+#              "toolName": str, "arguments": dict|str}
+#   Response: {"id": str, "success": bool, "message": str, ...payload}
+#
+# The Godot bridge accepts persistent connections — we use one connection
+# per call (simple, robust against editor restarts) but the framework is
+# in place to add connection pooling later if needed.
+
+
+async def godot_check_health(bridge_url: str = DEFAULT_GODOT_BRIDGE_URL) -> dict:
+    """Send a `health` envelope to the Godot bridge. Returns health dict.
+
+    Raises GodotBridgeError on connection failure or malformed response.
+    """
+    response = await _godot_call(bridge_url, {"endpoint": "health"}, timeout=GODOT_HEALTH_TIMEOUT)
+    if not response.get("success"):
+        raise GodotBridgeError(f"Godot bridge health probe failed: {response.get('error', 'unknown')}")
+    return response
+
+
+async def godot_is_available(bridge_url: str = DEFAULT_GODOT_BRIDGE_URL) -> bool:
+    """Return True if the Godot bridge is reachable and healthy."""
+    try:
+        h = await godot_check_health(bridge_url)
+        return h.get("status") == "ok"
+    except GodotBridgeError:
+        return False
+
+
+async def godot_execute_tool(
+    tool_name: str,
+    arguments: dict[str, Any],
+    bridge_url: str = DEFAULT_GODOT_BRIDGE_URL,
+    timeout: float = GODOT_TOOL_EXECUTE_TIMEOUT,
+) -> str:
+    """Run a Godot bridge tool. Returns a JSON string with the tool result.
+
+    Matches `execute_tool`'s contract: returns a JSON error envelope on
+    connection/protocol failure rather than raising, so the MCP client
+    surfaces the message in chat.
+    """
+    try:
+        response = await _godot_call(
+            bridge_url,
+            {
+                "endpoint": "tools/execute",
+                "toolName": tool_name,
+                "arguments": arguments,
+            },
+            timeout=timeout,
+        )
+    except GodotBridgeError as exc:
+        return json.dumps({"success": False, "message": f"Godot bridge error for {tool_name}: {exc}"})
+    # The bridge already returns {success, message, ...payload}; just stringify.
+    return json.dumps(response)
+
+
+async def godot_list_tools(bridge_url: str = DEFAULT_GODOT_BRIDGE_URL) -> list[str]:
+    """Return the bridge's registered tool names. Raises on failure."""
+    response = await _godot_call(bridge_url, {"endpoint": "tools/list"}, timeout=GODOT_HEALTH_TIMEOUT)
+    if not response.get("success"):
+        raise GodotBridgeError(f"tools/list failed: {response.get('error', 'unknown')}")
+    return list(response.get("tools", []))
+
+
+async def godot_recent_errors(
+    bridge_url: str = DEFAULT_GODOT_BRIDGE_URL,
+    limit: int = 10,
+) -> list[dict]:
+    """Read the per-session error tracker from the Godot bridge."""
+    response = await _godot_call(
+        bridge_url,
+        {"endpoint": "diagnostics/recent_errors", "limit": limit},
+        timeout=GODOT_HEALTH_TIMEOUT,
+    )
+    if not response.get("success"):
+        raise GodotBridgeError(f"recent_errors failed: {response.get('error', 'unknown')}")
+    return list(response.get("errors", []))
+
+
+async def _godot_call(bridge_url: str, payload: dict, *, timeout: float) -> dict:
+    """One-shot request/response over a fresh WebSocket connection.
+
+    Generates a request id, opens the WS, sends the envelope, awaits a
+    matching response (by id), closes. The bridge echoes ids verbatim so
+    we can verify correlation. Raises GodotBridgeError on any I/O,
+    decode, or correlation failure.
+
+    We import websockets lazily so users who only ever talk to Unity
+    don't pay the import cost. The dependency is declared in
+    pyproject.toml so it ships with `pip install gladekit-mcp`.
+    """
+    try:
+        import websockets  # type: ignore[import-not-found]
+    except ImportError as exc:  # pragma: no cover — pyproject pins websockets
+        raise GodotBridgeError(
+            "websockets package is not installed; reinstall gladekit-mcp to pick up the Godot bridge support"
+        ) from exc
+
+    request_id = uuid.uuid4().hex
+    envelope = {"id": request_id, **payload}
+    try:
+        async with asyncio.timeout(timeout):
+            async with websockets.connect(bridge_url) as ws:
+                await ws.send(json.dumps(envelope))
+                # The bridge serializes by request id; on a fresh connection
+                # the next frame IS our response.
+                raw = await ws.recv()
+    except asyncio.TimeoutError as exc:
+        raise GodotBridgeError(f"Godot bridge call timed out after {timeout}s") from exc
+    except Exception as exc:
+        # websockets raises ConnectionClosed, InvalidURI, OSError, etc. —
+        # collapse them all into one bridge error so callers handle
+        # uniformly.
+        raise GodotBridgeError(f"Godot bridge unreachable at {bridge_url}: {exc}") from exc
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise GodotBridgeError(f"Godot bridge returned non-JSON response: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise GodotBridgeError(f"Godot bridge returned non-dict response: {type(data).__name__}")
+
+    # Correlation check — defensive but cheap.
+    if data.get("id") and data["id"] != request_id:
+        raise GodotBridgeError(f"Godot bridge response id mismatch (sent {request_id}, got {data['id']})")
+
+    return data
+
+
+# ── Engine kind detection ────────────────────────────────────────────────────
+#
+# Single source of truth for "which engine bridge is reachable right now?"
+# Probed once at first tool list / first tool call and cached for the
+# lifetime of the process. Env override `GLADEKIT_MCP_FORCE_ENGINE` skips
+# the probe — useful for power users running both bridges simultaneously.
+#
+# Probe order: Unity first (larger install base), Godot second. If both
+# are reachable and no env override is set, Unity wins.
+
+_cached_bridge_kind: Optional[str] = None
+
+
+async def detect_bridge_kind() -> str:
+    """Probe local bridges and return the active engine kind.
+
+    Returns one of:
+      "unity" — Unity HTTP bridge reachable on :8765
+      "godot" — Godot WS bridge reachable on :8766
+      "none"  — neither reachable (likely no editor running yet)
+
+    Cached after the first call; call `clear_bridge_kind_cache()` to retry.
+    """
+    global _cached_bridge_kind
+    if _cached_bridge_kind is not None:
+        return _cached_bridge_kind
+
+    forced = os.environ.get("GLADEKIT_MCP_FORCE_ENGINE", "").strip().lower()
+    if forced in {"unity", "godot"}:
+        _cached_bridge_kind = forced
+        return forced
+
+    # Re-read URLs at call time so env-var overrides set after import are
+    # honored. The module-level DEFAULT_* constants are captured at import
+    # time, so passing them implicitly (via function default args) would
+    # miss late changes.
+    unity_url = os.environ.get("UNITY_BRIDGE_URL", "http://localhost:8765")
+    godot_url = os.environ.get("GODOT_BRIDGE_URL", "ws://localhost:8766/")
+
+    # Unity first (legacy + larger install base).
+    if await is_available(unity_url):
+        _cached_bridge_kind = "unity"
+        return "unity"
+
+    if await godot_is_available(godot_url):
+        _cached_bridge_kind = "godot"
+        return "godot"
+
+    # Neither reachable. Don't cache — bridges may come online later.
+    return "none"
+
+
+def clear_bridge_kind_cache() -> None:
+    """Reset the cached engine kind. Forces the next detect_bridge_kind()
+    to re-probe. Mainly for tests."""
+    global _cached_bridge_kind
+    _cached_bridge_kind = None

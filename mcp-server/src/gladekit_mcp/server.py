@@ -23,12 +23,13 @@ from . import (
     bridge,
     bridge_version,
     cloud,
+    godot_bridge_version,
     search,
     skill,
     telemetry,
 )
 from .prompts import build_prompt_from_bridge
-from .tools.registry import dispatch_tool_call, get_mcp_tools, sanitize_args
+from .tools.registry import dispatch_tool_call, get_active_engine, get_mcp_tools_async, sanitize_args
 from .tools.task_filter import get_relevant_tool_summary
 
 logger = logging.getLogger("gladekit-mcp")
@@ -197,8 +198,19 @@ _META_TOOLS = [
 
 @server.list_tools()
 async def list_tools() -> list[types.Tool]:
-    """Return all Unity tools + meta-tools as MCP tool definitions."""
-    return get_mcp_tools() + _META_TOOLS
+    """Return the active engine's tools + meta-tools as MCP tool definitions.
+
+    Probes for the active bridge kind on first call (cached for the
+    lifetime of the process) and returns Unity or Godot schemas
+    accordingly. Meta-tools are Unity-specific today — get_relevant_tools,
+    remember_for_session, batch_execute, search_project_scripts all
+    assume the Unity bridge's tool surface and context-gather endpoint.
+    On Godot we expose just the 33 native tools.
+    """
+    engine_tools = await get_mcp_tools_async()
+    if get_active_engine() == "godot":
+        return engine_tools
+    return engine_tools + _META_TOOLS
 
 
 @server.call_tool()
@@ -207,13 +219,21 @@ async def call_tool(
     arguments: dict,
 ) -> list[types.TextContent]:
     """Public entry — dispatches to _handle_tool_call and prepends a one-shot
-    bridge-staleness warning to the first text content if the bridge is older
-    than MIN_BRIDGE_VERSION. Computed before dispatch so even error responses
-    carry the warning on the first call after startup."""
-    bridge_warning = await bridge_version.get_warning_prefix()
+    bridge-staleness warning to the first text content. Engine-aware: probes
+    the active bridge kind and queries that engine's version-gate module.
+    Computed before dispatch so even error responses carry the warning on the
+    first call after startup."""
+    # Pick the right version-gate module for the active engine. Probe is
+    # cached so this stays cheap after the first call.
+    active = get_active_engine()
+    if active == "godot":
+        warning = await godot_bridge_version.get_warning_prefix()
+    else:
+        # Default to Unity for the legacy / unknown case.
+        warning = await bridge_version.get_warning_prefix()
     result = await _handle_tool_call(name, arguments)
-    if bridge_warning and result and getattr(result[0], "text", None) is not None:
-        result[0] = types.TextContent(type="text", text=bridge_warning + result[0].text)
+    if warning and result and getattr(result[0], "text", None) is not None:
+        result[0] = types.TextContent(type="text", text=warning + result[0].text)
     return result
 
 
@@ -622,9 +642,11 @@ async def run_server():
     import sys
 
     print(_banner("stdio"), file=sys.stderr)
-    # Warn early if the bridge is reachable but stale. Silent if Unity isn't
-    # running yet — we'll re-check on first tool call.
+    # Warn early if either bridge is reachable but stale. Both checks are
+    # silent when their respective bridge is offline — we re-check on the
+    # first tool call. Order doesn't matter — both are independent.
     await bridge_version.check_on_startup()
+    await godot_bridge_version.check_on_startup()
     try:
         async with stdio_server() as (read_stream, write_stream):
             await server.run(

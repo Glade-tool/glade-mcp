@@ -1,8 +1,13 @@
 """
 Dynamic MCP tool registration from OpenAI-format tool schemas.
 
-Converts the 222+ Unity tool schemas (OpenAI function-calling format) into
-MCP Tool definitions and dispatches tool calls to the Unity bridge.
+Engine-aware. Probes the local bridge at first list_tools to decide
+which schema set to expose:
+
+  Unity   — 222+ tools, filtered to a curated CORE set (~80) for Claude
+            Code's ~128-tool budget. All non-core tools remain
+            dispatchable via the bridge.
+  Godot   — 33 tools (full catalog, no filtering — well under the budget).
 
 OpenAI format:
     {"type": "function", "function": {"name": "...", "description": "...", "parameters": {...}}}
@@ -10,15 +15,13 @@ OpenAI format:
 MCP format:
     Tool(name="...", description="...", inputSchema={...})
 
-Tool exposure strategy
-─────────────────────
-Claude Code has a practical limit of ~128 tools before context overhead causes
-tools to be silently dropped. We expose a curated CORE set (~80 tools) covering
-the most commonly needed operations. All 200+ tools are still dispatchable via
-the bridge — they just aren't advertised in the tool list.
+Engine selection: `bridge.detect_bridge_kind()` is the single source of
+truth. Cached after first probe per process; override with
+`GLADEKIT_MCP_FORCE_ENGINE=unity|godot` if running both bridges and you
+need to address a specific one.
 
-Use get_relevant_tools (a meta-tool in server.py) to discover the full set and
-learn which core tool handles a specialized need.
+Use get_relevant_tools (Unity meta-tool in server.py) to discover
+extended Unity tools beyond the core listed set.
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ from typing import Any
 from mcp import types
 
 from .. import bridge
+from ..schemas.godot import get_godot_tool_schemas
 from . import get_unity_tool_schemas
 
 logger = logging.getLogger("gladekit-mcp")
@@ -151,9 +155,18 @@ CORE_TOOLS: set[str] = {
 #   create_scene, convert_materials_to_render_pipeline
 # Claude Code limit is ~128, so this core set fits both clients.
 
-# Cache: built once at first list_tools call
-_mcp_tools: list[types.Tool] | None = None
-_all_tool_names: set[str] | None = None
+# ── Engine-aware cache ────────────────────────────────────────────────────────
+# Per-engine caches so that switching engines (rare — would require an env
+# override + clear_bridge_kind_cache) doesn't bleed state across.
+
+_unity_mcp_tools: list[types.Tool] | None = None
+_unity_all_tool_names: set[str] | None = None
+
+_godot_mcp_tools: list[types.Tool] | None = None
+_godot_all_tool_names: set[str] | None = None
+
+# Per-process cached bridge kind, set on first get_mcp_tools call.
+_active_engine: str | None = None
 
 
 def _convert_openai_to_mcp(schema: dict[str, Any]) -> types.Tool:
@@ -166,30 +179,83 @@ def _convert_openai_to_mcp(schema: dict[str, Any]) -> types.Tool:
     )
 
 
-def get_mcp_tools() -> list[types.Tool]:
-    """Return core Unity tools as MCP Tool definitions (cached).
+def _build_tool_list(openai_schemas: list[dict[str, Any]]) -> tuple[list[types.Tool], set[str]]:
+    """Convert schemas → MCP tools, dedupe by name, return (tools, names)."""
+    converted = [_convert_openai_to_mcp(s) for s in openai_schemas]
+    seen: set[str] = set()
+    out: list[types.Tool] = []
+    for t in converted:
+        if t.name in seen:
+            logger.warning(f"Duplicate tool name in schemas: {t.name!r} — keeping first occurrence")
+            continue
+        seen.add(t.name)
+        out.append(t)
+    return out, seen
 
-    Only CORE_TOOLS are listed to stay within Claude Code's tool-count budget.
-    All tools remain callable via dispatch_tool_call regardless of listing.
+
+def _get_unity_mcp_tools() -> list[types.Tool]:
+    """Unity: filter to CORE_TOOLS for Claude Code's ~128-tool budget."""
+    global _unity_mcp_tools, _unity_all_tool_names
+    if _unity_mcp_tools is None:
+        all_tools, names = _build_tool_list(get_unity_tool_schemas())
+        _unity_all_tool_names = names
+        _unity_mcp_tools = [t for t in all_tools if t.name in CORE_TOOLS]
+        logger.info(f"Registered {len(_unity_mcp_tools)} core Unity tools ({len(names)} total available via bridge)")
+    return _unity_mcp_tools
+
+
+def _get_godot_mcp_tools() -> list[types.Tool]:
+    """Godot: expose all 33 tools (no filtering needed — well under budget)."""
+    global _godot_mcp_tools, _godot_all_tool_names
+    if _godot_mcp_tools is None:
+        all_tools, names = _build_tool_list(get_godot_tool_schemas())
+        _godot_all_tool_names = names
+        _godot_mcp_tools = all_tools
+        logger.info(f"Registered {len(_godot_mcp_tools)} Godot tools")
+    return _godot_mcp_tools
+
+
+async def get_mcp_tools_async() -> list[types.Tool]:
+    """Probe the bridge to decide engine, then return that engine's tools.
+
+    Called from server.list_tools (which is async). Caches the detected
+    engine so subsequent calls are no-ops on the probe path.
     """
-    global _mcp_tools, _all_tool_names
-    if _mcp_tools is None:
-        openai_schemas = get_unity_tool_schemas()
-        all_tools_with_dupes = [_convert_openai_to_mcp(s) for s in openai_schemas]
-        # Dedupe by name (MCP spec requires unique tool names; Windsurf hard-fails on duplicates).
-        # Keep first occurrence and warn — collision usually means the same tool was registered in two category modules.
-        seen: set[str] = set()
-        all_tools: list[types.Tool] = []
-        for t in all_tools_with_dupes:
-            if t.name in seen:
-                logger.warning(f"Duplicate tool name in schemas: {t.name!r} — keeping first occurrence")
-                continue
-            seen.add(t.name)
-            all_tools.append(t)
-        _all_tool_names = seen
-        _mcp_tools = [t for t in all_tools if t.name in CORE_TOOLS]
-        logger.info(f"Registered {len(_mcp_tools)} core tools ({len(_all_tool_names)} total available via bridge)")
-    return _mcp_tools
+    global _active_engine
+    if _active_engine is None:
+        _active_engine = await bridge.detect_bridge_kind()
+        if _active_engine == "none":
+            # No bridge reachable — default to Unity for backward compat.
+            # Tools still appear in list_tools; dispatch will surface the
+            # connection error if/when the user tries to invoke one.
+            _active_engine = "unity"
+            logger.warning(
+                "No bridge reachable on probe — defaulting to Unity schemas. "
+                "Start the editor and the next list_tools call will pick up the right engine."
+            )
+        else:
+            logger.info(f"Active bridge engine: {_active_engine}")
+    return _get_godot_mcp_tools() if _active_engine == "godot" else _get_unity_mcp_tools()
+
+
+def get_mcp_tools() -> list[types.Tool]:
+    """Sync wrapper that returns the active engine's tool list.
+
+    Kept synchronous for backward compatibility with the existing
+    list_tools call site. If the engine has never been probed (no async
+    list_tools call yet) defaults to Unity — the eventual probe via
+    get_mcp_tools_async will replace the cache on next async call.
+    """
+    if _active_engine == "godot":
+        return _get_godot_mcp_tools()
+    return _get_unity_mcp_tools()
+
+
+def get_active_engine() -> str:
+    """Return the currently-cached active engine ('unity' or 'godot') or
+    'unknown' if no probe has run yet. Used by server.py to pick which
+    bridge_version module to query for the warning prefix."""
+    return _active_engine or "unknown"
 
 
 def sanitize_args(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -318,11 +384,28 @@ def _preprocess_import_asset_args(arguments: dict[str, Any]) -> dict[str, Any] |
 
 async def dispatch_tool_call(name: str, arguments: dict[str, Any]) -> str:
     """
-    Execute a tool call by dispatching to the Unity bridge.
+    Execute a tool call by dispatching to the active engine's bridge.
 
     Returns the tool result as a JSON string.
     All tools (core + extended) are dispatchable even if not in the listed set.
     """
+    # Engine detection runs once per process; the rest of this function
+    # branches on the cached active engine.
+    if _active_engine is None:
+        # Trigger probe via the async helper. Safe — detect_bridge_kind
+        # is cached and idempotent.
+        await get_mcp_tools_async()
+
+    if _active_engine == "godot":
+        return await _dispatch_godot(name, arguments)
+
+    return await _dispatch_unity(name, arguments)
+
+
+async def _dispatch_unity(name: str, arguments: dict[str, Any]) -> str:
+    """Dispatch path for the Unity HTTP bridge. Preserves all the legacy
+    asset-pipeline / import-asset / find-asset special cases that don't
+    apply to Godot."""
     # Asset pipeline gate — refuse early when disabled, regardless of cache state.
     if name in {"find_asset", "import_asset", "list_imported_assets"}:
         if not _is_asset_pipeline_enabled():
@@ -350,12 +433,12 @@ async def dispatch_tool_call(name: str, arguments: dict[str, Any]) -> str:
         arguments = prepped
 
     # Ensure the full tool name index is populated
-    get_mcp_tools()
-    if _all_tool_names and name not in _all_tool_names:
+    _get_unity_mcp_tools()
+    if _unity_all_tool_names and name not in _unity_all_tool_names:
         return json.dumps(
             {
                 "success": False,
-                "message": f"Unknown tool: {name}. {len(_all_tool_names)} tools available.",
+                "message": f"Unknown tool: {name}. {len(_unity_all_tool_names)} Unity tools available.",
             }
         )
 
@@ -368,6 +451,38 @@ async def dispatch_tool_call(name: str, arguments: dict[str, Any]) -> str:
         return result
     except Exception as exc:
         logger.error(f"Tool execution error for {name}: {exc}")
+        return json.dumps(
+            {
+                "success": False,
+                "message": f"Error executing {name}: {str(exc)}",
+            }
+        )
+
+
+async def _dispatch_godot(name: str, arguments: dict[str, Any]) -> str:
+    """Dispatch path for the Godot WS bridge. Simpler than Unity — no
+    asset-pipeline special cases, no compilation wait, no Unity-specific
+    arg munging.
+
+    The Godot bridge does its own snake_case/camelCase normalization (see
+    ws_server.gd ToolUtils.normalize_args) so we don't sanitize here —
+    sanitize_args was a Unity-specific arg-munging path that stringifies
+    numbers to work around the Unity AI Gateway. Godot accepts native
+    JSON types.
+    """
+    _get_godot_mcp_tools()
+    if _godot_all_tool_names and name not in _godot_all_tool_names:
+        return json.dumps(
+            {
+                "success": False,
+                "message": f"Unknown tool: {name}. {len(_godot_all_tool_names)} Godot tools available.",
+            }
+        )
+
+    try:
+        return await bridge.godot_execute_tool(name, arguments)
+    except Exception as exc:
+        logger.error(f"Godot tool execution error for {name}: {exc}")
         return json.dumps(
             {
                 "success": False,

@@ -1,8 +1,10 @@
-# GladeKit Unity MCP
+# GladeKit MCP
 
-Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients directly to your Unity Editor.
+Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients directly to your Unity or Godot editor.
 
-**235+ tools.** A full Unity-aware system prompt. GLADE.md project context. Script semantic search. Skill calibration. Free CC0 asset pipeline (Kenney). Cloud intelligence layer with RAG and cross-session memory. All core features are free and local.
+**Unity:** 235+ tools, full Unity-aware system prompt, GLADE.md project context, script semantic search, skill calibration, free CC0 asset pipeline (Kenney), cloud intelligence layer with RAG and cross-session memory.
+
+**Godot (4.3+):** 33 native tools covering scene/node, script, camera/light, resource, physics, scene I/O, runtime (incl. a live `run_project`/`get_debug_output`/`stop_project` play-session loop), and Godot 4.4+ ResourceUID handling. The MCP server probes the local bridge at startup and exposes the matching tool set — Unity if the Unity bridge is running on `:8765`, Godot if the Godot bridge is running on `:8766`.
 
 ![GladeKit MCP Demo](GladeKitMCP_DemoGIF.gif)
 
@@ -10,15 +12,29 @@ Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients dire
 
 ## Quick Start
 
-### 1. Install the Unity package
+### 1. Install the editor bridge
 
-In Unity: **Window > Package Manager > + > Add package from git URL...**
+**Unity** — In Unity: **Window > Package Manager > + > Add package from git URL...**
 
 ```
 https://github.com/Glade-tool/glade-mcp-unity.git?path=/unity-bridge
 ```
 
 The Unity bridge starts automatically on `localhost:8765`.
+
+**Godot (4.3+)** — copy the addon into your project's `addons/` directory:
+
+1. Download the latest `com.gladekit.mcp-bridge` addon (GitHub releases).
+2. Extract into `<your-godot-project>/addons/com.gladekit.mcp-bridge/`.
+3. In Godot: **Project → Project Settings → Plugins** → enable **GladeKit MCP Bridge**.
+
+The Godot bridge starts automatically on `localhost:8766`. You should see a confirmation line in the editor Output panel:
+
+```
+[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.3.0, 33 tools registered, thread-polled at 200Hz)
+```
+
+Engine auto-detection: the MCP server probes both ports on startup and exposes the matching tool set. Running both editors at once? Set `GLADEKIT_MCP_FORCE_ENGINE=unity` or `=godot` to pin a specific engine.
 
 ### 2. Connect your AI client
 

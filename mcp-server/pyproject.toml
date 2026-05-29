@@ -14,6 +14,11 @@ dependencies = [
     "httpx>=0.25.0",
     "openai>=1.0.0",
     "numpy>=1.21.0",
+    # websockets is the transport for the Godot bridge (Unity uses httpx).
+    # 13+ has the asyncio client interface bridge.py uses. Kept as a hard
+    # dependency even at 0.6.8 (pre-Godot-release) so the import-time
+    # check in bridge.py works for early adopters running from source.
+    "websockets>=13.0",
 ]
 
 [project.optional-dependencies]
