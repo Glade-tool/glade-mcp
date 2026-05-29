@@ -6,8 +6,8 @@ Thanks for your interest in contributing! This guide covers everything you need 
 
 ```bash
 # Clone the repo
-git clone https://github.com/Glade-tool/glade-mcp-unity.git
-cd glade-mcp-unity/mcp-server
+git clone https://github.com/Glade-tool/glade-mcp.git
+cd glade-mcp/mcp-server
 
 # Create a virtual environment and install dependencies
 uv venv && source .venv/bin/activate

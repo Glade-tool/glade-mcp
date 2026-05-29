@@ -1,0 +1,23 @@
+; Engine configuration file.
+;
+; This file is intentionally minimal: it exists so godot-bridge/ can be opened
+; as a Godot project for developing and testing the bridge addon. It is synced
+; to the public glade-mcp repo as a ready-to-open starter project for
+; contributors — open godot-bridge/ in Godot, the addon is already enabled.
+
+config_version=5
+
+[application]
+
+config/name="GladeKit MCP Bridge — Dev Project"
+config/description="Local Godot project for developing and testing the GladeKit MCP Bridge addon."
+config/features=PackedStringArray("4.3", "GL Compatibility")
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/com.gladekit.mcp-bridge/plugin.cfg")
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

@@ -6,7 +6,7 @@ This guide walks you through verifying that GladeKit works correctly with your A
 
 1. **Unity**: Open your project and install the bridge package.
    - **Window > Package Manager > + > Add package from git URL...**
-   - Paste: `https://github.com/Glade-tool/glade-mcp-unity.git?path=/unity-bridge`
+   - Paste: `https://github.com/Glade-tool/glade-mcp.git?path=/unity-bridge`
    - Wait for import, then open an empty scene.
 
 2. **AI Client**: Follow the config instructions in [README.md](README.md) for your client (Cursor, Claude Code, Windsurf, etc).

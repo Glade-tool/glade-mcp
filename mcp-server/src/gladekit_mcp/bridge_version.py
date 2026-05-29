@@ -36,7 +36,7 @@ MIN_BRIDGE_VERSION = "0.7.1"
 UPGRADE_INSTRUCTIONS = (
     f"Update via Unity → Window → Package Manager → GladeKit MCP Bridge → Update, "
     f"or pin manifest.json: "
-    f'"com.gladekit.mcp-bridge": "https://github.com/Glade-tool/glade-mcp-unity.git'
+    f'"com.gladekit.mcp-bridge": "https://github.com/Glade-tool/glade-mcp.git'
     f'?path=unity-bridge#v{MIN_BRIDGE_VERSION}"'
 )
 

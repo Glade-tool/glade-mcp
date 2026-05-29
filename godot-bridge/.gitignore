@@ -1,0 +1,11 @@
+# Godot editor cache — regenerated on every editor open, never source
+.godot/
+
+# Local test scratch artifacts — created when poking at the bridge by hand
+test.tscn
+_test_*.tres
+_test_*.tscn
+
+# OS metadata
+.DS_Store
+Thumbs.db

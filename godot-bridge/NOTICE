@@ -1,0 +1,67 @@
+GladeKit MCP Bridge for Godot
+Copyright (c) 2026 GladeKit
+
+This product includes software developed from third-party MIT-licensed projects:
+
+────────────────────────────────────────────────────────────────────────────
+Coding-Solo/godot-mcp
+https://github.com/Coding-Solo/godot-mcp
+Copyright (c) Coding-Solo, MIT License
+────────────────────────────────────────────────────────────────────────────
+
+Specific code adapted from godot-mcp (per-file headers cite the source
+file + line range):
+
+  bridge/tool_utils.gd
+    safe_instantiate_class() and supporting class_name resolver
+    Source: src/scripts/godot_operations.gd lines ~95-162
+    Purpose: instantiate any class — built-in (ClassDB) or user-declared
+             via `class_name` — from agent input, with strict regex
+             validation.
+
+  tools/implementations/uid/get_uid.gd
+  tools/implementations/uid/update_project_uids.gd
+    Godot 4.4+ resource-UID handling.
+    Source: src/scripts/godot_operations.gd lines ~889-1090
+    Purpose: read/regenerate the .uid sidecars that Godot 4.4+ uses to
+             track resource references across renames and moves. Edge
+             cases for the resave-after-uid-change flow are pre-debugged
+             upstream (godot-mcp issues #102, #104).
+
+  glade-electron/src/main/godotInstallerMain.ts (Phase 4)
+    detectGodotExecutable()
+    Source: src/index.ts lines ~280-366
+    Purpose: cross-platform Godot binary auto-detection for the desktop
+             app's installer flow.
+
+  glade-electron/src/main/engineDetector.ts (Phase 4)
+    listGodotProjects()
+    Source: src/index.ts lines ~603-661
+    Purpose: recursive walker that finds every `project.godot` under a
+             root directory, used to populate the project picker UI.
+
+────────────────────────────────────────────────────────────────────────────
+godot-mcp MIT License (full text)
+────────────────────────────────────────────────────────────────────────────
+
+MIT License
+
+Copyright (c) Coding-Solo
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

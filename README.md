@@ -17,7 +17,7 @@ Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients dire
 **Unity** — In Unity: **Window > Package Manager > + > Add package from git URL...**
 
 ```
-https://github.com/Glade-tool/glade-mcp-unity.git?path=/unity-bridge
+https://github.com/Glade-tool/glade-mcp.git?path=/unity-bridge
 ```
 
 The Unity bridge starts automatically on `localhost:8765`.
@@ -497,7 +497,7 @@ Endpoints:
 - Unity caches UPM git packages and never refetches, so an `?path=unity-bridge` install drifts behind `main` over time. Update via Unity → **Window > Package Manager > GladeKit MCP Bridge > Update**, or pin the manifest entry to a specific tag so future updates are explicit:
 
   ```json
-  "com.gladekit.mcp-bridge": "https://github.com/Glade-tool/glade-mcp-unity.git?path=unity-bridge#v0.4.1"
+  "com.gladekit.mcp-bridge": "https://github.com/Glade-tool/glade-mcp.git?path=unity-bridge#v0.4.1"
   ```
 
 - The same warning also appears as a one-shot prefix on the next tool response so you see it in chat. To silence both: add `"GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING": "1"` to the `env` of your MCP client config.
