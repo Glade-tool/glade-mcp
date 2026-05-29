@@ -32,14 +32,21 @@ from gladekit_mcp.schemas.godot import (
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def _repo_root() -> Path:
-    """The mcp-server/ package lives one level inside the repo. Walk up
-    from this test file until we find godot-bridge/."""
+def _repo_root() -> Path | None:
+    """The mcp-server/ package lives one level inside the monorepo. Walk up
+    from this test file looking for godot-bridge/.
+
+    Returns None when not found — that's the normal case in the published
+    open-source repo, where mcp-server/ is synced WITHOUT godot-bridge/
+    (the Godot bridge ships from its own repo). Callers skip in that case;
+    the parity check is only meaningful in the monorepo where both halves
+    are present.
+    """
     here = Path(__file__).resolve()
     for parent in [here, *here.parents]:
         if (parent / "godot-bridge").is_dir():
             return parent
-    raise RuntimeError("Could not locate repo root (no godot-bridge/ ancestor)")
+    return None
 
 
 def _bridge_tool_names() -> set[str]:
@@ -49,7 +56,10 @@ def _bridge_tool_names() -> set[str]:
     Rather than parsing all 33 .gd files, we scan their files for that one
     line — robust and minimal.
     """
-    impls_root = _repo_root() / "godot-bridge" / "addons" / "com.gladekit.mcp-bridge" / "tools" / "implementations"
+    root = _repo_root()
+    if root is None:
+        pytest.skip("Godot bridge sources not present (mcp-server synced without godot-bridge/)")
+    impls_root = root / "godot-bridge" / "addons" / "com.gladekit.mcp-bridge" / "tools" / "implementations"
     if not impls_root.is_dir():
         pytest.skip(f"Godot bridge sources not present at {impls_root}")
 

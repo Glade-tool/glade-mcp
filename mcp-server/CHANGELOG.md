@@ -4,7 +4,7 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-05-29
+## [0.7.1] - 2026-05-29
 
 ### Added
 
@@ -15,6 +15,7 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 ### Notes
 
 - Unity behavior is unchanged: the Unity HTTP path is byte-identical, and a session with no engine declared defaults to Unity. Existing Unity clients require no changes.
+- `0.7.0` was tagged but never published — a CI-only test that assumed the Godot bridge sources sit alongside `mcp-server/` failed in the published-repo layout (they ship from a separate repo). The test now skips when those sources are absent; `0.7.1` is the first published release with Godot support.
 
 ## [0.6.8] - 2026-05-28
 
