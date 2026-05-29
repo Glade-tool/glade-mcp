@@ -4,6 +4,18 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-29
+
+### Added
+
+- **Godot engine support (4.3+).** The MCP server now drives the Godot editor in addition to Unity. On startup it probes the local bridges and exposes the matching tool set — Unity if the Unity bridge is reachable on `:8765`, Godot if the Godot bridge is reachable on `:8766`. Set `GLADEKIT_MCP_FORCE_ENGINE=unity|godot` to skip the probe and pin an engine (useful when both editors are open).
+- **33 native Godot tools** across scene/node (create/find/transform/reparent/duplicate/delete nodes), GDScript (create/modify/read/find scripts + node attachment), camera & light, resources (materials), physics bodies, scene I/O (`.tscn` create/open/save/instantiate), a live play-session loop (`run_project` → `get_debug_output` → `stop_project`), and Godot 4.4+ `ResourceUID` handling.
+- **Godot bridge addon** (`com.gladekit.mcp-bridge` for Godot, v0.3.1) — a thread-based WebSocket server for the Godot editor, installed by copying into `addons/`. See the README's Godot Quick Start.
+
+### Notes
+
+- Unity behavior is unchanged: the Unity HTTP path is byte-identical, and a session with no engine declared defaults to Unity. Existing Unity clients require no changes.
+
 ## [0.6.8] - 2026-05-28
 
 ### Fixed
