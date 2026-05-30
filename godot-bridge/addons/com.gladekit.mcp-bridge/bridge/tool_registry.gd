@@ -57,6 +57,11 @@ const LaunchEditorTool        = preload("res://addons/com.gladekit.mcp-bridge/to
 const GetUidTool            = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/uid/get_uid.gd")
 const UpdateProjectUidsTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/uid/update_project_uids.gd")
 
+# ── Signal tools (Phase 5) ─────────────────────────────────────────────────
+const ConnectSignalTool         = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/signal/connect_signal.gd")
+const ListSignalConnectionsTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/signal/list_signal_connections.gd")
+const DisconnectSignalTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/signal/disconnect_signal.gd")
+
 var _tools: Dictionary = {}
 
 
@@ -106,6 +111,10 @@ func _register_all() -> void:
 	# UID (2, 4.4+)
 	register_tool(GetUidTool.new())
 	register_tool(UpdateProjectUidsTool.new())
+	# Signal (3, Phase 5) — persistent (scene-saved) signal wiring
+	register_tool(ConnectSignalTool.new())
+	register_tool(ListSignalConnectionsTool.new())
+	register_tool(DisconnectSignalTool.new())
 
 
 func register_tool(tool_instance) -> void:
