@@ -28,18 +28,6 @@ file + line range):
              cases for the resave-after-uid-change flow are pre-debugged
              upstream (godot-mcp issues #102, #104).
 
-  glade-electron/src/main/godotInstallerMain.ts (Phase 4)
-    detectGodotExecutable()
-    Source: src/index.ts lines ~280-366
-    Purpose: cross-platform Godot binary auto-detection for the desktop
-             app's installer flow.
-
-  glade-electron/src/main/engineDetector.ts (Phase 4)
-    listGodotProjects()
-    Source: src/index.ts lines ~603-661
-    Purpose: recursive walker that finds every `project.godot` under a
-             root directory, used to populate the project picker UI.
-
 ────────────────────────────────────────────────────────────────────────────
 godot-mcp MIT License (full text)
 ────────────────────────────────────────────────────────────────────────────

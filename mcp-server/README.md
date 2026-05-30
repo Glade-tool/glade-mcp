@@ -399,7 +399,7 @@ Set `GLADEKIT_API_KEY` in your MCP config's `env` field to unlock cloud-powered 
 
 - **RAG knowledge base** - `get_relevant_tools` queries a curated Unity knowledge base (API corrections, error patterns) and injects results alongside tool recommendations.
 - **Cross-session persistent memory** - facts stored with `remember_for_session` persist across sessions and are re-injected into the system prompt.
-- **Convention extraction** - the cloud backend distills coding patterns (naming, architecture, preferences) from your accumulated memories.
+- **Convention extraction** - coding patterns (naming, architecture, preferences) are distilled from your accumulated memories and surfaced in future sessions.
 
 All cloud features degrade gracefully: if the key is missing or the cloud is unreachable, everything works normally.
 
