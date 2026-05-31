@@ -41,7 +41,10 @@ extends Node
 #
 # The 'id' field is echoed verbatim so async clients can correlate.
 
-const VERSION := "0.3.1"
+# VERSION is read dynamically from plugin.cfg at startup — see _read_version().
+# A hardcoded const here drifted in 0.3.1 -> 0.4.0 (smoke test caught it), so
+# we make plugin.cfg the single source of truth for the on-the-wire version.
+const PLUGIN_CFG_PATH := "res://addons/com.gladekit.mcp-bridge/plugin.cfg"
 const BRIDGE_KIND := "godot-mcp"
 const DEFAULT_PORT := 8766
 const BIND_ADDRESS := "127.0.0.1"
@@ -54,6 +57,10 @@ const ReadOnlyGuard = preload("res://addons/com.gladekit.mcp-bridge/services/rea
 const ErrorTracker  = preload("res://addons/com.gladekit.mcp-bridge/services/error_tracker.gd")
 
 # ── Bridge state ─────────────────────────────────────────────────────────
+# Populated once in start() from plugin.cfg, then read-only for the rest of
+# the bridge's lifetime — safe to read from the worker thread without a mutex.
+var VERSION: String = "unknown"
+
 var _tcp_server: TCPServer = null
 var _peers: Array[WebSocketPeer] = []  # thread-owned after start()
 var _registry = null
@@ -85,6 +92,9 @@ var _accept_log_count: int = 0
 func start() -> void:
 	if _running:
 		return
+	# Resolve VERSION before anything reads it. Must happen before _thread
+	# spawns (the worker thread reads VERSION on every health request).
+	VERSION = _read_version()
 	_port = _resolve_port()
 	_registry = ToolRegistry.new()
 	_tcp_server = TCPServer.new()
@@ -371,7 +381,25 @@ func _make_error(request_id: String, message: String) -> Dictionary:
 	}
 
 
-# ── Port resolution + bind-failure UX ────────────────────────────────────
+# ── Version + port resolution + bind-failure UX ──────────────────────────
+
+# Read the bridge version from plugin.cfg at startup. Single source of truth:
+# the same line the Godot plugin system reads to display "v0.4.0" in the
+# Project Settings → Plugins UI is what we return over the wire. Removes the
+# whole class of "hardcoded const drifted from plugin.cfg" bugs.
+func _read_version() -> String:
+	var cfg := ConfigFile.new()
+	var err := cfg.load(PLUGIN_CFG_PATH)
+	if err != OK:
+		push_warning(
+			"[GladeKit MCP Bridge] Could not load plugin.cfg (err %d). " % err
+			+ "Reporting bridgeVersion as 'unknown'. Check that the addon is "
+			+ "installed at %s." % PLUGIN_CFG_PATH
+		)
+		return "unknown"
+	var v = cfg.get_value("plugin", "version", "unknown")
+	return str(v) if v != null else "unknown"
+
 
 func _resolve_port() -> int:
 	var override: String = OS.get_environment("GLADEKIT_GODOT_BRIDGE_PORT")

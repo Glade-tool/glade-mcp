@@ -185,31 +185,91 @@ func _flag_bits_to_names(bits: int) -> Array:
 	return out
 
 
-# Return up to 3 closest matches by case-insensitive substring + prefix
-# similarity. Cheap fuzzy matcher — perfect is unnecessary; the goal is to
-# steer the agent toward the right name when it misspells.
+# Return up to 3 closest matches. Combines prefix/substring boosts (for
+# partial input — agent typed "find_no" wanting "find_nodes") with
+# Levenshtein edit distance (for typos — agent typed "timeput" wanting
+# "timeout"). The old substring-only version missed the typo case
+# entirely, which is by far the most common agent failure mode.
 func _closest(target: String, candidates: Array) -> Array:
 	var t := target.to_lower()
+	if t.is_empty() or candidates.is_empty():
+		return _alphabetical_fallback(candidates)
 	var scored: Array = []
 	for c in candidates:
 		var cs := String(c).to_lower()
-		var score := 0
-		if cs == t:
-			score = 1000
-		elif cs.begins_with(t) or t.begins_with(cs):
-			score = 100
-		elif cs.contains(t) or t.contains(cs):
-			score = 50
-		if score > 0:
+		var score := _similarity(t, cs)
+		# 0.4 threshold: roughly "less than 60% of characters disagree".
+		# Anything below this is probably noise, not a misspelling.
+		if score >= 0.4:
 			scored.append({"name": String(c), "score": score})
+	if scored.is_empty():
+		return _alphabetical_fallback(candidates)
 	scored.sort_custom(func(a, b): return a.score > b.score)
+	# When the top match is clearly excellent (>0.85), drop weak runners-up
+	# (>0.2 below top). Otherwise the agent sees noise alongside the
+	# obvious answer — e.g. typo "request_redy" should suggest only
+	# "request_ready", not "request_ready, get_rid, queue_free".
+	var top_score: float = scored[0].score
+	var cutoff: float = top_score - 0.2 if top_score > 0.85 else 0.0
 	var out: Array = []
 	for i in min(3, scored.size()):
+		if scored[i].score < cutoff:
+			break
 		out.append("Try '%s'" % scored[i].name)
-	if out.is_empty() and candidates.size() > 0:
-		# Fall back: show first 3 alphabetical so the agent at least sees the namespace.
-		var sample: Array = candidates.duplicate()
-		sample.sort()
-		for i in min(3, sample.size()):
-			out.append("Available: '%s'" % sample[i])
 	return out
+
+
+# Fallback when nothing scores above the similarity threshold: show the
+# first 3 alphabetical candidates so the agent at least sees the namespace.
+func _alphabetical_fallback(candidates: Array) -> Array:
+	var out: Array = []
+	if candidates.is_empty():
+		return out
+	var sample: Array = candidates.duplicate()
+	sample.sort()
+	for i in min(3, sample.size()):
+		out.append("Available: '%s'" % sample[i])
+	return out
+
+
+# Similarity score in [0, 1]. 1.0 = exact match.
+# Prefix/substring overlap is treated as a strong signal even when the
+# strings differ in length (so partial input scores high). Otherwise falls
+# back to Levenshtein normalized by the longer string.
+func _similarity(a: String, b: String) -> float:
+	if a == b:
+		return 1.0
+	if a.is_empty() or b.is_empty():
+		return 0.0
+	if a.begins_with(b) or b.begins_with(a):
+		return 0.85
+	if a.contains(b) or b.contains(a):
+		return 0.7
+	var ed := _levenshtein(a, b)
+	var max_len: int = max(a.length(), b.length())
+	return 1.0 - float(ed) / float(max_len)
+
+
+# Iterative two-row Levenshtein. O(m*n) time, O(n) memory. Names are
+# short (<32 chars) and candidate sets are small (<50 signals/methods) so
+# performance is a non-issue.
+func _levenshtein(a: String, b: String) -> int:
+	var m: int = a.length()
+	var n: int = b.length()
+	if m == 0:
+		return n
+	if n == 0:
+		return m
+	var prev: Array = []
+	prev.resize(n + 1)
+	for j in range(n + 1):
+		prev[j] = j
+	for i in range(1, m + 1):
+		var curr: Array = []
+		curr.resize(n + 1)
+		curr[0] = i
+		for j in range(1, n + 1):
+			var cost: int = 0 if a[i - 1] == b[j - 1] else 1
+			curr[j] = min(min(prev[j] + 1, curr[j - 1] + 1), prev[j - 1] + cost)
+		prev = curr
+	return prev[n]

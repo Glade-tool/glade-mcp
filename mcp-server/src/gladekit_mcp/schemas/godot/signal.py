@@ -76,10 +76,13 @@ TOOLS: List[Dict] = [
                     "method_name": {
                         "type": "string",
                         "description": (
-                            "Name of the method on the target node. Must already exist "
-                            "on the target's attached script — connect_signal will refuse "
-                            "to wire to a nonexistent method (otherwise the connection "
-                            "would silently no-op at runtime). Convention: '_on_<emitter>_<signal>'."
+                            "Name of the method on the target node. Must be callable on "
+                            "the target — either declared on its attached script, or a "
+                            "built-in method inherited from its class (e.g. queue_free, "
+                            "request_ready, set_process). connect_signal refuses to wire "
+                            "to a nonexistent method (otherwise the connection would "
+                            "silently no-op at runtime). For script methods, the "
+                            "convention is '_on_<emitter>_<signal>'."
                         ),
                     },
                     "flags": {

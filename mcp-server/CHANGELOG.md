@@ -4,6 +4,20 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- **3 Godot signal-wiring tools** for editor-time, scene-saved (CONNECT_PERSIST) signal connections — the same kind of wiring you'd otherwise make through the Godot editor's Node panel:
+  - `connect_signal` — wire an emitter's signal to a target method (idempotent; refuses to wire nonexistent signals or methods with closest-match suggestions).
+  - `list_signal_connections` — read existing wiring on a node; `response_format="detailed"` also lists every signal declared on the node.
+  - `disconnect_signal` — remove a persistent connection; never silently no-ops.
+- Godot bridge addon **v0.4.1** (`com.gladekit.mcp-bridge` for Godot) shipping the new signal tools. Download the addon zip from the [`godot-v0.4.1` GitHub Release](https://github.com/Glade-tool/glade-mcp/releases/tag/godot-v0.4.1).
+
+### Fixed
+
+- **Godot bridge `/health` endpoint reported the wrong version.** A hardcoded version constant in the bridge silently drifted from `plugin.cfg` during a bump, so up-to-date users saw false "stale bridge" warnings from the MCP server. The bridge now reads its version dynamically from `plugin.cfg` at startup, and a regression-guard test refuses to merge any future hardcoded version constant.
+- **`connect_signal` typo suggestions are much more useful.** A 1-character typo like `timeput` (for `timeout`) or `request_redy` (for `request_ready`) now returns the actual closest match instead of an alphabetical fallback. Uses Levenshtein edit-distance matching with a noise filter that drops weak runners-up when the top match is clearly correct.
+- **`connect_signal` schema description** for `method_name` now correctly notes that built-in class methods (`queue_free`, `request_ready`, etc.) are valid targets, not just script-declared methods. The previous wording would have steered agents away from a working path.
+
 ## [0.7.1] - 2026-05-29
 
 ### Added
