@@ -5,13 +5,14 @@ scene, node, script, and resource tools so AI assistants can read and modify
 the active project. Designed to be addressed by an MCP server (for use with
 Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 
-**Status:** Phase 3 — 33 tools registered. MVP catalog complete.
+**Status:** 36 tools registered across 9 categories.
 
 | Phase | Tools | Cumulative | Status |
 | --- | --- | --- | --- |
 | 1 | `get_scene_tree` | 1 | shipped (v0.1.0) |
 | 2 | + 9 Scene/Node, + 5 Script | 15 | shipped (v0.2.0) |
 | 3 | + 2 Camera/Light, + 2 Resource, + 1 Physics, + 4 Scene I/O, + 7 Runtime/process (incl. `run_project`/`stop_project`/`get_debug_output` + `launch_editor`), + 2 UID (4.4+) | 33 | shipped (v0.3.0) |
+| 5 | + 3 Signal wiring (`connect_signal`, `list_signal_connections`, `disconnect_signal`) | 36 | shipped (v0.4.1) |
 
 ### New in Phase 3
 
@@ -34,6 +35,17 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
   `possible_solutions: [...]` so the agent has next-step suggestions
   rather than just a single error string.
 
+### New in Phase 5
+
+- **Signal wiring tools (3)** — `connect_signal`, `list_signal_connections`,
+  `disconnect_signal`. Editor-time, scene-saved (CONNECT_PERSIST) signal
+  connections — the same kind you'd otherwise create through the editor's
+  Node panel. `list_signal_connections` with `response_format="detailed"`
+  also lists every signal *declared* on the node, so the agent can plan
+  a connection without a second tool call. Suggestions use edit-distance
+  matching so a 1-character typo (`timeput` instead of `timeout`) surfaces
+  the right name.
+
 ## Requirements
 
 - Godot **4.3** or newer
@@ -50,7 +62,7 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 3. Enable **GladeKit MCP Bridge**.
 4. Confirm the bridge is up: the editor Output panel should print
    ```
-   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.3.0, 33 tools registered, thread-polled at 200Hz)
+   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.4.1, 36 tools registered, thread-polled at 200Hz)
    ```
 
 The server stops automatically when you disable the plugin or close Godot.

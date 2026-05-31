@@ -4,7 +4,7 @@ Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients dire
 
 **Unity:** 235+ tools, full Unity-aware system prompt, GLADE.md project context, script semantic search, skill calibration, free CC0 asset pipeline (Kenney), cloud intelligence layer with RAG and cross-session memory.
 
-**Godot (4.3+):** 33 native tools covering scene/node, script, camera/light, resource, physics, scene I/O, runtime (incl. a live `run_project`/`get_debug_output`/`stop_project` play-session loop), and Godot 4.4+ ResourceUID handling. The MCP server probes the local bridge at startup and exposes the matching tool set — Unity if the Unity bridge is running on `:8765`, Godot if the Godot bridge is running on `:8766`.
+**Godot (4.3+):** 36 native tools covering scene/node, script, camera/light, resource, physics, scene I/O, runtime (incl. a live `run_project`/`get_debug_output`/`stop_project` play-session loop), Godot 4.4+ ResourceUID handling, and editor-time signal wiring (`connect_signal` / `list_signal_connections` / `disconnect_signal`). The MCP server probes the local bridge at startup and exposes the matching tool set — Unity if the Unity bridge is running on `:8765`, Godot if the Godot bridge is running on `:8766`.
 
 ![GladeKit MCP Demo](GladeKitMCP_DemoGIF.gif)
 
@@ -24,17 +24,36 @@ The Unity bridge starts automatically on `localhost:8765`.
 
 **Godot (4.3+)** — copy the addon into your project's `addons/` directory:
 
-1. Download the latest `com.gladekit.mcp-bridge` addon (GitHub releases).
+1. Download the latest `com.gladekit.mcp-bridge` addon zip from [GladeKit MCP releases](https://github.com/Glade-tool/glade-mcp/releases) (the asset is named `com.gladekit.mcp-bridge-<version>.zip`).
 2. Extract into `<your-godot-project>/addons/com.gladekit.mcp-bridge/`.
 3. In Godot: **Project → Project Settings → Plugins** → enable **GladeKit MCP Bridge**.
 
 The Godot bridge starts automatically on `localhost:8766`. You should see a confirmation line in the editor Output panel:
 
 ```
-[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.3.0, 33 tools registered, thread-polled at 200Hz)
+[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.4.1, 36 tools registered, thread-polled at 200Hz)
 ```
 
+**Supported:** Godot 4.3+ GDScript projects, Forward+ and Compatibility renderers, 2D and 3D. **Not yet supported:** Godot Mono / C# projects, web export targets, headless server builds. The bridge is editor-only; it never runs in exported games.
+
 Engine auto-detection: the MCP server probes both ports on startup and exposes the matching tool set. Running both editors at once? Set `GLADEKIT_MCP_FORCE_ENGINE=unity` or `=godot` to pin a specific engine.
+
+#### Verify the bridge is reachable
+
+Before wiring up an AI client, you can confirm the bridge is responding via any WebSocket client. With Python + the `websockets` package:
+
+```python
+import asyncio, json, websockets
+
+async def main():
+    async with websockets.connect("ws://127.0.0.1:8766") as ws:
+        await ws.send(json.dumps({"id": "1", "endpoint": "health"}))
+        print(await ws.recv())
+
+asyncio.run(main())
+```
+
+Expected response: `{"id": "1", "success": true, "status": "ok", "bridgeVersion": "0.4.1", "bridgeKind": "godot-mcp", ...}`. To list every registered tool, send `{"id": "2", "endpoint": "tools/list"}` instead.
 
 ### 2. Connect your AI client
 
@@ -92,6 +111,30 @@ If you cloned this repo, the `.mcp.json` auto-connects. Otherwise add to your Cl
 <summary><strong>Claude Desktop</strong></summary>
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "gladekit-unity": {
+      "command": "uvx",
+      "args": ["gladekit-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Cline (VS Code extension)</strong></summary>
+
+Open Cline's MCP settings file (auto-created on first MCP use):
+
+- **Mac:** `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- **Windows:** `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+- **Linux:** `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+
+Add:
 
 ```json
 {
