@@ -62,6 +62,9 @@ const ConnectSignalTool         = preload("res://addons/com.gladekit.mcp-bridge/
 const ListSignalConnectionsTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/signal/list_signal_connections.gd")
 const DisconnectSignalTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/signal/disconnect_signal.gd")
 
+# ── Project introspection tools ────────────────────────────────────────────
+const GetProjectInfoTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/project/get_project_info.gd")
+
 var _tools: Dictionary = {}
 
 
@@ -115,6 +118,8 @@ func _register_all() -> void:
 	register_tool(ConnectSignalTool.new())
 	register_tool(ListSignalConnectionsTool.new())
 	register_tool(DisconnectSignalTool.new())
+	# Project introspection (1)
+	register_tool(GetProjectInfoTool.new())
 
 
 func register_tool(tool_instance) -> void:

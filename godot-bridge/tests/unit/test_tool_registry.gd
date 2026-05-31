@@ -20,8 +20,8 @@ class _StubTool extends ITool:
 
 func test_registry_contains_all_mvp_tools() -> void:
 	var registry = ToolRegistry.new()
-	# 15 from Phase 2 + 18 from Phase 3 + 3 from Phase 5 (signal) = 36 total.
-	assert_eq(registry.get_tool_count(), 36, "Catalog should register exactly 36 tools")
+	# 15 from Phase 2 + 18 from Phase 3 + 3 from Phase 5 (signal) + 1 project = 37 total.
+	assert_eq(registry.get_tool_count(), 37, "Catalog should register exactly 37 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -48,6 +48,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"get_uid", "update_project_uids",
 		# Phase 5 — Signal wiring (persistent, scene-saved)
 		"connect_signal", "list_signal_connections", "disconnect_signal",
+		# Project introspection
+		"get_project_info",
 	]
 	for name in expected_names:
 		assert_true(registry.has_tool(name), "Missing registration for tool '%s'" % name)

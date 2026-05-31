@@ -19,11 +19,12 @@ Categories follow the Godot bridge's own directory layout under
     runtime   — Play-mode + selection + console + play session  ( 7 tools)
     uid       — Godot 4.4+ ResourceUID handling                 ( 2 tools)
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
+    project   — Single-call project introspection               ( 1 tool )
                                                                 ───────
-                                                                36 tools
+                                                                37 tools
 
 Unlike the Unity side (~222 tools across 17 categories) we expose the
-full Godot catalog directly — 36 tools is well within Claude Code's
+full Godot catalog directly — 37 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 """
 
@@ -31,6 +32,7 @@ from typing import Dict, List
 
 from .camera import TOOLS as CAMERA_TOOLS
 from .physics import TOOLS as PHYSICS_TOOLS
+from .project import TOOLS as PROJECT_TOOLS
 from .resource import TOOLS as RESOURCE_TOOLS
 from .runtime import TOOLS as RUNTIME_TOOLS
 from .scene import TOOLS as SCENE_TOOLS
@@ -49,11 +51,12 @@ ALL_CATEGORIES = [
     ("runtime", RUNTIME_TOOLS),
     ("uid", UID_TOOLS),
     ("signal", SIGNAL_TOOLS),
+    ("project", PROJECT_TOOLS),
 ]
 
 
 def get_godot_tool_schemas() -> List[Dict]:
-    """Return all 36 Godot tool schemas as a flat list (OpenAI function format)."""
+    """Return all 37 Godot tool schemas as a flat list (OpenAI function format)."""
     all_tools: List[Dict] = []
     for _, tools in ALL_CATEGORIES:
         all_tools.extend(tools)
