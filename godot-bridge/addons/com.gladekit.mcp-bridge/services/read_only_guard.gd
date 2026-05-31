@@ -29,6 +29,10 @@ const READ_ONLY_TOOLS: Array[String] = [
 	"get_debug_output",
 	# UID reads
 	"get_uid",
+	# Signal reads
+	"list_signal_connections",
+	# Project introspection reads
+	"get_project_info",
 ]
 
 const SETTING_KEY := "gladekit/read_only_mode"

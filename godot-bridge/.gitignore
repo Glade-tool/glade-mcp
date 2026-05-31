@@ -7,10 +7,21 @@
 # user's project, and to match the godot-v0.3.1 release zip baseline.
 *.uid
 
+# GUT (Godot Unit Test) — dev-only test framework, installed per-machine into
+# addons/gut/ (see tests/README.md). Intentionally NOT bundled: it's a dev
+# dependency, not part of the shipped addon.
+addons/gut/
+.gutconfig.json
+
 # Local test scratch artifacts — created when poking at the bridge by hand
 test.tscn
 _test_*.tres
 _test_*.tscn
+_gk_verify_*.gd
+_gk_verify_*.tres
+
+# BackupManager runtime output — per-machine pre-mutation file backups
+.gladekit-backups/
 
 # OS metadata
 .DS_Store

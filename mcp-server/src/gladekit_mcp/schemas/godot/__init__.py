@@ -10,7 +10,8 @@ asserts every registered bridge tool has a schema and vice versa.
 Categories follow the Godot bridge's own directory layout under
 `addons/com.gladekit.mcp-bridge/tools/implementations/`:
 
-    scene     — Node creation, hierarchy queries, transforms (10 tools)
+    scene     — Node creation, hierarchy queries, transforms,
+                resource assignment                              (11 tools)
     script    — GDScript file CRUD + node attachment           ( 5 tools)
     camera    — Camera3D + Light3D                              ( 2 tools)
     resource  — Material creation + property updates            ( 2 tools)
@@ -21,10 +22,10 @@ Categories follow the Godot bridge's own directory layout under
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
     project   — Single-call project introspection               ( 1 tool )
                                                                 ───────
-                                                                37 tools
+                                                                38 tools
 
 Unlike the Unity side (~222 tools across 17 categories) we expose the
-full Godot catalog directly — 37 tools is well within Claude Code's
+full Godot catalog directly — 38 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 """
 
@@ -53,6 +54,45 @@ ALL_CATEGORIES = [
     ("signal", SIGNAL_TOOLS),
     ("project", PROJECT_TOOLS),
 ]
+
+
+# ── Read-only tool set ────────────────────────────────────────────────────────
+# Tools that only query the project / editor and never mutate it. The MCP
+# layer stamps these with a `readOnlyHint` annotation so clients (Claude Code,
+# Cursor, …) can auto-approve them without a per-call confirmation prompt.
+#
+# This MUST stay in lockstep with the bridge's authoritative list at
+#   godot-bridge/addons/com.gladekit.mcp-bridge/services/read_only_guard.gd
+# (the `READ_ONLY_TOOLS` const). A parity test in tests/test_registry_godot.py
+# parses that file and asserts the two sets are identical, so drift in either
+# direction surfaces as a failing test rather than a silently wrong annotation.
+#
+# Note: run_project / stop_project / launch_editor are NOT here — they are
+# safe to call in play mode (requires_edit_mode = false) but they DO have
+# side effects (spawn/kill a game process, focus the editor), so they are not
+# read-only.
+GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
+    {
+        # Scene/Node reads
+        "get_scene_tree",
+        "get_node_info",
+        "find_nodes",
+        # Script reads
+        "get_script_content",
+        "find_scripts",
+        # Runtime/observability reads
+        "get_godot_console_logs",
+        "get_play_mode_state",
+        "get_selection",
+        "get_debug_output",
+        # UID reads
+        "get_uid",
+        # Signal reads
+        "list_signal_connections",
+        # Project introspection reads
+        "get_project_info",
+    }
+)
 
 
 def get_godot_tool_schemas() -> List[Dict]:

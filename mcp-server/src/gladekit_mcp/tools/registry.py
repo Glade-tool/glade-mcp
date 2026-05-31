@@ -33,7 +33,7 @@ from typing import Any
 from mcp import types
 
 from .. import bridge
-from ..schemas.godot import get_godot_tool_schemas
+from ..schemas.godot import GODOT_READ_ONLY_TOOLS, get_godot_tool_schemas
 from . import get_unity_tool_schemas
 
 logger = logging.getLogger("gladekit-mcp")
@@ -169,19 +169,35 @@ _godot_all_tool_names: set[str] | None = None
 _active_engine: str | None = None
 
 
-def _convert_openai_to_mcp(schema: dict[str, Any]) -> types.Tool:
-    """Convert a single OpenAI function-calling schema to an MCP Tool."""
+def _convert_openai_to_mcp(
+    schema: dict[str, Any],
+    read_only_names: set[str] | frozenset[str] | None = None,
+) -> types.Tool:
+    """Convert a single OpenAI function-calling schema to an MCP Tool.
+
+    When the tool's name is in ``read_only_names``, stamp it with a
+    ``readOnlyHint`` annotation so MCP clients can auto-approve the call
+    without prompting. Mutating tools are left un-annotated (the spec
+    default, which clients treat as "may modify — confirm").
+    """
     func = schema["function"]
+    annotations = None
+    if read_only_names and func["name"] in read_only_names:
+        annotations = types.ToolAnnotations(readOnlyHint=True)
     return types.Tool(
         name=func["name"],
         description=func.get("description", ""),
         inputSchema=func.get("parameters", {"type": "object", "properties": {}}),
+        annotations=annotations,
     )
 
 
-def _build_tool_list(openai_schemas: list[dict[str, Any]]) -> tuple[list[types.Tool], set[str]]:
+def _build_tool_list(
+    openai_schemas: list[dict[str, Any]],
+    read_only_names: set[str] | frozenset[str] | None = None,
+) -> tuple[list[types.Tool], set[str]]:
     """Convert schemas → MCP tools, dedupe by name, return (tools, names)."""
-    converted = [_convert_openai_to_mcp(s) for s in openai_schemas]
+    converted = [_convert_openai_to_mcp(s, read_only_names) for s in openai_schemas]
     seen: set[str] = set()
     out: list[types.Tool] = []
     for t in converted:
@@ -208,7 +224,7 @@ def _get_godot_mcp_tools() -> list[types.Tool]:
     """Godot: expose all 33 tools (no filtering needed — well under budget)."""
     global _godot_mcp_tools, _godot_all_tool_names
     if _godot_mcp_tools is None:
-        all_tools, names = _build_tool_list(get_godot_tool_schemas())
+        all_tools, names = _build_tool_list(get_godot_tool_schemas(), GODOT_READ_ONLY_TOOLS)
         _godot_all_tool_names = names
         _godot_mcp_tools = all_tools
         logger.info(f"Registered {len(_godot_mcp_tools)} Godot tools")

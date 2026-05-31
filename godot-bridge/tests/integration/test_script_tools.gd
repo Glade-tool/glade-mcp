@@ -189,7 +189,7 @@ func test_find_scripts_happy() -> void:
 	_run("create_script", {"script_path": SANDBOX_DIR + "/uniquename_two.gd", "content": "extends Node"})
 	var r := _run("find_scripts", {"name_contains": "uniquename"})
 	assert_true(r.success)
-	assert_ge(r.count, 2)
+	assert_gte(r.count, 2)
 
 
 func test_find_scripts_no_filter_returns_all() -> void:

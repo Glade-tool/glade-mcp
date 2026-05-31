@@ -24,10 +24,12 @@ import pytest
 
 from gladekit_mcp.schemas.godot import (
     ALL_CATEGORIES,
+    GODOT_READ_ONLY_TOOLS,
     get_category_for_tool,
     get_godot_tool_names,
     get_godot_tool_schemas,
 )
+from gladekit_mcp.tools.registry import _build_tool_list
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +76,31 @@ def _bridge_tool_names() -> set[str]:
     return names
 
 
+def _bridge_read_only_tools() -> set[str]:
+    """Parse the bridge's authoritative READ_ONLY_TOOLS const from
+    services/read_only_guard.gd.
+
+    The const is a typed Array[String] literal; we extract every quoted
+    string between the `const READ_ONLY_TOOLS ... [` opener and its closing
+    `]`. Skips (like the parity tests above) when the bridge sources aren't
+    present in the synced OSS layout.
+    """
+    root = _repo_root()
+    if root is None:
+        pytest.skip("Godot bridge sources not present (mcp-server synced without godot-bridge/)")
+    guard = root / "godot-bridge" / "addons" / "com.gladekit.mcp-bridge" / "services" / "read_only_guard.gd"
+    if not guard.is_file():
+        pytest.skip(f"Godot bridge sources not present at {guard}")
+
+    text = guard.read_text(encoding="utf-8")
+    # Anchor on `= [` so the `[` inside the `Array[String]` type annotation
+    # doesn't terminate the match; the array body holds only quoted strings +
+    # comments, so the first `]` after `= [` is the real closer.
+    block = re.search(r"READ_ONLY_TOOLS[^=]*=\s*\[(.*?)\]", text, re.DOTALL)
+    assert block, "Could not locate READ_ONLY_TOOLS array literal in read_only_guard.gd"
+    return set(re.findall(r'"([a-z_][a-z0-9_]*)"', block.group(1)))
+
+
 # ── Parity ───────────────────────────────────────────────────────────────────
 
 
@@ -105,10 +132,10 @@ def test_every_schema_corresponds_to_a_bridge_tool():
 
 def test_tool_count_matches_canonical_catalog():
     """Phase 3 shipped 33 tools; Phase 5 added 3 signal tools → 36;
-    get_project_info added → 37 total. A change here is a real change —
-    update both sides and bump the count."""
+    get_project_info added → 37; set_node_resource added → 38 total. A change
+    here is a real change — update both sides and bump the count."""
     bridge_names = _bridge_tool_names()
-    expected = 37
+    expected = 38
     assert len(bridge_names) == expected, (
         f"Expected {expected} Godot bridge tools, got {len(bridge_names)}. "
         f"If the catalog grew or shrank, update this test and the schema package."
@@ -178,3 +205,54 @@ def test_get_category_for_tool_resolves_known_tool():
 
 def test_get_category_for_tool_returns_empty_for_unknown():
     assert get_category_for_tool("definitely_not_a_real_tool_xyz") == ""
+
+
+# ── Read-only annotations (Tier 1B) ───────────────────────────────────────────
+
+
+def test_read_only_set_matches_bridge_guard():
+    """GODOT_READ_ONLY_TOOLS must equal the bridge's authoritative
+    READ_ONLY_TOOLS const. If they drift, a tool gets a wrong/missing
+    readOnlyHint relative to what the bridge actually enforces in read-only
+    mode — exactly the kind of silent mismatch this guard exists to catch."""
+    assert set(GODOT_READ_ONLY_TOOLS) == _bridge_read_only_tools(), (
+        "GODOT_READ_ONLY_TOOLS (schemas/godot/__init__.py) and the bridge's "
+        "READ_ONLY_TOOLS (services/read_only_guard.gd) have drifted. Update both."
+    )
+
+
+def test_read_only_tools_are_real_godot_tools():
+    """Every name in the read-only set must be an actual registered tool —
+    a typo would annotate nothing and silently pass elsewhere."""
+    schema_names = set(get_godot_tool_names())
+    unknown = set(GODOT_READ_ONLY_TOOLS) - schema_names
+    assert not unknown, f"Read-only set names not present in schemas: {sorted(unknown)}"
+
+
+def test_read_only_tools_get_readonly_hint_annotation():
+    """Each read-only Godot tool's MCP definition must carry
+    annotations.readOnlyHint == True so clients can auto-approve it."""
+    tools, _ = _build_tool_list(get_godot_tool_schemas(), GODOT_READ_ONLY_TOOLS)
+    by_name = {t.name: t for t in tools}
+    for name in GODOT_READ_ONLY_TOOLS:
+        tool = by_name[name]
+        assert tool.annotations is not None, f"{name} should carry annotations"
+        assert tool.annotations.readOnlyHint is True, f"{name} should have readOnlyHint=True"
+
+
+def test_mutating_tools_have_no_readonly_hint():
+    """Mutating tools (everything not in the read-only set) must NOT advertise
+    readOnlyHint — otherwise a client auto-approves a project-modifying call.
+    run_project / stop_project / launch_editor are explicitly checked here:
+    they're play-mode-safe but have side effects, so they are NOT read-only."""
+    tools, _ = _build_tool_list(get_godot_tool_schemas(), GODOT_READ_ONLY_TOOLS)
+    for tool in tools:
+        if tool.name in GODOT_READ_ONLY_TOOLS:
+            continue
+        hint = None if tool.annotations is None else tool.annotations.readOnlyHint
+        assert hint is not True, f"{tool.name} is mutating but advertises readOnlyHint=True"
+    # Spot-check the three deceptive ones explicitly.
+    by_name = {t.name: t for t in tools}
+    for name in ("run_project", "stop_project", "launch_editor"):
+        hint = None if by_name[name].annotations is None else by_name[name].annotations.readOnlyHint
+        assert hint is not True, f"{name} must not be marked read-only"

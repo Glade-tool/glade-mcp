@@ -31,6 +31,18 @@ func test_read_only_enabled_still_allows_reads() -> void:
 	assert_true(ReadOnlyGuard.is_allowed("get_scene_tree"))
 	assert_true(ReadOnlyGuard.is_allowed("get_node_info"))
 	assert_true(ReadOnlyGuard.is_allowed("get_uid"))
+	# Late-added read-only tools must also pass (regression for the stale-list bug).
+	assert_true(ReadOnlyGuard.is_allowed("list_signal_connections"))
+	assert_true(ReadOnlyGuard.is_allowed("get_project_info"))
+
+
+func test_read_only_blocks_side_effecting_play_mode_tools() -> void:
+	# run/stop/launch are play-mode-safe but NOT read-only — they must be
+	# blocked in read-only mode (they spawn/kill processes / focus the editor).
+	OS.set_environment("GLADEKIT_GODOT_READ_ONLY", "1")
+	assert_false(ReadOnlyGuard.is_allowed("run_project"))
+	assert_false(ReadOnlyGuard.is_allowed("stop_project"))
+	assert_false(ReadOnlyGuard.is_allowed("launch_editor"))
 
 
 func test_read_only_env_true_string_works() -> void:

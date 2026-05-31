@@ -302,4 +302,48 @@ TOOLS: List[Dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_node_resource",
+            "description": (
+                "Assign a Resource loaded from a res:// path to a Resource-typed "
+                "property on a node — e.g. a Mesh onto MeshInstance3D.mesh, a "
+                "Texture2D onto Sprite2D.texture, a Shape3D onto "
+                "CollisionShape3D.shape, an AudioStream onto AudioStreamPlayer.stream, "
+                "an Environment onto Camera3D.environment, or a Material onto "
+                "material_override. One tool for every 'give this node a resource' "
+                'case. Pass resource_path="" (or null) to clear the property.\n\n'
+                "Validates that the property exists and is resource-typed; when the "
+                "property declares a built-in expected class, the loaded resource "
+                "must match it (the error lists the node's resource-typed properties "
+                "to recover from a wrong name).\n\n"
+                "For MeshInstance3D per-surface material overrides, use "
+                "set_material_property (target_node_path + surface) instead."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_path": {
+                        "type": "string",
+                        "description": "Target node in the edited scene.",
+                    },
+                    "property": {
+                        "type": "string",
+                        "description": (
+                            "Resource-typed property to set, e.g. 'mesh', 'texture', "
+                            "'shape', 'stream', 'material_override', 'environment'."
+                        ),
+                    },
+                    "resource_path": {
+                        "type": "string",
+                        "description": (
+                            'res:// path to the resource to load and assign. Pass "" or null to clear the property.'
+                        ),
+                    },
+                },
+                "required": ["node_path", "property", "resource_path"],
+            },
+        },
+    },
 ]

@@ -5,7 +5,7 @@ scene, node, script, and resource tools so AI assistants can read and modify
 the active project. Designed to be addressed by an MCP server (for use with
 Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 
-**Status:** 37 tools registered across 10 categories.
+**Status:** 38 tools registered across 10 categories.
 
 | Phase | Tools | Cumulative | Status |
 | --- | --- | --- | --- |
@@ -14,6 +14,7 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 | 3 | + 2 Camera/Light, + 2 Resource, + 1 Physics, + 4 Scene I/O, + 7 Runtime/process (incl. `run_project`/`stop_project`/`get_debug_output` + `launch_editor`), + 2 UID (4.4+) | 33 | shipped (v0.3.0) |
 | 5 | + 3 Signal wiring (`connect_signal`, `list_signal_connections`, `disconnect_signal`) | 36 | shipped (v0.4.1) |
 | 6 | + 1 Project introspection (`get_project_info`) | 37 | shipped (v0.4.2) |
+| 7 | + 1 Resource assignment (`set_node_resource`); `readOnlyHint` on read-only tools | 38 | shipped (v0.4.4) |
 
 ### New in Phase 3
 
@@ -59,6 +60,24 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
   resources / 5000 entries hard cap) so the call stays fast even on
   pathological projects.
 
+### New in v0.4.4
+
+- **`set_node_resource`** — assign a Resource loaded from a `res://` path to
+  any Resource-typed property on a node: a `Mesh` onto `MeshInstance3D.mesh`,
+  a `Texture2D` onto `Sprite2D.texture`, a `Shape3D` onto
+  `CollisionShape3D.shape`, an `AudioStream` onto `AudioStreamPlayer.stream`,
+  and so on. One consolidated tool instead of a separate `assign_*` per
+  resource kind. Validates that the property exists and is resource-typed,
+  enforces the property's declared built-in class, and on a wrong property
+  name returns the node's resource-typed properties as recovery hints. Pass
+  `resource_path=""` to clear a property.
+- **`readOnlyHint` tool annotations** — the 12 read-only tools (queries,
+  hierarchy/script reads, console/debug reads, `get_project_info`,
+  `list_signal_connections`) now advertise the MCP `readOnlyHint` annotation
+  so clients like Claude Code can auto-approve them without a per-call
+  confirmation prompt. (Also fixes two read-only tools that were missing from
+  the read-only-mode allow-list.)
+
 ## Requirements
 
 - Godot **4.3** or newer
@@ -75,7 +94,7 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 3. Enable **GladeKit MCP Bridge**.
 4. Confirm the bridge is up: the editor Output panel should print
    ```
-   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.4.2, 37 tools registered, thread-polled at 200Hz)
+   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.4.4, 38 tools registered, thread-polled at 200Hz)
    ```
 
 The server stops automatically when you disable the plugin or close Godot.

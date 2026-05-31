@@ -19,6 +19,7 @@ const RenameNodeTool        = preload("res://addons/com.gladekit.mcp-bridge/tool
 const DuplicateNodeTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/duplicate_node.gd")
 const SetNodeParentTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_parent.gd")
 const SetNodeTransformTool  = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_transform.gd")
+const SetNodeResourceTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_resource.gd")
 
 # ── Script tools (Phase 2) ─────────────────────────────────────────────────
 const CreateScriptTool       = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_script.gd")
@@ -73,7 +74,7 @@ func _init() -> void:
 
 
 func _register_all() -> void:
-	# Scene / Node (10)
+	# Scene / Node (11)
 	register_tool(GetSceneTreeTool.new())
 	register_tool(GetNodeInfoTool.new())
 	register_tool(FindNodesTool.new())
@@ -84,6 +85,7 @@ func _register_all() -> void:
 	register_tool(DuplicateNodeTool.new())
 	register_tool(SetNodeParentTool.new())
 	register_tool(SetNodeTransformTool.new())
+	register_tool(SetNodeResourceTool.new())
 	# Script (5)
 	register_tool(CreateScriptTool.new())
 	register_tool(ModifyScriptTool.new())

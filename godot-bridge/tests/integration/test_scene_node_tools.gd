@@ -103,14 +103,14 @@ func test_find_nodes_happy_by_type() -> void:
 	child.owner = EditorInterface.get_edited_scene_root()
 	var r := _run("find_nodes", {"name_exact": "FindMe"})
 	assert_true(r.success)
-	assert_ge(r.count, 1)
+	assert_gte(r.count, 1)
 
 
 func test_find_nodes_no_filters_returns_results() -> void:
 	# All-pass with default cap: should return at least the sandbox itself.
 	var r := _run("find_nodes", {})
 	assert_true(r.success)
-	assert_ge(r.count, 1)
+	assert_gte(r.count, 1)
 
 
 func test_find_nodes_wrong_type_max_results_falls_back() -> void:
@@ -337,3 +337,125 @@ func test_set_node_transform_invalid_space() -> void:
 		"position": "0,0,0",
 	})
 	assert_false(r.success)
+
+
+# ── set_node_resource ──────────────────────────────────────────────────────
+
+# Saves a resource to a unique res:// path so the tool can load() it like a
+# real on-disk asset. Caller is responsible for _rm() afterwards.
+func _save_temp_resource(res: Resource, filename: String) -> String:
+	var path := "res://%s" % filename
+	var err := ResourceSaver.save(res, path)
+	assert_eq(err, OK, "Failed to save temp resource %s" % path)
+	return path
+
+
+func _rm(path: String) -> void:
+	if not path.is_empty() and FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func _make_mesh_instance(node_name: String) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.name = node_name
+	_sandbox.add_child(mi)
+	mi.owner = EditorInterface.get_edited_scene_root()
+	return mi
+
+
+func test_set_node_resource_happy_assigns_mesh() -> void:
+	var mi := _make_mesh_instance("MeshTarget")
+	var mesh_path := _save_temp_resource(BoxMesh.new(), "_test_gk_box.tres")
+	var r := _run("set_node_resource", {
+		"node_path": "%s/MeshTarget" % SANDBOX_NAME,
+		"property": "mesh",
+		"resource_path": mesh_path,
+	})
+	assert_true(r.success, str(r))
+	assert_true(mi.mesh is BoxMesh, "mesh property should now hold the BoxMesh")
+	assert_eq(r.property, "mesh")
+	assert_eq(r.resource_type, "BoxMesh")
+	_rm(mesh_path)
+
+
+func test_set_node_resource_clears_with_empty_path() -> void:
+	var mi := _make_mesh_instance("MeshClear")
+	mi.mesh = BoxMesh.new()
+	var r := _run("set_node_resource", {
+		"node_path": "%s/MeshClear" % SANDBOX_NAME,
+		"property": "mesh",
+		"resource_path": "",
+	})
+	assert_true(r.success, str(r))
+	assert_null(mi.mesh, "mesh should be cleared to null")
+	assert_null(r.resource_path)
+
+
+func test_set_node_resource_missing_node_path() -> void:
+	var r := _run("set_node_resource", {"property": "mesh", "resource_path": ""})
+	assert_false(r.success)
+	assert_string_contains(r.error, "node_path is required")
+
+
+func test_set_node_resource_missing_resource_path_arg() -> void:
+	var _mi := _make_mesh_instance("MeshNoPath")
+	var r := _run("set_node_resource", {
+		"node_path": "%s/MeshNoPath" % SANDBOX_NAME,
+		"property": "mesh",
+	})
+	assert_false(r.success)
+	assert_string_contains(r.error, "resource_path is required")
+
+
+func test_set_node_resource_unknown_property_lists_resource_props() -> void:
+	var _mi := _make_mesh_instance("MeshUnknownProp")
+	var r := _run("set_node_resource", {
+		"node_path": "%s/MeshUnknownProp" % SANDBOX_NAME,
+		"property": "not_a_real_property",
+		"resource_path": "res://whatever.tres",
+	})
+	assert_false(r.success)
+	assert_has(r, "resource_properties")
+	# MeshInstance3D exposes a resource-typed `mesh` property — it must appear
+	# in the recovery hints so the agent can pick the right name.
+	var names: Array = []
+	for p in r.resource_properties:
+		names.append(p.get("name", ""))
+	assert_true(names.has("mesh"), "resource_properties should include 'mesh'")
+
+
+func test_set_node_resource_non_resource_property_refused() -> void:
+	var _mi := _make_mesh_instance("MeshScalarProp")
+	var r := _run("set_node_resource", {
+		"node_path": "%s/MeshScalarProp" % SANDBOX_NAME,
+		"property": "position",  # Vector3, not a Resource
+		"resource_path": "res://whatever.tres",
+	})
+	assert_false(r.success)
+	assert_string_contains(r.error, "not resource-typed")
+
+
+func test_set_node_resource_type_mismatch_refused() -> void:
+	var _mi := _make_mesh_instance("MeshTypeMismatch")
+	# Save a Material and try to assign it to the `mesh` property (expects Mesh).
+	var mat_path := _save_temp_resource(StandardMaterial3D.new(), "_test_gk_mat.tres")
+	var r := _run("set_node_resource", {
+		"node_path": "%s/MeshTypeMismatch" % SANDBOX_NAME,
+		"property": "mesh",
+		"resource_path": mat_path,
+	})
+	assert_false(r.success)
+	assert_string_contains(r.error, "expects Mesh")
+	assert_eq(r.expected_type, "Mesh")
+	_rm(mat_path)
+
+
+func test_set_node_resource_nonexistent_path() -> void:
+	var _mi := _make_mesh_instance("MeshNoFile")
+	var r := _run("set_node_resource", {
+		"node_path": "%s/MeshNoFile" % SANDBOX_NAME,
+		"property": "mesh",
+		"resource_path": "res://definitely_not_here_xyz.tres",
+	})
+	assert_false(r.success)
+	assert_string_contains(r.error, "does not exist")
