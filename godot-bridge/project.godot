@@ -1,27 +1,21 @@
 ; Engine configuration file.
-; It's best edited using the editor UI and not directly,
-; since the parameters that go here are not all obvious.
 ;
-; Format:
-;   [section] ; section goes between []
-;   param=value ; assign values to parameters
+; This file is intentionally minimal: it exists so godot-bridge/ can be opened
+; as a Godot project for developing and testing the bridge addon. It is synced
+; to the public glade-mcp repo as a ready-to-open starter project for
+; contributors — open godot-bridge/ in Godot, the addon is already enabled.
 
 config_version=5
-
-[animation]
-
-compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="GladeKit MCP Bridge — Dev Project"
 config/description="Local Godot project for developing and testing the GladeKit MCP Bridge addon."
-run/main_scene="res://node_3d.tscn"
-config/features=PackedStringArray("4.6", "GL Compatibility")
+config/features=PackedStringArray("4.3", "GL Compatibility")
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/com.gladekit.mcp-bridge/plugin.cfg", "res://addons/gut/plugin.cfg")
+enabled=PackedStringArray("res://addons/com.gladekit.mcp-bridge/plugin.cfg")
 
 [rendering]
 
