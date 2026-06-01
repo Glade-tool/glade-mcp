@@ -4,7 +4,9 @@ Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients dire
 
 **Unity:** 235+ tools, full Unity-aware system prompt, GLADE.md project context, script semantic search, skill calibration, free CC0 asset pipeline (Kenney), cloud intelligence layer with RAG and cross-session memory.
 
-**Godot (4.3+):** 38 native tools covering scene/node (incl. `set_node_resource` for assigning meshes/textures/shapes/streams to node properties), script, camera/light, resource, physics, scene I/O, runtime (incl. a live `run_project`/`get_debug_output`/`stop_project` play-session loop), Godot 4.4+ ResourceUID handling, editor-time signal wiring (`connect_signal` / `list_signal_connections` / `disconnect_signal`), and single-call project introspection (`get_project_info`). Read-only tools advertise the MCP `readOnlyHint` annotation so clients can auto-approve them. The MCP server probes the local bridge at startup and exposes the matching tool set — Unity if the Unity bridge is running on `:8765`, Godot if the Godot bridge is running on `:8766`.
+**Godot (4.3+):** 38 native tools across scene/node, scripts, resources, signals, runtime, and project introspection. Read-only tools advertise the MCP `readOnlyHint` annotation for auto-approval.
+
+The MCP server auto-detects which editor is running (Unity on `:8765`, Godot on `:8766`) and exposes the matching tool set.
 
 ![GladeKit MCP Demo](GladeKitMCP_DemoGIF.gif)
 
@@ -14,7 +16,7 @@ Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients dire
 
 ### 1. Install the editor bridge
 
-**Unity** — In Unity: **Window > Package Manager > + > Add package from git URL...**
+**Unity:** In Unity, open **Window > Package Manager > + > Add package from git URL...**
 
 ```
 https://github.com/Glade-tool/glade-mcp.git?path=/unity-bridge
@@ -22,7 +24,7 @@ https://github.com/Glade-tool/glade-mcp.git?path=/unity-bridge
 
 The Unity bridge starts automatically on `localhost:8765`.
 
-**Godot (4.3+)** — copy the addon into your project's `addons/` directory:
+**Godot (4.3+):** copy the addon into your project's `addons/` directory:
 
 1. Download the latest `com.gladekit.mcp-bridge` addon zip from [GladeKit MCP releases](https://github.com/Glade-tool/glade-mcp/releases) (the asset is named `com.gladekit.mcp-bridge-<version>.zip`).
 2. Extract into `<your-godot-project>/addons/com.gladekit.mcp-bridge/`.
@@ -38,23 +40,6 @@ The Godot bridge starts automatically on `localhost:8766`. You should see a conf
 
 Engine auto-detection: the MCP server probes both ports on startup and exposes the matching tool set. Running both editors at once? Set `GLADEKIT_MCP_FORCE_ENGINE=unity` or `=godot` to pin a specific engine.
 
-#### Verify the bridge is reachable
-
-Before wiring up an AI client, you can confirm the bridge is responding via any WebSocket client. With Python + the `websockets` package:
-
-```python
-import asyncio, json, websockets
-
-async def main():
-    async with websockets.connect("ws://127.0.0.1:8766") as ws:
-        await ws.send(json.dumps({"id": "1", "endpoint": "health"}))
-        print(await ws.recv())
-
-asyncio.run(main())
-```
-
-Expected response: `{"id": "1", "success": true, "status": "ok", "bridgeVersion": "0.4.1", "bridgeKind": "godot-mcp", ...}`. To list every registered tool, send `{"id": "2", "endpoint": "tools/list"}` instead.
-
 ### 2. Connect your AI client
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (one-time):
@@ -67,19 +52,19 @@ Then add the MCP config to your AI client. The client launches the MCP server au
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-**Option A — one-liner (recommended):**
+**Option A: one-liner (recommended)**
 
-- **Mac/Linux:** `claude mcp add --transport stdio gladekit-unity --scope user -- uvx gladekit-mcp`
-- **Windows:** `claude mcp add --transport stdio gladekit-unity --scope user -- cmd /c uvx gladekit-mcp`
+- **Mac/Linux:** `claude mcp add --transport stdio gladekit-mcp --scope user -- uvx gladekit-mcp`
+- **Windows:** `claude mcp add --transport stdio gladekit-mcp --scope user -- cmd /c uvx gladekit-mcp`
 
-**Option B — manual config:**
+**Option B: manual config**
 
 If you cloned this repo, the `.mcp.json` auto-connects. Otherwise add to your Claude Code MCP settings:
 
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "command": "uvx",
       "args": ["gladekit-mcp"]
     }
@@ -97,7 +82,7 @@ If you cloned this repo, the `.mcp.json` auto-connects. Otherwise add to your Cl
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "command": "uvx",
       "args": ["gladekit-mcp"]
     }
@@ -115,7 +100,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac) or 
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "command": "uvx",
       "args": ["gladekit-mcp"]
     }
@@ -139,7 +124,7 @@ Add:
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "command": "uvx",
       "args": ["gladekit-mcp"]
     }
@@ -157,7 +142,7 @@ In Windsurf, open **Windsurf Settings → MCP Servers → Open MCP Registry**, t
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "command": "uvx",
       "args": ["gladekit-mcp"]
     }
@@ -182,7 +167,7 @@ Unity's built-in AI Assistant can connect to GladeKit via MCP. This gives you Gl
   "enabled": true,
   "path": "",
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "type": "stdio",
       "command": "uvx",
       "args": ["gladekit-mcp"]
@@ -213,7 +198,7 @@ Add to `.vscode/mcp.json` in your workspace:
 ```json
 {
   "servers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "type": "stdio",
       "command": "uvx",
       "args": ["gladekit-mcp"]
@@ -277,14 +262,14 @@ Naming: PascalCase for scripts, snake_case for folders
 <details>
 <summary><strong>Script semantic search</strong></summary>
 
-Set `OPENAI_API_KEY` in your MCP config's `env` field and the server ranks project scripts by semantic similarity to your query. Ask "how does the enemy spawn?" and the right script surfaces — even if it's not named `EnemySpawner`.
+Set `OPENAI_API_KEY` in your MCP config's `env` field and the server ranks project scripts by semantic similarity to your query. Ask "how does the enemy spawn?" and the right script surfaces, even if it's not named `EnemySpawner`.
 
 Everything needed ships with the package; no install flags or extras required. Get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (pay-as-you-go, pennies per search via `text-embedding-3-small`).
 
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "command": "uvx",
       "args": ["gladekit-mcp"],
       "env": { "OPENAI_API_KEY": "sk-..." }
@@ -307,15 +292,15 @@ The server tracks vocabulary across your messages and detects whether you're a U
 <details>
 <summary><strong>Asset pipeline (free CC0 imports)</strong></summary>
 
-Three tools for finding and importing free, commercially-usable assets directly from your AI client. All assets are CC0 (public domain — no attribution required). v1 ships [Kenney.nl](https://kenney.nl) packs; additional providers (Freesound, Quaternius, AI generation) are on the roadmap.
+Three tools for finding and importing free, commercially-usable assets directly from your AI client. All assets are CC0 (public domain, no attribution required). v1 ships [Kenney.nl](https://kenney.nl) packs; additional providers (Freesound, Quaternius, AI generation) are on the roadmap.
 
-| Tool | Purpose |
-| --- | --- |
-| `find_asset` | Search ranked candidates by description, asset type, style, and license. Read-only, no Unity dispatch. |
-| `import_asset` | Download, extract, place under `Assets/`, configure import settings for the asset type, and write a `.gladekit-asset.json` sidecar with license metadata. Requires explicit `licenseAcknowledged: true`. |
-| `list_imported_assets` | Walk the project's sidecars and surface a license audit (license counts, attribution-required count). Useful before a commercial release. |
+| Tool                   | Purpose                                                                                                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `find_asset`           | Search ranked candidates by description, asset type, style, and license. Read-only, no Unity dispatch.                                                                                                   |
+| `import_asset`         | Download, extract, place under `Assets/`, configure import settings for the asset type, and write a `.gladekit-asset.json` sidecar with license metadata. Requires explicit `licenseAcknowledged: true`. |
+| `list_imported_assets` | Walk the project's sidecars and surface a license audit (license counts, attribution-required count). Useful before a commercial release.                                                                |
 
-**Example workflow** (Cursor, Claude Code, Windsurf — same pattern across clients):
+**Example workflow** (Cursor, Claude Code, Windsurf use the same pattern):
 
 > **You:** I'm prototyping a 2D platformer and need placeholder character + tile art. Find me something free.
 
@@ -338,7 +323,7 @@ Result (truncated):
     {
       "id": "kenney/platformer-pack-redux",
       "name": "Platformer Pack Redux",
-      "description": "360+ side-scrolling platformer sprites — characters, enemies, tiles, items, hazards.",
+      "description": "360+ side-scrolling platformer sprites: characters, enemies, tiles, items, hazards.",
       "license": "CC0-1.0",
       "license_summary": "Public domain. No attribution required for any use, including commercial.",
       "official_page": "https://kenney.nl/assets/platformer-pack-redux",
@@ -365,7 +350,7 @@ The AI calls `import_asset`:
 }
 ```
 
-The MCP server resolves the download URL locally (catalog is bundled with the server — no cloud dependency), passes it to the Unity bridge, which downloads, extracts, configures `TextureImporter` for each sprite (Texture Type = Sprite, Filter Mode = Point, Uncompressed) and writes the license sidecar. Result:
+The MCP server resolves the download URL locally (catalog is bundled with the server, no cloud dependency), passes it to the Unity bridge, which downloads, extracts, configures `TextureImporter` for each sprite (Texture Type = Sprite, Filter Mode = Point, Uncompressed) and writes the license sidecar. Result:
 
 ```json
 {
@@ -411,7 +396,7 @@ CC0 needs no attribution; the audit report is empty for required attributions. I
 
 - The LLM never sees download URLs. URL resolution happens cloud/MCP-side; the bridge tool refuses if the resolved fields are missing or LLM-injected.
 - `licenseAcknowledged: true` is required on every `import_asset` call. The bridge refuses without it. Do not set it without explicit user confirmation.
-- The bridge validates `_resolvedUrl`'s host against a per-provider allowlist (`AssetPipelineGuard.IsResolvedUrlHostAllowed`) before downloading. Even a client bypassing both the cloud and MCP preprocessors cannot smuggle in an arbitrary download URL — unknown hosts fail closed. HTTPS only.
+- The bridge validates `_resolvedUrl`'s host against a per-provider allowlist (`AssetPipelineGuard.IsResolvedUrlHostAllowed`) before downloading. Even a client bypassing both the cloud and MCP preprocessors cannot smuggle in an arbitrary download URL; unknown hosts fail closed. HTTPS only.
 - Every imported asset bundle gets a `.gladekit-asset.json` sidecar recording the candidate id, provider, license, attribution string, source URL, and timestamp. `list_imported_assets` reads these for the audit report.
 - Asset Pipeline tools are gated by `AssetPipelineGuard` on the bridge side. A misconfigured client cannot bypass it.
 
@@ -422,7 +407,7 @@ Set `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE=1` in the MCP server's environment to s
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "command": "uvx",
       "args": ["gladekit-mcp"],
       "env": { "GLADEKIT_MCP_DISABLE_ASSET_PIPELINE": "1" }
@@ -449,7 +434,7 @@ All cloud features degrade gracefully: if the key is missing or the cloud is unr
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "command": "uvx",
       "args": ["gladekit-mcp"],
       "env": { "GLADEKIT_API_KEY": "your-api-key" }
@@ -491,7 +476,7 @@ Endpoints:
 ```json
 {
   "mcpServers": {
-    "gladekit-unity": {
+    "gladekit-mcp": {
       "url": "http://127.0.0.1:8766/mcp"
     }
   }
@@ -503,13 +488,13 @@ Endpoints:
 <details>
 <summary><strong>Environment Variables</strong></summary>
 
-| Variable                              | Required | Description                                                                                     |
-| ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------- |
-| `UNITY_BRIDGE_URL`                    | No       | Unity bridge URL (default: `http://localhost:8765`)                                             |
-| `OPENAI_API_KEY`                      | No       | Enables script semantic search via embeddings ([get one](https://platform.openai.com/api-keys)) |
-| `GLADEKIT_API_KEY`                    | No       | Enables RAG knowledge base, cross-session memory, convention extraction                         |
-| `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE` | No       | Set to `1` to suppress `find_asset` / `import_asset` / `list_imported_assets` (curated-asset workflows) |
-| `GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING`| No       | Set to `1` to silence the stderr warning when the Unity bridge is older than the recommended version |
+| Variable                               | Required | Description                                                                                             |
+| -------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| `UNITY_BRIDGE_URL`                     | No       | Unity bridge URL (default: `http://localhost:8765`)                                                     |
+| `OPENAI_API_KEY`                       | No       | Enables script semantic search via embeddings ([get one](https://platform.openai.com/api-keys))         |
+| `GLADEKIT_API_KEY`                     | No       | Enables RAG knowledge base, cross-session memory, convention extraction                                 |
+| `GLADEKIT_MCP_DISABLE_ASSET_PIPELINE`  | No       | Set to `1` to suppress `find_asset` / `import_asset` / `list_imported_assets` (curated-asset workflows) |
+| `GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING` | No       | Set to `1` to silence the stderr warning when the Unity bridge is older than the recommended version    |
 
 </details>
 

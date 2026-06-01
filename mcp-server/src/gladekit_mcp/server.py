@@ -35,23 +35,25 @@ from .tools.task_filter import get_relevant_tool_summary
 logger = logging.getLogger("gladekit-mcp")
 
 _INSTRUCTIONS = (
-    "You are connected to a live Unity Editor via GladeKit. "
-    "Use the gladekit-unity tools for ALL Unity-related tasks: creating/modifying "
-    "GameObjects, scenes, materials, scripts, components, physics, UI, lighting, "
-    "animation, and audio. Do NOT edit .unity, .prefab, .asset, or .meta files "
-    "directly — they are serialized binary/YAML and will corrupt. Do NOT try to "
-    "infer scene contents from files — call get_scene_hierarchy instead.\n\n"
-    "Before creating scripts involving player movement or input handling, read the "
-    "'Project Configuration' resource (unity://project/info) to determine which Input "
-    "System API to use (NEW InputSystem vs. legacy Input.GetAxis).\n\n"
-    "Workflow: (1) read Project Configuration resource, (2) call get_scene_hierarchy "
-    "to see what exists, (3) call get_relevant_tools with a task description to discover "
-    "the best tools, (4) execute the tools. For any request involving the Unity scene or "
-    "project assets, prefer these tools over file editing."
+    "You are connected to a live game-engine editor (Unity or Godot) via GladeKit. "
+    "Use the tools exposed in this session for all engine work: scene and node "
+    "creation, scripts, materials, physics, UI, lighting, audio, and animation. "
+    "Do not edit serialized scene or asset files directly (.unity, .prefab, .asset, "
+    ".meta, .tscn, .tres); they will corrupt. Inspect live state via the read tools "
+    "(get_scene_hierarchy on Unity, get_scene_tree on Godot, plus get_gameobject_info "
+    "/ get_node_info and the find_* tools) instead of inferring from files.\n\n"
+    "On Unity: before creating scripts involving player movement or input handling, "
+    "read the 'Project Configuration' resource (unity://project/info) to determine "
+    "which Input System API to use (NEW InputSystem vs. legacy Input.GetAxis). "
+    "Call get_relevant_tools with a task description to discover extended tools "
+    "beyond the core set.\n\n"
+    "On Godot: call get_project_info first for a single-call snapshot of the project "
+    "(engine version, renderer, current scene, enabled addons, input map) so you do "
+    "not burn calls on cold-start exploration."
 )
 
 server = Server(
-    "gladekit-unity",
+    "gladekit-mcp",
     instructions=_INSTRUCTIONS,
 )
 
