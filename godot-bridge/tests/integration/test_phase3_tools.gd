@@ -135,6 +135,141 @@ func test_set_material_property_missing_path() -> void:
 	assert_false(r.success)
 
 
+# ── create_resource (generic Resource factory) ────────────────────────────
+
+func test_create_resource_happy_box_mesh() -> void:
+	var path := SCRATCH_DIR + "/cr_box_mesh.tres"
+	var r := _run("create_resource", {
+		"path": path,
+		"type": "BoxMesh",
+		"properties": {"size": "3,4,5"},
+	})
+	assert_true(r.success, "create_resource happy path: %s" % r.get("error", ""))
+	assert_eq(r.type, "BoxMesh")
+	assert_eq(r.path, path)
+	assert_true(FileAccess.file_exists(path))
+	assert_eq(r.applied_properties, ["size"])
+	assert_eq(r.unapplied_properties, [])
+
+	# Round-trip: the saved .tres loads back as a BoxMesh with the right size.
+	var loaded := load(path)
+	assert_true(loaded is BoxMesh)
+	assert_eq((loaded as BoxMesh).size, Vector3(3, 4, 5))
+
+
+func test_create_resource_happy_concrete_shape() -> void:
+	# Composition: this is the canonical use-case (create the shape, then
+	# set_node_resource it to a CollisionShape3D.shape).
+	var path := SCRATCH_DIR + "/cr_box_shape.tres"
+	var r := _run("create_resource", {
+		"path": path,
+		"type": "BoxShape3D",
+		"properties": {"size": "2,2,2"},
+	})
+	assert_true(r.success)
+	assert_eq(r.type, "BoxShape3D")
+
+
+func test_create_resource_no_extension_auto_appends_tres() -> void:
+	var path := SCRATCH_DIR + "/cr_no_ext"
+	var r := _run("create_resource", {"path": path, "type": "BoxMesh"})
+	assert_true(r.success)
+	assert_eq(r.path, path + ".tres")
+	assert_true(FileAccess.file_exists(path + ".tres"))
+
+
+func test_create_resource_refuses_overwrite() -> void:
+	var path := SCRATCH_DIR + "/cr_overwrite.tres"
+	_run("create_resource", {"path": path, "type": "BoxMesh"})
+	var r := _run("create_resource", {"path": path, "type": "SphereMesh"})
+	assert_false(r.success)
+	assert_true(r.has("possible_solutions"))
+
+
+func test_create_resource_unknown_type_returns_suggestions() -> void:
+	var r := _run("create_resource", {
+		"path": SCRATCH_DIR + "/cr_unknown.tres",
+		"type": "BoxMash",  # Typo for BoxMesh
+	})
+	assert_false(r.success)
+	assert_true(r.has("suggestions"))
+	assert_gt(r.suggestions.size(), 0)
+	# Edit distance should rank "BoxMesh" near the top for "BoxMash".
+	assert_true(
+		r.suggestions.has("BoxMesh"),
+		"Expected 'BoxMesh' in suggestions for typo 'BoxMash', got: %s" % str(r.suggestions),
+	)
+
+
+func test_create_resource_redirects_material() -> void:
+	var r := _run("create_resource", {
+		"path": SCRATCH_DIR + "/cr_redirect.tres",
+		"type": "StandardMaterial3D",
+	})
+	assert_false(r.success)
+	assert_true(r.has("possible_solutions"))
+	# Redirect message should mention create_material.
+	assert_true(
+		String(r.error).find("create_material") != -1,
+		"Expected 'create_material' in redirect error, got: %s" % r.error,
+	)
+
+
+func test_create_resource_redirects_script() -> void:
+	var r := _run("create_resource", {
+		"path": SCRATCH_DIR + "/cr_script.tres",
+		"type": "GDScript",
+	})
+	assert_false(r.success)
+	assert_true(String(r.error).find("create_script") != -1)
+
+
+func test_create_resource_refuses_non_resource_type() -> void:
+	var r := _run("create_resource", {
+		"path": SCRATCH_DIR + "/cr_node.tres",
+		"type": "Node3D",  # A Node, not a Resource.
+	})
+	assert_false(r.success)
+	assert_true(String(r.error).find("not a Resource") != -1)
+
+
+func test_create_resource_refuses_abstract_type() -> void:
+	var r := _run("create_resource", {
+		"path": SCRATCH_DIR + "/cr_abstract.tres",
+		"type": "Shape3D",  # Abstract base class.
+	})
+	assert_false(r.success)
+	assert_true(r.has("suggestions"))
+	# At least one concrete Shape3D subclass should be suggested.
+	assert_gt(r.suggestions.size(), 0)
+
+
+func test_create_resource_unknown_property_lands_in_unapplied() -> void:
+	var path := SCRATCH_DIR + "/cr_unknown_prop.tres"
+	var r := _run("create_resource", {
+		"path": path,
+		"type": "BoxMesh",
+		"properties": {
+			"size": "1,1,1",
+			"nonexistent_prop": 42,
+		},
+	})
+	assert_true(r.success)
+	assert_eq(r.applied_properties, ["size"])
+	assert_eq(r.unapplied_properties.size(), 1)
+	assert_eq(r.unapplied_properties[0].name, "nonexistent_prop")
+
+
+func test_create_resource_missing_path() -> void:
+	var r := _run("create_resource", {"type": "BoxMesh"})
+	assert_false(r.success)
+
+
+func test_create_resource_missing_type() -> void:
+	var r := _run("create_resource", {"path": SCRATCH_DIR + "/cr_no_type.tres"})
+	assert_false(r.success)
+
+
 # ── Physics ───────────────────────────────────────────────────────────────
 
 func test_create_physics_body_happy_static() -> void:

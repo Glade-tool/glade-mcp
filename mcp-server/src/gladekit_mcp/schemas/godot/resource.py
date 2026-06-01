@@ -1,14 +1,19 @@
 """
-Godot resource tools — material creation + property updates (2 tools).
+Godot resource tools (3 tools).
 
 Godot uses .tres files for human-readable resources (.res for binary).
-Materials default to StandardMaterial3D (PBR); pass material_type='shader'
-for a ShaderMaterial backed by a custom .gdshader.
 
-`set_material_property` doubles as the assignment tool — pass
-`target_node_path` to attach the material to a MeshInstance3D's
-surface_override slot. (The plan originally had a separate
-assign_material_to_mesh tool; folded in here per the Phase 3 dedupe.)
+  create_material         specialized creator for Material subclasses, with
+                          PBR knobs (albedo / metallic / roughness / emission)
+                          and a shader_path path for ShaderMaterial.
+  set_material_property   modify an existing material AND/OR assign it to a
+                          MeshInstance3D surface_override slot.
+  create_resource         generic creator for every other Resource subclass
+                          (Mesh / Shape3D / Curve / Environment / AudioStream*
+                          / Gradient / Texture variants / etc.). Refuses
+                          Material and Script types with a redirect so the
+                          three creators stay cleanly partitioned. Composes
+                          with set_node_resource to assign the saved file.
 """
 
 from typing import Dict, List
@@ -101,6 +106,70 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["material_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_resource",
+            "description": (
+                "Create a built-in Godot Resource subclass (Mesh, Shape3D, Curve, "
+                "Environment, AudioStream*, Gradient, Texture variants, etc.) and "
+                "save it as a .tres file. Pair with set_node_resource to assign the "
+                "saved file to a node property.\n\n"
+                "Use create_material for Material/StandardMaterial3D/ShaderMaterial "
+                "and create_script for GDScript/CSharpScript — those have specialized "
+                "args and create_resource refuses them with a redirect.\n\n"
+                "Refuses to overwrite an existing file (no in-place edit). On unknown "
+                "'type', returns up to 5 edit-distance suggestions from the ClassDB "
+                "Resource subclasses. On abstract 'type' (e.g. 'Shape3D'), returns "
+                "concrete subclasses (e.g. 'BoxShape3D', 'SphereShape3D').\n\n"
+                "Example: create_resource(path='res://shapes/box.tres', type='BoxShape3D', "
+                "properties={'size': '2,2,2'}). Property values for Vector2/3/4 accept "
+                "'x,y,z' strings or [x,y,z] arrays. Color values accept '#rrggbb' or "
+                "'r,g,b'. Unknown property keys land in the response's unapplied_properties "
+                "array with a reason — fix the name and call again."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "res:// path for the .tres file. Auto-appends .tres if no "
+                            "extension. Refuses to overwrite an existing file."
+                        ),
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": (
+                            "Godot class name in PascalCase. Must be a concrete (non-"
+                            "abstract) Resource subclass registered in ClassDB. "
+                            "Examples: 'BoxMesh', 'SphereMesh', 'BoxShape3D', 'Curve', "
+                            "'Gradient', 'Environment', 'AudioStreamRandomizer'."
+                        ),
+                    },
+                    "properties": {
+                        "type": "object",
+                        "description": (
+                            "Optional initial property values, keyed by property name. "
+                            "Vector2/3/4 accept 'x,y,z' strings or arrays. Color accepts "
+                            "'#rrggbb' or 'r,g,b'. Primitives (int/float/bool/string) are "
+                            "coerced from JSON. Other types pass through to Godot's "
+                            "variant system. Unknown keys surface in unapplied_properties "
+                            "with a reason."
+                        ),
+                        "additionalProperties": True,
+                    },
+                },
+                "required": ["path", "type"],
+            },
+            "annotations": {
+                "title": "Create Resource (.tres)",
+                "readOnlyHint": False,
+                "destructiveHint": False,
+                "idempotentHint": False,
             },
         },
     },

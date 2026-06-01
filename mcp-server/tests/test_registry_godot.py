@@ -132,10 +132,11 @@ def test_every_schema_corresponds_to_a_bridge_tool():
 
 def test_tool_count_matches_canonical_catalog():
     """Phase 3 shipped 33 tools; Phase 5 added 3 signal tools → 36;
-    get_project_info added → 37; set_node_resource added → 38 total. A change
-    here is a real change — update both sides and bump the count."""
+    get_project_info added → 37; set_node_resource added → 38; create_resource
+    added → 39 total. A change here is a real change — update both sides and
+    bump the count."""
     bridge_names = _bridge_tool_names()
-    expected = 38
+    expected = 39
     assert len(bridge_names) == expected, (
         f"Expected {expected} Godot bridge tools, got {len(bridge_names)}. "
         f"If the catalog grew or shrank, update this test and the schema package."

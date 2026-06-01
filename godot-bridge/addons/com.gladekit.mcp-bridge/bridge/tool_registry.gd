@@ -32,9 +32,10 @@ const AttachScriptToNodeTool = preload("res://addons/com.gladekit.mcp-bridge/too
 const CreateCamera3DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_camera_3d.gd")
 const CreateLightTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_light.gd")
 
-# ── Resource tools (Phase 3) ───────────────────────────────────────────────
+# ── Resource tools (Phase 3 + 7) ───────────────────────────────────────────
 const CreateMaterialTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/resource/create_material.gd")
 const SetMaterialPropertyTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/resource/set_material_property.gd")
+const CreateResourceTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/resource/create_resource.gd")
 
 # ── Physics tools (Phase 3) ────────────────────────────────────────────────
 const CreatePhysicsBodyTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/create_physics_body.gd")
@@ -95,9 +96,11 @@ func _register_all() -> void:
 	# Camera / Light (2)
 	register_tool(CreateCamera3DTool.new())
 	register_tool(CreateLightTool.new())
-	# Resource (2)
+	# Resource (3) — Material has its own dedicated tool; create_resource
+	# handles every other built-in Resource subclass (Mesh, Shape3D, Curve, etc.)
 	register_tool(CreateMaterialTool.new())
 	register_tool(SetMaterialPropertyTool.new())
+	register_tool(CreateResourceTool.new())
 	# Physics (1)
 	register_tool(CreatePhysicsBodyTool.new())
 	# Scene I/O (4)

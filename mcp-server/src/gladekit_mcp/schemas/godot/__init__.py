@@ -14,7 +14,8 @@ Categories follow the Godot bridge's own directory layout under
                 resource assignment                              (11 tools)
     script    — GDScript file CRUD + node attachment           ( 5 tools)
     camera    — Camera3D + Light3D                              ( 2 tools)
-    resource  — Material creation + property updates            ( 2 tools)
+    resource  — Material creation, generic Resource creation,
+                property updates                                ( 3 tools)
     physics   — PhysicsBody3D + auto-collision-shape            ( 1 tool)
     scene_io  — .tscn create/open/save/instantiate              ( 4 tools)
     runtime   — Play-mode + selection + console + play session  ( 7 tools)
@@ -22,10 +23,10 @@ Categories follow the Godot bridge's own directory layout under
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
     project   — Single-call project introspection               ( 1 tool )
                                                                 ───────
-                                                                38 tools
+                                                                39 tools
 
 Unlike the Unity side (~222 tools across 17 categories) we expose the
-full Godot catalog directly — 38 tools is well within Claude Code's
+full Godot catalog directly — 39 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 """
 
