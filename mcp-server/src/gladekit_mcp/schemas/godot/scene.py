@@ -20,10 +20,12 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "get_scene_tree",
             "description": (
-                "Read the active scene's full node tree as a JSON-friendly structure. "
-                "Returns {name, type, path, children[], script_path?} recursively. "
-                "Safe to call any time (read-only, works in both edit and play mode). "
-                "Call this first to understand what's in the scene before mutating it."
+                "Read the active scene's full node tree. Returns `node_count`, a flat "
+                "indented `tree_text` listing every node (read this to enumerate the "
+                "scene), and a nested `tree` of {name, type, path, children[], "
+                "script_path?} for programmatic use. Safe to call any time (read-only, "
+                "works in both edit and play mode). Call this first to understand what's "
+                "in the scene before mutating it."
             ),
             "parameters": {
                 "type": "object",

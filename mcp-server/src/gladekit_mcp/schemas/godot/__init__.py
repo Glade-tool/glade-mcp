@@ -96,7 +96,7 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
 
 
 def get_godot_tool_schemas() -> List[Dict]:
-    """Return all 37 Godot tool schemas as a flat list (OpenAI function format)."""
+    """Return all 38 Godot tool schemas as a flat list (OpenAI function format)."""
     all_tools: List[Dict] = []
     for _, tools in ALL_CATEGORIES:
         all_tools.extend(tools)

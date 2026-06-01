@@ -60,6 +60,16 @@ func test_get_scene_tree_happy() -> void:
 	assert_true(r.success)
 	assert_has(r, "tree")
 	assert_has(r, "node_count")
+	# Flat, model-friendly rendering must be present and non-empty, and the
+	# count must surface in the message so weak models don't under-report.
+	assert_has(r, "tree_text")
+	assert_true(r.tree_text is String and not (r.tree_text as String).is_empty())
+	assert_string_contains(r.message, "node")
+	# Every node the count claims should show up as a line in tree_text. The
+	# sandbox guarantees at least the scene root + _GladeKitTestSandbox.
+	var line_count := (r.tree_text as String).split("\n", false).size()
+	assert_eq(line_count, r.node_count, "tree_text must list one line per node")
+	assert_string_contains(r.tree_text, SANDBOX_NAME)
 
 
 func test_get_scene_tree_wrong_type_max_depth_falls_back() -> void:
