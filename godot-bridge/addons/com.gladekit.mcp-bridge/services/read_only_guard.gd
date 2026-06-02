@@ -33,6 +33,7 @@ const READ_ONLY_TOOLS: Array[String] = [
 	"list_signal_connections",
 	# Project introspection reads
 	"get_project_info",
+	"list_assets",
 ]
 
 const SETTING_KEY := "gladekit/read_only_mode"

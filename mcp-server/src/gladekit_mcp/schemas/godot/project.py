@@ -59,4 +59,51 @@ TOOLS: List[Dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_assets",
+            "description": (
+                "List the project's referenceable assets — textures, audio, "
+                "models, scenes, Godot resources (.tres/.res), fonts, and "
+                "shaders — each tagged with a coarse `type` ('texture', "
+                "'audio', 'model', 'scene', 'resource', 'font', 'shader'). "
+                "Complements get_project_info, whose project walk only counts "
+                "scenes/scripts/resources and never enumerates raw media. "
+                "Scripts are excluded — use find_scripts for those. Results "
+                "are sorted by path and bounded; `truncated` signals a cap was "
+                "hit. Read-only; safe to call in play mode."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "type_filter": {
+                        "type": "string",
+                        "enum": [
+                            "texture",
+                            "audio",
+                            "model",
+                            "scene",
+                            "resource",
+                            "font",
+                            "shader",
+                        ],
+                        "description": ("Restrict results to one asset category. Omit to return every kind."),
+                    },
+                    "name_contains": {
+                        "type": "string",
+                        "description": ("Case-insensitive substring filter on the filename. Empty matches all assets."),
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": ("Maximum number of assets to return (default 200, clamped 1..1000)."),
+                    },
+                    "include_addons": {
+                        "type": "boolean",
+                        "description": ("Include assets under res://addons/. Default false."),
+                    },
+                },
+            },
+        },
+    },
 ]

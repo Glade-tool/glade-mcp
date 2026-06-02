@@ -153,3 +153,55 @@ func test_tool_is_marked_read_only() -> void:
 	# to call it any time to orient itself.
 	var t = _registry.get_tool("get_project_info")
 	assert_false(t.requires_edit_mode, "get_project_info must be safe in play mode")
+
+
+# ── list_assets ───────────────────────────────────────────────────────────
+# Contract-level checks: the tool walks the project and returns a sorted,
+# typed asset list. Assertions avoid exact counts because the dev project's
+# asset set drifts over time.
+
+func _run_assets(args: Dictionary) -> Dictionary:
+	var t = _registry.get_tool("list_assets")
+	assert_not_null(t, "list_assets must be registered")
+	return t.execute(args)
+
+
+func test_list_assets_returns_typed_sorted_entries() -> void:
+	var r := _run_assets({})
+	assert_true(r.success, "list_assets should succeed: %s" % r.get("message", ""))
+	assert_true(r.has("assets") and r.assets is Array, "assets must be an Array")
+	assert_true(r.has("count") and r.count is int, "count must be an int")
+	assert_true(r.has("truncated") and r.truncated is bool, "truncated must be a bool")
+	assert_eq(r.count, r.assets.size(), "count must equal the assets array length")
+
+	var prev := ""
+	for entry in r.assets:
+		assert_true(entry is Dictionary, "each asset must be a Dictionary")
+		assert_true(entry.has("path") and entry.path is String, "asset needs a String path")
+		assert_true(entry.has("type") and entry.type is String, "asset needs a String type")
+		assert_true(String(entry.path).begins_with("res://"), "asset path must be a res:// URI")
+		# Scripts are intentionally excluded — they have their own discovery.
+		assert_false(String(entry.path).ends_with(".gd"), "list_assets must not return scripts")
+		# Results are sorted by path.
+		assert_true(prev <= String(entry.path), "assets must be sorted by path")
+		prev = String(entry.path)
+
+
+func test_list_assets_type_filter_restricts_results() -> void:
+	# Whatever the project contains, filtering by "scene" must yield only
+	# scene-typed entries (possibly none — that's still a valid result).
+	var r := _run_assets({"type_filter": "scene"})
+	assert_true(r.success)
+	for entry in r.assets:
+		assert_eq(String(entry.type), "scene", "type_filter=scene must only return scenes")
+
+
+func test_list_assets_respects_max_results() -> void:
+	var r := _run_assets({"max_results": 1})
+	assert_true(r.success)
+	assert_true(r.assets.size() <= 1, "max_results=1 must cap the list at one entry")
+
+
+func test_list_assets_is_marked_read_only() -> void:
+	var t = _registry.get_tool("list_assets")
+	assert_false(t.requires_edit_mode, "list_assets must be safe in play mode")

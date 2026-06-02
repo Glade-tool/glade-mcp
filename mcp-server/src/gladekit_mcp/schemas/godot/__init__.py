@@ -21,7 +21,7 @@ Categories follow the Godot bridge's own directory layout under
     runtime   — Play-mode + selection + console + play session  ( 7 tools)
     uid       — Godot 4.4+ ResourceUID handling                 ( 2 tools)
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
-    project   — Single-call project introspection               ( 1 tool )
+    project   — Project introspection + asset listing           ( 2 tools)
                                                                 ───────
                                                                 39 tools
 
@@ -92,6 +92,7 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
         "list_signal_connections",
         # Project introspection reads
         "get_project_info",
+        "list_assets",
     }
 )
 
