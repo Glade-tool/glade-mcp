@@ -168,7 +168,12 @@ func _drain_pending_dispatches() -> void:
 		var peer: WebSocketPeer = entry["peer"]
 		var request: Dictionary = entry["request"]
 		var request_id: String = entry["request_id"]
-		var response := _main_dispatch_tool(request_id, request)
+		var endpoint: String = str(request.get("endpoint", ""))
+		var response: Dictionary
+		if endpoint == "context/gather":
+			response = _main_dispatch_context_gather(request_id, request)
+		else:
+			response = _main_dispatch_tool(request_id, request)
 		_enqueue_send(peer, response)
 
 
@@ -240,6 +245,88 @@ func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
 	var response: Dictionary = {"id": request_id}
 	for key in result:
 		response[key] = result[key]
+	return response
+
+
+# Aggregate the bridge's three first-turn signals (project metadata, scene
+# tree, recent failure history) into one round-trip. Used by clients that
+# would otherwise spend 2-3 separate tools/execute calls to orient the
+# agent on each session's first turn. Returns success-shaped even when
+# individual sub-fetches fail — the caller treats this as best-effort
+# orientation, not a hard precondition.
+#
+# Args (all optional):
+#   project_response_format: "concise" (default) | "detailed" — passed
+#       through to get_project_info. Detailed mode adds bounded file
+#       listings and the input map.
+#   scene_max_depth: int — passed through to get_scene_tree as max_depth.
+#       Defaults to the tool's own default (50) when omitted.
+#   errors_limit: int — how many recent ErrorTracker entries to include.
+#       Defaults to 10.
+#
+# Response payload:
+#   project:     Dictionary — get_project_info's `project` payload, or
+#                {} on failure with an `errors.project` entry.
+#   scene_tree:  Dictionary — get_scene_tree's payload (tree, tree_text,
+#                scene_path, node_count), or null on failure.
+#   recent_errors: Array — most-recent-first list of {tool, message, args_summary}.
+#   errors:      Dictionary — sub-fetch failure messages keyed by source
+#                ("project" | "scene_tree"). Absent when all three succeed.
+func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> Dictionary:
+	var project_format: String = str(request.get("project_response_format", "concise"))
+	var scene_max_depth_raw = request.get("scene_max_depth", null)
+	var errors_limit_raw = request.get("errors_limit", 10)
+	var errors_limit: int = int(errors_limit_raw) if (errors_limit_raw is int or errors_limit_raw is float) else 10
+
+	var response: Dictionary = {
+		"id": request_id,
+		"success": true,
+		"project": {},
+		"scene_tree": null,
+		"recent_errors": [],
+	}
+	var sub_errors: Dictionary = {}
+
+	# Project info — reuse the existing tool's execute() rather than
+	# re-implementing the file walk. Tool returns its own success/error envelope.
+	var project_tool = _registry.get_tool("get_project_info")
+	if project_tool != null:
+		var project_result = project_tool.execute({"response_format": project_format})
+		if project_result is Dictionary and project_result.get("success", false):
+			response["project"] = project_result.get("project", {})
+		else:
+			sub_errors["project"] = str(project_result.get("error", project_result.get("message", "get_project_info failed")))
+	else:
+		sub_errors["project"] = "get_project_info tool not registered"
+
+	# Scene tree — same pattern. tree + tree_text + scene_path + node_count.
+	var scene_args: Dictionary = {}
+	if scene_max_depth_raw != null:
+		scene_args["max_depth"] = scene_max_depth_raw
+	var scene_tool = _registry.get_tool("get_scene_tree")
+	if scene_tool != null:
+		var scene_result = scene_tool.execute(scene_args)
+		if scene_result is Dictionary and scene_result.get("success", false):
+			response["scene_tree"] = {
+				"tree":       scene_result.get("tree"),
+				"tree_text":  scene_result.get("tree_text", ""),
+				"scene_path": scene_result.get("scene_path", ""),
+				"node_count": scene_result.get("node_count", 0),
+			}
+		else:
+			sub_errors["scene_tree"] = str(scene_result.get("error", scene_result.get("message", "get_scene_tree failed")))
+	else:
+		sub_errors["scene_tree"] = "get_scene_tree tool not registered"
+
+	# Recent errors — already thread-safe (append-only static array). Mirrors
+	# the diagnostics/recent_errors endpoint's slice, so clients can build a
+	# retry-context prompt without a second round-trip.
+	if errors_limit > 0:
+		response["recent_errors"] = ErrorTracker.recent(errors_limit)
+
+	if not sub_errors.is_empty():
+		response["errors"] = sub_errors
+
 	return response
 
 
@@ -338,6 +425,19 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 			})
 		"tools/execute":
 			# Marshal to main thread — tools touch the scene tree.
+			_pending_main_dispatches_mutex.lock()
+			_pending_main_dispatches.append({
+				"peer": peer,
+				"request": request,
+				"request_id": request_id,
+			})
+			_pending_main_dispatches_mutex.unlock()
+		"context/gather":
+			# One-shot project orientation snapshot for clients (Electron's
+			# pre-prompt context, primarily). Aggregates get_project_info +
+			# get_scene_tree + recent_errors so the agent doesn't burn
+			# 2-3 round-trips on every Godot session's first turn.
+			# Scene-tree access requires the main thread.
 			_pending_main_dispatches_mutex.lock()
 			_pending_main_dispatches.append({
 				"peer": peer,

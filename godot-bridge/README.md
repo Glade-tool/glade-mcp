@@ -5,7 +5,7 @@ scene, node, script, and resource tools so AI assistants can read and modify
 the active project. Designed to be addressed by an MCP server (for use with
 Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 
-**Status:** 38 tools registered across 10 categories.
+**Status:** 39 tools registered across 10 categories.
 
 | Phase | Tools | Cumulative | Status |
 | --- | --- | --- | --- |
@@ -15,6 +15,8 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 | 5 | + 3 Signal wiring (`connect_signal`, `list_signal_connections`, `disconnect_signal`) | 36 | shipped (v0.4.1) |
 | 6 | + 1 Project introspection (`get_project_info`) | 37 | shipped (v0.4.2) |
 | 7 | + 1 Resource assignment (`set_node_resource`); `readOnlyHint` on read-only tools | 38 | shipped (v0.4.4) |
+| 8 | + 1 Generic resource factory (`create_resource`) | 39 | shipped (v0.4.5) |
+| 9 | `context/gather` aggregating endpoint (project + scene tree + recent errors in one round-trip) | 39 | shipped (v0.4.6) |
 
 ### New in Phase 3
 
@@ -78,6 +80,34 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
   confirmation prompt. (Also fixes two read-only tools that were missing from
   the read-only-mode allow-list.)
 
+### New in v0.4.5
+
+- **`create_resource`** — generic factory for any concrete `Resource`
+  subclass. Composition partner to `set_node_resource`: create the `.tres`
+  here, then assign it there. Handles `BoxMesh`/`SphereMesh`/`PlaneMesh`,
+  every `Shape3D` (`BoxShape3D`, `SphereShape3D`, `CapsuleShape3D`, …),
+  `Curve`/`Curve2D`/`Curve3D`, `Environment`, `AudioStream` subclasses,
+  `Gradient`/`GradientTexture*`, and so on. Refuses `Material`/`Script`
+  types with a redirect to `create_material`/`create_script` so the three
+  resource creators stay cleanly partitioned. On unknown class names returns
+  up to 5 edit-distance-ranked suggestions; on abstract types returns
+  concrete subclasses. Properties are validated against the resource's
+  declared schema — typos land in `unapplied_properties` with a reason so
+  the agent can retry against the right key.
+
+### New in v0.4.6
+
+- **`context/gather` endpoint** — single round-trip orientation snapshot.
+  Aggregates `get_project_info` (detailed), `get_scene_tree` (including the
+  flat `tree_text` view), and the recent-error history into one response.
+  Previously, a first-turn orientation cost 2–3 separate `tools/execute`
+  calls; clients that bridge an agent loop to this endpoint can replace all
+  of those with one call. Sub-fetch failures degrade gracefully — an
+  optional per-source `errors` map appears alongside whichever data
+  succeeded, so the caller never gets a hard failure on this best-effort
+  path. Args: `project_response_format` ("concise" | "detailed"),
+  `scene_max_depth` (int), `errors_limit` (int, default 10, 0 = skip).
+
 ## Requirements
 
 - Godot **4.3** or newer
@@ -94,7 +124,7 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 3. Enable **GladeKit MCP Bridge**.
 4. Confirm the bridge is up: the editor Output panel should print
    ```
-   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.4.4, 38 tools registered, thread-polled at 200Hz)
+   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.4.6, 39 tools registered, thread-polled at 200Hz)
    ```
 
 The server stops automatically when you disable the plugin or close Godot.
@@ -164,6 +194,7 @@ On error:
 | `tools/list` | List registered tool names | `tools: [String]` |
 | `tools/execute` | Run a named tool | Tool-specific. Always carries `success` and `message`. |
 | `diagnostics/recent_errors` | Recent tool failures for retry context | `errors: [{timestamp_ms, tool_name, error, args_keys}]`, `total` (set `limit: int` in request, default 10) |
+| `context/gather` (v0.4.6+) | One-shot orientation snapshot | `project` (from `get_project_info`), `scene_tree` (`tree` + `tree_text` + `scene_path` + `node_count`), `recent_errors` (list). On per-source failure adds an `errors` map keyed by `"project"` \| `"scene_tree"` while still returning whatever succeeded. Args: `project_response_format`, `scene_max_depth`, `errors_limit`. |
 
 ### Play-mode safety
 

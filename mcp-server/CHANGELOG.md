@@ -6,12 +6,34 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ### Added
 
+- **`create_script` overwrite guard.** Sibling hole to the shipped `modify_script` gate — previously a model could clobber any real project script by calling `create_script` with a colliding path. The bridge now refuses `create_script` when the target path already exists on disk and was not created in the current session via `create_script`, unless the caller passes `confirmExistingFileModification=true` (same flag name as `modify_script` so the agent learns one pattern). Schema description updated lockstep on the MCP server so clients see the new arg + the new behavior contract.
+- **Godot bridge addon v0.4.6** with the new `context/gather` endpoint: one round-trip returns project metadata + scene tree (including the model-friendly flat `tree_text`) + recent-error history. Replaces the 2–3 separate `tools/execute` calls a fresh session would otherwise need to orient the agent. Used by the GladeKit desktop app; MCP clients can call it directly if they want the same aggregation.
+- **Godot bridge addon v0.4.5** with `create_resource` — generic factory for any concrete Resource subclass (BoxMesh, Shape3D variants, Curve, Environment, AudioStream, Gradient, …). Composition partner to the v0.4.4 `set_node_resource`: create the `.tres` here, then assign it there. Refuses Material/Script types with a redirect to the dedicated creators so the three resource creators stay cleanly partitioned.
+
+### Notes
+
+## [0.7.4] - 2026-06-01
+
+### Added
+
+- **`create_resource` Godot tool.** Generic factory for any concrete `Resource` subclass — `BoxMesh`, every `Shape3D`, `Curve`/`Curve2D`/`Curve3D`, `Environment`, `AudioStream` subclasses, `Gradient`/`GradientTexture*`, and more. Composition partner to the v0.4.4 `set_node_resource`: create the `.tres` here, then assign it there. Refuses `Material`/`Script` types with a redirect to `create_material`/`create_script` so the three resource creators stay cleanly partitioned. On unknown class names returns up to 5 edit-distance-ranked suggestions; on abstract types returns concrete subclasses. Ships with Godot bridge addon **v0.4.5**.
+
+## [0.7.3] - 2026-06-01
+
+### Fixed
+
+- Re-publish after a PyPI trusted-publisher hiccup blocked the 0.7.2 upload. No code changes from 0.7.2.
+
+## [0.7.2] - 2026-06-01
+
+### Added
+
 - **`get_project_info` Godot tool.** Single-call snapshot of a Godot project: name, version, renderer, main scene, currently edited scene, counts of scenes/scripts/resources, enabled addons, and (in `response_format="detailed"`) bounded file listings, top-level directories, and the project's custom input actions (engine builtins like `ui_accept` are filtered out). Replaces the 4-5 exploratory calls an agent typically makes when dropped into an unfamiliar project. Read-only and safe in play mode.
 - **3 Godot signal-wiring tools** for editor-time, scene-saved (CONNECT_PERSIST) signal connections — the same kind of wiring you'd otherwise make through the Godot editor's Node panel:
   - `connect_signal` — wire an emitter's signal to a target method (idempotent; refuses to wire nonexistent signals or methods with closest-match suggestions).
   - `list_signal_connections` — read existing wiring on a node; `response_format="detailed"` also lists every signal declared on the node.
   - `disconnect_signal` — remove a persistent connection; never silently no-ops.
-- Godot bridge addon **v0.4.2** (`com.gladekit.mcp-bridge` for Godot) shipping `get_project_info` and the signal-wiring tools. Download the addon zip from the [`godot-v0.4.2` GitHub Release](https://github.com/Glade-tool/glade-mcp/releases/tag/godot-v0.4.2).
+- **`set_node_resource` Godot tool** (bridge v0.4.4). Assign a Resource loaded from a `res://` path to any Resource-typed property on a node. One consolidated tool instead of a separate `assign_*` per resource kind.
 
 ### Fixed
 

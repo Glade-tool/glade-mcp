@@ -28,7 +28,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_script",
-            "description": "Create a new text-based asset file (.cs, .shader, .compute, .hlsl, etc.). Extension determines asset type. Use when the file does NOT exist; use modify_script if it already exists. IMPORTANT: After creating a .cs script, you MUST call compile_scripts and wait for status='idle' BEFORE calling add_component with the new type — otherwise the type won't be found.",
+            "description": "Create a new text-based asset file (.cs, .shader, .compute, .hlsl, etc.). Extension determines asset type. Use when the file does NOT exist; use modify_script if it already exists. IMPORTANT: After creating a .cs script, you MUST call compile_scripts and wait for status='idle' BEFORE calling add_component with the new type — otherwise the type won't be found. SAFETY: the bridge refuses create_script when the target path already exists on disk and was not created in this session via create_script, unless confirmExistingFileModification=true is set. Set the flag ONLY when the user explicitly named the file to regenerate or replace. Otherwise pick a different path — never silently clobber existing user code.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -39,6 +39,10 @@ TOOLS: List[Dict] = [
                     "scriptContent": {
                         "type": "string",
                         "description": "Complete file content. For .cs files: C# script code with all required using statements, null checks, and proper Unity patterns. For .shader files: HLSL/CG shader code with Shader declaration, Properties, SubShader, and Pass blocks. For other file types: appropriate content for that asset type.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set to true ONLY when the user explicitly named the file to regenerate or replace (e.g. 'rewrite PlayerController.cs from scratch'). Required for any create_script call whose target path already exists and was not created via create_script in the current session. Defaults to false. Setting this without explicit user authorization risks clobbering real project code.",
                     },
                 },
                 "required": ["scriptPath", "scriptContent"],
