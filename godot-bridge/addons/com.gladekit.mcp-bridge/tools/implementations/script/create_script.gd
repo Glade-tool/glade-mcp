@@ -28,18 +28,42 @@ func execute(args: Dictionary) -> Dictionary:
 	var script_path: String = ToolUtils.parse_path_arg(args, "script_path")
 	if script_path.is_empty():
 		return ToolUtils.error("script_path is required")
-	if not args.has("content"):
-		return ToolUtils.error("content is required")
-	var content: String = ToolUtils.parse_string_arg(args, "content")
 
 	# Auto-extension: default to .gd.
 	if script_path.get_extension().is_empty():
 		script_path += ".gd"
-	# We only handle .gd here — .cs (Godot Mono) and .gdshader live on
-	# different code paths and are out of scope for Phase 2.
+	# Extension check runs BEFORE content so a model that brought Unity habits
+	# (.cs files, C# style) sees the actionable engine-mismatch error first,
+	# instead of "content is required" hiding the root cause.
 	var ext := script_path.get_extension().to_lower()
+	if ext == "cs":
+		return ToolUtils.error_with_solutions(
+			"create_script only handles GDScript (.gd) files — got .cs. This is a Godot project; C# is a Unity convention.",
+			[
+				"Change the file extension from .cs to .gd",
+				"Rewrite the body in GDScript: `#` comments (not `//`), `var`/`func`/`extends`, no `public class ...`",
+				"Pass `script_path` (snake_case) and `content` (NOT `scriptPath`/`scriptContent`)",
+			]
+		)
 	if ext != "gd":
-		return ToolUtils.error("create_script only handles .gd files (got .%s); .cs / .gdshader will land in later phases" % ext)
+		return ToolUtils.error("create_script only handles .gd files (got .%s); .gdshader will land in a later phase" % ext)
+
+	# Accept Unity arg-name habits: `scriptContent` arrives as `script_content`
+	# after normalize_args; `scriptText` becomes `script_text`. We document
+	# `content` as the canonical name (and the schema enforces it for new
+	# callers), but a model leaning on Unity priors gets one free pass instead
+	# of a cryptic "content is required" while the diff card displays the
+	# content it actually sent.
+	var content_key := ""
+	for candidate in ["content", "script_content", "script_text"]:
+		if args.has(candidate):
+			content_key = candidate
+			break
+	if content_key == "":
+		return ToolUtils.error(
+			"content is required (Godot uses `content`; if you reached for `scriptContent` / `scriptText`, that's a Unity habit — use `content`)"
+		)
+	var content: String = ToolUtils.parse_string_arg(args, content_key)
 
 	# Ensure parent directory exists. DirAccess.make_dir_recursive_absolute
 	# returns OK if the dir already exists; we check globalize_path so the

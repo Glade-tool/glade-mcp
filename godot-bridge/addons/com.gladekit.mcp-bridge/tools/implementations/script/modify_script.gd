@@ -33,15 +33,35 @@ func execute(args: Dictionary) -> Dictionary:
 	var script_path: String = ToolUtils.parse_path_arg(args, "script_path")
 	if script_path.is_empty():
 		return ToolUtils.error("script_path is required")
-	if not args.has("content"):
-		return ToolUtils.error("content is required")
-	var content: String = ToolUtils.parse_string_arg(args, "content")
 
 	if script_path.get_extension().is_empty():
 		script_path += ".gd"
 	var ext := script_path.get_extension().to_lower()
+	if ext == "cs":
+		return ToolUtils.error_with_solutions(
+			"modify_script only handles GDScript (.gd) files — got .cs. This is a Godot project; C# is a Unity convention.",
+			[
+				"Change the file extension from .cs to .gd",
+				"Rewrite the body in GDScript syntax (# comments, var/func/extends)",
+				"Pass `script_path` and `content` (NOT `scriptPath`/`scriptContent`)",
+			]
+		)
 	if ext != "gd":
 		return ToolUtils.error("modify_script only handles .gd files (got .%s)" % ext)
+
+	# Accept Unity arg-name habits: `scriptContent` arrives as `script_content`
+	# after normalize_args. Mirrors create_script's defense — keeps a
+	# Unity-trained model out of the cryptic "content is required" trap.
+	var content_key := ""
+	for candidate in ["content", "script_content", "script_text"]:
+		if args.has(candidate):
+			content_key = candidate
+			break
+	if content_key == "":
+		return ToolUtils.error(
+			"content is required (Godot uses `content`; if you reached for `scriptContent` / `scriptText`, that's a Unity habit — use `content`)"
+		)
+	var content: String = ToolUtils.parse_string_arg(args, content_key)
 
 	if not FileAccess.file_exists(script_path):
 		return ToolUtils.error("File does not exist at '%s' (use create_script to create a new script)" % script_path)
