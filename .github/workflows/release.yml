@@ -1,15 +1,33 @@
 name: Release
 
+# Two parallel tag conventions trigger this workflow:
+#
+#   v0.7.4         → Unity bridge + gladekit-mcp PyPI release. Bumps
+#                    unity-bridge/package.json on main, builds the wheel,
+#                    publishes to PyPI, and creates the GitHub Release.
+#
+#   godot-v0.4.9   → Godot bridge addon release. Builds the addon zip from
+#                    godot-bridge/addons/com.gladekit.mcp-bridge/ and
+#                    creates the GitHub Release. No PyPI publish — the
+#                    Python package is engine-agnostic and only re-publishes
+#                    on Unity-side tags.
+#
+# Each job is gated on the tag prefix so the workflow does the right thing
+# for whichever tag was pushed. The Unity-side jobs were the original
+# release pipeline; the Godot-side job was added to close a manual gap
+# (every Godot release before v0.4.9 was published by hand).
 on:
   push:
     tags:
       - "v*.*.*"
+      - "godot-v*.*.*"
 
 jobs:
-  # ── 1. Run tests ─────────────────────────────────────────────────────────────
+  # ── Unity-side: 1. Run tests ────────────────────────────────────────────────
   test:
     name: Test Python package
     runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'v')  # v* only, NOT godot-v*
     steps:
       - uses: actions/checkout@v4
 
@@ -35,11 +53,12 @@ jobs:
         working-directory: mcp-server
         run: uv run pytest tests/ -v
 
-  # ── 2. Publish to PyPI ───────────────────────────────────────────────────────
+  # ── Unity-side: 2. Publish to PyPI ──────────────────────────────────────────
   pypi:
     name: Publish to PyPI
     needs: test
     runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'v')
     environment: pypi
     permissions:
       id-token: write  # for trusted publishing (no API token needed)
@@ -63,11 +82,12 @@ jobs:
         with:
           packages-dir: mcp-server/dist/
 
-  # ── 3. Bump unity-bridge version ─────────────────────────────────────────────
+  # ── Unity-side: 3. Bump unity-bridge version ────────────────────────────────
   unity-bridge-version:
     name: Sync unity-bridge package.json version
     needs: test
     runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'v')
     permissions:
       contents: write
     steps:
@@ -94,11 +114,12 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: bump unity-bridge version to ${{ steps.version.outputs.VERSION }}"
           git push
 
-  # ── 4. Create GitHub release ─────────────────────────────────────────────────
-  github-release:
-    name: Create GitHub Release
+  # ── Unity-side: 4. Create GitHub release ────────────────────────────────────
+  github-release-unity:
+    name: Create GitHub Release (Unity)
     needs: [pypi, unity-bridge-version]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'v')
     permissions:
       contents: write
     steps:
@@ -111,7 +132,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "GladeKit MCP v${{ steps.version.outputs.VERSION }}"
+          # Engine-prefixed title parallels the Godot release title below.
+          # The Unity-side tag ships TWO artifacts (the UPM Unity bridge
+          # source + the gladekit-mcp PyPI package), so both are named.
+          name: "Unity bridge & MCP server v${{ steps.version.outputs.VERSION }}"
           body: |
             ## Installation
 
@@ -123,8 +147,68 @@ jobs:
 
             **Unity bridge (UPM):**
             ```
-            https://github.com/gladekit/gladekit-mcp.git?path=/unity-bridge#v${{ steps.version.outputs.VERSION }}
+            https://github.com/Glade-tool/glade-mcp.git?path=/unity-bridge#v${{ steps.version.outputs.VERSION }}
             ```
+
+            See the [README](README.md) for full setup instructions.
+          generate_release_notes: true
+
+  # ── Godot-side: build addon zip + create GitHub release ─────────────────────
+  # Replaces the manual `gh release create godot-v...` step that every Godot
+  # bump required before. Triggered by godot-v* tags pushed by the private
+  # repo's sync-oss workflow. No PyPI publish, no unity-bridge bump — the
+  # Godot bridge ships only as an addon zip + a UPM-style git URL.
+  github-release-godot:
+    name: Create GitHub Release (Godot)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'godot-v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#godot-v}" >> $GITHUB_OUTPUT
+
+      - name: Verify plugin.cfg version matches tag
+        # Belt-and-suspenders: the private repo's sync-oss step derives the
+        # tag from plugin.cfg so these can't drift by definition, but a
+        # human-pushed godot-v* tag would silently ship a stale addon
+        # without this guard.
+        run: |
+          PLUGIN_VERSION=$(awk -F'"' '/^version=/ {print $2}' \
+            godot-bridge/addons/com.gladekit.mcp-bridge/plugin.cfg)
+          TAG_VERSION="${{ steps.version.outputs.VERSION }}"
+          if [ "$PLUGIN_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match plugin.cfg ($PLUGIN_VERSION)"
+            exit 1
+          fi
+
+      - name: Build addon zip
+        # Zip layout matches the manual releases (v0.4.8 etc.): top-level
+        # com.gladekit.mcp-bridge/ directory containing plugin.cfg. The
+        # GladeKit desktop app installer's findAddonRoot walker expects
+        # this shape.
+        run: |
+          cd godot-bridge/addons
+          zip -r "/tmp/com.gladekit.mcp-bridge-${{ steps.version.outputs.VERSION }}.zip" \
+            com.gladekit.mcp-bridge
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Godot bridge v${{ steps.version.outputs.VERSION }}"
+          files: /tmp/com.gladekit.mcp-bridge-${{ steps.version.outputs.VERSION }}.zip
+          body: |
+            ## Installation
+
+            **UPM-style git URL (Godot 4.4+ via addon folder copy):**
+            ```
+            https://github.com/Glade-tool/glade-mcp.git?path=godot-bridge/addons/com.gladekit.mcp-bridge#godot-v${{ steps.version.outputs.VERSION }}
+            ```
+
+            **Manual install:** download `com.gladekit.mcp-bridge-${{ steps.version.outputs.VERSION }}.zip` below, extract it into your project's `addons/` directory, then enable in *Project → Project Settings → Plugins*.
 
             See the [README](README.md) for full setup instructions.
           generate_release_notes: true
