@@ -50,11 +50,12 @@ const DEFAULT_PORT := 8766
 const BIND_ADDRESS := "127.0.0.1"
 const THREAD_POLL_SLEEP_MSEC := 5  # ~200Hz worker loop (never throttled)
 
-const ToolRegistry  = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_registry.gd")
-const ToolUtils     = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
-const EngineMode    = preload("res://addons/com.gladekit.mcp-bridge/bridge/engine_mode.gd")
-const ReadOnlyGuard = preload("res://addons/com.gladekit.mcp-bridge/services/read_only_guard.gd")
-const ErrorTracker  = preload("res://addons/com.gladekit.mcp-bridge/services/error_tracker.gd")
+const ToolRegistry   = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_registry.gd")
+const ToolUtils      = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
+const EngineMode     = preload("res://addons/com.gladekit.mcp-bridge/bridge/engine_mode.gd")
+const ReadOnlyGuard  = preload("res://addons/com.gladekit.mcp-bridge/services/read_only_guard.gd")
+const ErrorTracker   = preload("res://addons/com.gladekit.mcp-bridge/services/error_tracker.gd")
+const BackupManager  = preload("res://addons/com.gladekit.mcp-bridge/services/backup_manager.gd")
 
 # ── Bridge state ─────────────────────────────────────────────────────────
 # Populated once in start() from plugin.cfg, then read-only for the rest of
@@ -172,6 +173,14 @@ func _drain_pending_dispatches() -> void:
 		var response: Dictionary
 		if endpoint == "context/gather":
 			response = _main_dispatch_context_gather(request_id, request)
+		elif endpoint == "backup/file":
+			response = _main_dispatch_backup_file(request_id, request)
+		elif endpoint == "backup/check_exists":
+			response = _main_dispatch_backup_check_exists(request_id, request)
+		elif endpoint == "turn/revert":
+			response = _main_dispatch_turn_revert(request_id, request)
+		elif endpoint == "turn/accept":
+			response = _main_dispatch_turn_accept(request_id, request)
 		else:
 			response = _main_dispatch_tool(request_id, request)
 		_enqueue_send(peer, response)
@@ -330,6 +339,162 @@ func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> D
 	return response
 
 
+# ── File-level revert/backup endpoints ────────────────────────────────────
+# A four-endpoint set that lets a client drive a per-turn undo flow:
+#
+#   backup/file          take a pre-mutation snapshot, returns abs path
+#   backup/check_exists  prune turn entries whose snapshots are GC'd
+#   turn/revert          restore (or delete) per-change file outcomes
+#   turn/accept          tear down a turn's backup subtree
+#
+# Implementations live on BackupManager — these handlers just unmarshal
+# arguments and roll up per-change outcomes. Scene-tree (node) mutations
+# are not yet revertible: turn/revert accepts a `gameObjectChanges`
+# array for protocol symmetry but reports 0/0 for those counts and
+# annotates the message. A follow-up will add PackedScene-based node-state
+# backups to close that gap.
+func _main_dispatch_backup_file(request_id: String, request: Dictionary) -> Dictionary:
+	var file_path: String = str(request.get("filePath", ""))
+	if file_path.is_empty():
+		return _make_error(request_id, "filePath is required")
+	if not (file_path.begins_with("res://") or file_path.begins_with("user://")):
+		# Lift Unity-style "Assets/Player.cs" to a res:// URI. Same trim the
+		# bridge tools' parse_path_arg helper does — the renderer's wire
+		# format is engine-agnostic, the bridge normalizes here.
+		if file_path.begins_with("/"):
+			file_path = file_path.substr(1)
+		file_path = "res://" + file_path
+	var turn_id: String = str(request.get("turnId", ""))
+	# If the source file doesn't exist there's nothing to back up — a
+	# create_*-style tool is about to write it for the first time. Return
+	# success with no backupPath so the renderer records a "file_created"
+	# change (revert path will delete the file instead of restoring).
+	if not FileAccess.file_exists(file_path):
+		return {
+			"id": request_id,
+			"success": true,
+			"backupPath": "",
+			"note": "source did not exist at backup time (likely a create-style mutation)",
+		}
+	var abs_backup_path := BackupManager.backup_file(file_path, turn_id)
+	if abs_backup_path.is_empty():
+		return _make_error(request_id, "backup_file returned empty path for '%s'" % file_path)
+	return {
+		"id": request_id,
+		"success": true,
+		"backupPath": abs_backup_path,
+	}
+
+
+func _main_dispatch_backup_check_exists(request_id: String, request: Dictionary) -> Dictionary:
+	var raw = request.get("paths", [])
+	if not (raw is Array):
+		return _make_error(request_id, "paths must be an array")
+	var existing: Array = []
+	for entry in raw:
+		var p: String = str(entry)
+		if BackupManager.path_exists(p):
+			existing.append(p)
+	return {
+		"id": request_id,
+		"success": true,
+		"existingPaths": existing,
+	}
+
+
+func _main_dispatch_turn_revert(request_id: String, request: Dictionary) -> Dictionary:
+	var turn_id: String = str(request.get("turnId", ""))
+	if turn_id.is_empty():
+		return _make_error(request_id, "turnId is required")
+	var raw_file_changes = request.get("fileChanges", [])
+	if not (raw_file_changes is Array):
+		return _make_error(request_id, "fileChanges must be an array")
+	var files_restored: int = 0
+	var files_deleted: int = 0
+	var errors: Array = []
+	for entry in raw_file_changes:
+		if not (entry is Dictionary):
+			errors.append({"error": "fileChanges entry was not a Dictionary"})
+			continue
+		var change: Dictionary = entry
+		var change_type: String = str(change.get("changeType", "")).to_lower()
+		var file_path: String = str(change.get("filePath", ""))
+		var backup_path: String = str(change.get("backupPath", ""))
+		if file_path.is_empty():
+			errors.append({"error": "fileChanges entry missing filePath", "change": change})
+			continue
+		if not (file_path.begins_with("res://") or file_path.begins_with("user://")):
+			if file_path.begins_with("/"):
+				file_path = file_path.substr(1)
+			file_path = "res://" + file_path
+		match change_type:
+			"created":
+				# Undo a creation: delete the file. No backup to consult.
+				var del := BackupManager.delete_file(file_path)
+				if del.get("success", false):
+					if del.get("deleted", false):
+						files_deleted += 1
+				else:
+					errors.append({"filePath": file_path, "changeType": change_type, "error": del.get("error", "delete failed")})
+			"modified", "deleted":
+				if backup_path.is_empty():
+					errors.append({"filePath": file_path, "changeType": change_type, "error": "backupPath required for %s revert" % change_type})
+					continue
+				var res := BackupManager.restore_file(backup_path, file_path)
+				if res.get("success", false):
+					files_restored += 1
+				else:
+					errors.append({"filePath": file_path, "changeType": change_type, "error": res.get("error", "restore failed")})
+			_:
+				errors.append({"filePath": file_path, "changeType": change_type, "error": "unknown changeType"})
+
+	# Tell the editor's filesystem to rescan so the rewound state shows up
+	# without the user manually triggering Project → Reload Current Project.
+	# Best-effort: a failed scan doesn't fail the revert.
+	var fs = EditorInterface.get_resource_filesystem()
+	if fs != null:
+		fs.scan()
+
+	# Scene-tree mutations aren't yet revertible on Godot. The renderer
+	# can send `gameObjectChanges` for symmetry with the Unity contract;
+	# we accept the field and report 0/0. A follow-up PR will add
+	# PackedScene-based node-state backups.
+	var go_changes_raw = request.get("gameObjectChanges", [])
+	var go_count: int = (go_changes_raw as Array).size() if (go_changes_raw is Array) else 0
+	var message: String
+	if go_count > 0:
+		message = "Reverted %d file change(s); scene-tree changes (%d) are not yet revertible on Godot." % [files_restored + files_deleted, go_count]
+	else:
+		message = "Reverted %d file change(s)." % (files_restored + files_deleted)
+
+	var response: Dictionary = {
+		"id": request_id,
+		"success": errors.is_empty(),
+		"message": message,
+		"filesRestored": files_restored,
+		"filesDeleted": files_deleted,
+		"gameObjectsRestored": 0,
+		"gameObjectsDeleted": 0,
+	}
+	if not errors.is_empty():
+		response["errors"] = errors
+		response["error"] = "%d change(s) failed to revert" % errors.size()
+	return response
+
+
+func _main_dispatch_turn_accept(request_id: String, request: Dictionary) -> Dictionary:
+	var turn_id: String = str(request.get("turnId", ""))
+	if turn_id.is_empty():
+		return _make_error(request_id, "turnId is required")
+	var removed: int = BackupManager.delete_turn(turn_id)
+	return {
+		"id": request_id,
+		"success": true,
+		"message": "Accepted turn %s (removed %d backup file(s))" % [turn_id, removed],
+		"backupsRemoved": removed,
+	}
+
+
 # ── Worker thread: accept, poll, send ────────────────────────────────────
 # Owns _tcp_server, _peers, and the I/O loop. Touches main-thread state
 # only via mutex-protected queues. Never calls EditorInterface or scene-tree
@@ -438,6 +603,21 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 			# get_scene_tree + recent_errors so the agent doesn't burn
 			# 2-3 round-trips on every Godot session's first turn.
 			# Scene-tree access requires the main thread.
+			_pending_main_dispatches_mutex.lock()
+			_pending_main_dispatches.append({
+				"peer": peer,
+				"request": request,
+				"request_id": request_id,
+			})
+			_pending_main_dispatches_mutex.unlock()
+		"backup/file", "backup/check_exists", "turn/revert", "turn/accept":
+			# File-level revert/backup endpoints. Routed through the main
+			# thread for two reasons: (a) FileAccess + DirAccess operations
+			# are safer on the editor's main thread, and (b) turn/revert
+			# refreshes EditorInterface.get_resource_filesystem() after the
+			# restore so the editor immediately reflects the rewound state —
+			# that call is main-thread-only. These endpoints don't touch
+			# the scene tree, so latency is dominated by disk I/O.
 			_pending_main_dispatches_mutex.lock()
 			_pending_main_dispatches.append({
 				"peer": peer,

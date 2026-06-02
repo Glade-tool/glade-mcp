@@ -129,3 +129,119 @@ func test_backup_file_snapshots_existing_file() -> void:
 	# Cleanup
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(_BACKUP_TEST_FILE))
 	DirAccess.remove_absolute(backup_path)
+
+
+# ── BackupManager: turn-scoped flow (backup → restore → accept) ──────────
+# These pin the end-to-end revert contract the four bridge endpoints rely
+# on. The unscoped path above (no turn_id) is preserved for backwards
+# compatibility with legacy callers (set_material_property, save_scene);
+# everything below exercises the new turn-id subtree.
+
+const _TURN_SCOPED_TEST_FILE := "res://_gk_turn_scoped_test.gd"
+const _TURN_ID := "turn-1234567890-test1"
+
+
+func _write_test_file(res_path: String, body: String) -> void:
+	var f := FileAccess.open(res_path, FileAccess.WRITE)
+	assert_not_null(f, "could not open '%s' for write" % res_path)
+	f.store_string(body)
+	f.close()
+
+
+func _cleanup_test_file(res_path: String) -> void:
+	if FileAccess.file_exists(res_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(res_path))
+
+
+func _cleanup_turn(turn_id: String) -> void:
+	# delete_turn returns 0 on a no-op (turn never created any files) so
+	# it's safe to call unconditionally in teardown.
+	BackupManager.delete_turn(turn_id)
+
+
+func test_backup_file_with_turn_id_lands_under_turn_subdir() -> void:
+	_write_test_file(_TURN_SCOPED_TEST_FILE, "v1")
+	var backup_path := BackupManager.backup_file(_TURN_SCOPED_TEST_FILE, _TURN_ID)
+	assert_false(backup_path.is_empty(), "backup_file should return a path")
+	# Per-turn subtree: the absolute backup path must contain the turn_id.
+	assert_true(backup_path.contains(_TURN_ID), "backup path should contain turn id, got '%s'" % backup_path)
+	assert_true(FileAccess.file_exists(backup_path))
+	# delete_turn must report at least one file removed (could be more if
+	# the path-suffix prune kept additional snapshots).
+	var removed: int = BackupManager.delete_turn(_TURN_ID)
+	assert_gt(removed, 0, "delete_turn should report >=1 file removed")
+	assert_false(FileAccess.file_exists(backup_path), "backup must be gone after delete_turn")
+	_cleanup_test_file(_TURN_SCOPED_TEST_FILE)
+
+
+func test_backup_then_modify_then_restore_round_trip() -> void:
+	# Write v1 → snapshot under turn_id → mutate to v2 → restore must
+	# rewind to v1. Smoking-gun for the turn/revert endpoint.
+	_write_test_file(_TURN_SCOPED_TEST_FILE, "v1")
+	var backup_path := BackupManager.backup_file(_TURN_SCOPED_TEST_FILE, _TURN_ID)
+	assert_false(backup_path.is_empty())
+
+	_write_test_file(_TURN_SCOPED_TEST_FILE, "v2-mutated")
+
+	var result := BackupManager.restore_file(backup_path, _TURN_SCOPED_TEST_FILE)
+	assert_true(result.get("success", false), "restore should succeed, got: %s" % str(result))
+	var read := FileAccess.open(_TURN_SCOPED_TEST_FILE, FileAccess.READ)
+	assert_eq(read.get_as_text(), "v1", "restored content should match the pre-mutation snapshot")
+	read.close()
+
+	_cleanup_turn(_TURN_ID)
+	_cleanup_test_file(_TURN_SCOPED_TEST_FILE)
+
+
+func test_restore_returns_structured_error_when_backup_missing() -> void:
+	# Manually-deleted backup (or one that pruned out before revert ran).
+	var fake_backup_path: String = ProjectSettings.globalize_path("res://.does_not_exist.bak")
+	var result := BackupManager.restore_file(fake_backup_path, _TURN_SCOPED_TEST_FILE)
+	assert_false(result.get("success", true), "restore should fail when backup is missing")
+	assert_true(str(result.get("error", "")).contains("no longer exists"), "error message should mention missing backup")
+
+
+func test_delete_file_removes_existing_and_no_ops_when_absent() -> void:
+	_write_test_file(_TURN_SCOPED_TEST_FILE, "to be deleted")
+
+	var r1 := BackupManager.delete_file(_TURN_SCOPED_TEST_FILE)
+	assert_true(r1.get("success", false), "delete_file should succeed: %s" % str(r1))
+	assert_true(r1.get("deleted", false), "delete_file should report deleted=true on first call")
+	assert_false(FileAccess.file_exists(_TURN_SCOPED_TEST_FILE))
+
+	# Second call on the same path — file already absent. Must still
+	# return success (revert is idempotent for "created"-changetype undo).
+	var r2 := BackupManager.delete_file(_TURN_SCOPED_TEST_FILE)
+	assert_true(r2.get("success", false), "delete_file should be idempotent (success=true on absent file)")
+	assert_false(r2.get("deleted", false), "second call should report deleted=false")
+
+
+func test_delete_turn_is_safe_on_empty_or_unknown_turn() -> void:
+	# A turn that produced no file mutations should not raise — just
+	# returns 0. Same for a garbage turn id.
+	assert_eq(BackupManager.delete_turn("turn-never-existed"), 0)
+	assert_eq(BackupManager.delete_turn(""), 0, "empty turn id should be a no-op")
+
+
+func test_turn_id_with_slashes_is_path_sanitized() -> void:
+	# Belt-and-suspenders: a hostile turn_id like "../../etc/passwd" must
+	# not escape the backup root. The sanitizer turns illegal characters
+	# into "_" — see _turn_subdir.
+	_write_test_file(_TURN_SCOPED_TEST_FILE, "v1")
+	var backup_path := BackupManager.backup_file(_TURN_SCOPED_TEST_FILE, "../../bad")
+	assert_false(backup_path.is_empty())
+	# The on-disk path must not contain "../" segments — they should be
+	# replaced with underscores.
+	assert_false(backup_path.contains("../"), "turn_id sanitizer should strip path traversal: %s" % backup_path)
+	BackupManager.delete_turn("../../bad")
+	_cleanup_test_file(_TURN_SCOPED_TEST_FILE)
+
+
+func test_path_exists_helper_checks_disk_state() -> void:
+	# backup/check_exists endpoint hangs off this. Smoke: returns true for
+	# a written file, false after deletion, false for empty/garbage paths.
+	_write_test_file(_TURN_SCOPED_TEST_FILE, "exists")
+	assert_true(BackupManager.path_exists(_TURN_SCOPED_TEST_FILE))
+	_cleanup_test_file(_TURN_SCOPED_TEST_FILE)
+	assert_false(BackupManager.path_exists(_TURN_SCOPED_TEST_FILE))
+	assert_false(BackupManager.path_exists(""))

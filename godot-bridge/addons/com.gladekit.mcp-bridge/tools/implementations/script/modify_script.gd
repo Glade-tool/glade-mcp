@@ -22,6 +22,7 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 
 const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 const SessionTracker = preload("res://addons/com.gladekit.mcp-bridge/bridge/session_tracker.gd")
+const BackupManager = preload("res://addons/com.gladekit.mcp-bridge/services/backup_manager.gd")
 
 
 func _init() -> void:
@@ -74,6 +75,16 @@ func execute(args: Dictionary) -> Dictionary:
 			+ "Otherwise treat this as a fresh-scaffold task and call create_script with a new path.",
 			{"script_path": script_path, "reason": "preExistingScriptWithoutConfirmation"}
 		)
+
+	# Snapshot the pre-modification file BEFORE we overwrite it. The renderer
+	# layer drives the revert UI off per-tool {backupPath, turnId} that comes
+	# back from the bridge's backup/file endpoint, but a tool that mutates a
+	# file without a corresponding endpoint round-trip would lose its pre-state
+	# the moment we open(WRITE) below. Belt-and-suspenders: do an in-tool
+	# snapshot too (unscoped, so it doesn't collide with the turn tree). Best
+	# effort — backup_file is documented to never raise — so this never blocks
+	# the mutation.
+	BackupManager.backup_file(script_path)
 
 	var file := FileAccess.open(script_path, FileAccess.WRITE)
 	if file == null:
