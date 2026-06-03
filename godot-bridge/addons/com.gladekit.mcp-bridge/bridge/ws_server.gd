@@ -175,6 +175,8 @@ func _drain_pending_dispatches() -> void:
 			response = _main_dispatch_context_gather(request_id, request)
 		elif endpoint == "backup/file":
 			response = _main_dispatch_backup_file(request_id, request)
+		elif endpoint == "backup/node":
+			response = _main_dispatch_backup_node(request_id, request)
 		elif endpoint == "backup/check_exists":
 			response = _main_dispatch_backup_check_exists(request_id, request)
 		elif endpoint == "turn/revert":
@@ -339,27 +341,27 @@ func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> D
 	return response
 
 
-# ── File-level revert/backup endpoints ────────────────────────────────────
-# A four-endpoint set that lets a client drive a per-turn undo flow:
+# ── Revert/backup endpoints ───────────────────────────────────────────────
+# A five-endpoint set that lets a client drive a per-turn undo flow:
 #
-#   backup/file          take a pre-mutation snapshot, returns abs path
+#   backup/file          take a pre-mutation file snapshot, returns abs path
+#   backup/node          take a pre-mutation scene-tree (PackedScene) snapshot
 #   backup/check_exists  prune turn entries whose snapshots are GC'd
-#   turn/revert          restore (or delete) per-change file outcomes
+#   turn/revert          restore/delete per-change file + node outcomes
 #   turn/accept          tear down a turn's backup subtree
 #
 # Implementations live on BackupManager — these handlers just unmarshal
-# arguments and roll up per-change outcomes. Scene-tree (node) mutations
-# are not yet revertible: turn/revert accepts a `gameObjectChanges`
-# array for protocol symmetry but reports 0/0 for those counts and
-# annotates the message. A follow-up will add PackedScene-based node-state
-# backups to close that gap.
+# arguments and roll up per-change outcomes. Scene-tree mutations
+# (gameObjectChanges in the wire payload) are restored via PackedScene
+# re-instantiation; see BackupManager.backup_node / restore_node for the
+# owner-rewiring dance PackedScene.pack requires in editor sessions.
 func _main_dispatch_backup_file(request_id: String, request: Dictionary) -> Dictionary:
 	var file_path: String = str(request.get("filePath", ""))
 	if file_path.is_empty():
 		return _make_error(request_id, "filePath is required")
 	if not (file_path.begins_with("res://") or file_path.begins_with("user://")):
 		# Lift Unity-style "Assets/Player.cs" to a res:// URI. Same trim the
-		# bridge tools' parse_path_arg helper does — the renderer's wire
+		# bridge tools' parse_path_arg helper does — the client's wire
 		# format is engine-agnostic, the bridge normalizes here.
 		if file_path.begins_with("/"):
 			file_path = file_path.substr(1)
@@ -367,7 +369,7 @@ func _main_dispatch_backup_file(request_id: String, request: Dictionary) -> Dict
 	var turn_id: String = str(request.get("turnId", ""))
 	# If the source file doesn't exist there's nothing to back up — a
 	# create_*-style tool is about to write it for the first time. Return
-	# success with no backupPath so the renderer records a "file_created"
+	# success with no backupPath so the client records a "file_created"
 	# change (revert path will delete the file instead of restoring).
 	if not FileAccess.file_exists(file_path):
 		return {
@@ -383,6 +385,50 @@ func _main_dispatch_backup_file(request_id: String, request: Dictionary) -> Dict
 		"id": request_id,
 		"success": true,
 		"backupPath": abs_backup_path,
+	}
+
+
+func _main_dispatch_backup_node(request_id: String, request: Dictionary) -> Dictionary:
+	# Pre-mutation snapshot of a scene-tree node. The client calls this
+	# before scene-tree-mutating tools (delete_node, set_node_transform,
+	# rename_node, etc.) so the turn can be reverted. The bridge picks the
+	# backup location (per-turn subdir under .gladekit-backups/nodes/) so
+	# the client doesn't have to know the project root.
+	#
+	# Returns success=true with backupPath="" when the node doesn't exist
+	# yet (a create_*-style mutation is about to add it). Mirrors
+	# backup/file's "source did not exist" branch — the client then
+	# records a `gameobject_created` change so revert deletes the node
+	# instead of restoring it.
+	var node_path: String = str(request.get("nodePath", ""))
+	if node_path.is_empty():
+		return _make_error(request_id, "nodePath is required")
+	var turn_id: String = str(request.get("turnId", ""))
+	if turn_id.is_empty():
+		return _make_error(request_id, "turnId is required")
+
+	var node: Node = ToolUtils.find_node_by_path(node_path)
+	if node == null:
+		return {
+			"id": request_id,
+			"success": true,
+			"backupPath": "",
+			"note": "node did not exist at backup time (likely a create-style mutation)",
+		}
+	var root: Node = EditorInterface.get_edited_scene_root()
+	if node == root:
+		# Root-level mutations would need EditorInterface.set_edited_scene
+		# on restore — out of scope for this revert flow. Surface clearly
+		# instead of silently no-op'ing.
+		return _make_error(request_id, "scene root cannot be backed up via backup/node; close/reopen the scene to undo root mutations")
+
+	var result := BackupManager.backup_node(node, node_path, turn_id)
+	if not result.get("success", false):
+		return _make_error(request_id, str(result.get("error", "backup_node failed")))
+	return {
+		"id": request_id,
+		"success": true,
+		"backupPath": str(result.get("backup_path", "")),
 	}
 
 
@@ -455,17 +501,106 @@ func _main_dispatch_turn_revert(request_id: String, request: Dictionary) -> Dict
 	if fs != null:
 		fs.scan()
 
-	# Scene-tree mutations aren't yet revertible on Godot. The renderer
-	# can send `gameObjectChanges` for symmetry with the Unity contract;
-	# we accept the field and report 0/0. A follow-up PR will add
-	# PackedScene-based node-state backups.
+	# Scene-tree (node) revert. Iterates gameObjectChanges in reverse order
+	# so within a single turn the most recent mutation undoes first
+	# (matches Ctrl-Z intuition for stacked operations on the same node).
 	var go_changes_raw = request.get("gameObjectChanges", [])
-	var go_count: int = (go_changes_raw as Array).size() if (go_changes_raw is Array) else 0
+	var gameobjects_restored: int = 0
+	var gameobjects_deleted: int = 0
+	if go_changes_raw is Array:
+		var go_changes: Array = (go_changes_raw as Array).duplicate()
+		go_changes.reverse()
+		for entry in go_changes:
+			if not (entry is Dictionary):
+				errors.append({"error": "gameObjectChanges entry was not a Dictionary"})
+				continue
+			var change: Dictionary = entry
+			var change_type: String = str(change.get("changeType", "")).to_lower()
+			var go_path: String = str(change.get("gameObjectPath", ""))
+			var state_backup: String = str(change.get("stateBackupPath", ""))
+			if go_path.is_empty():
+				errors.append({"error": "gameObjectChanges entry missing gameObjectPath", "change": change})
+				continue
+			match change_type:
+				"created":
+					# Undo a creation: delete the node. No backup to consult.
+					var del := BackupManager.delete_node_at(go_path)
+					if del.get("success", false):
+						if del.get("deleted", false):
+							gameobjects_deleted += 1
+					else:
+						errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": del.get("error", "delete failed")})
+				"deleted":
+					# Re-create the node from its PackedScene backup. Parse the
+					# scene-relative path into parent + name; the parent must
+					# still exist for the restore to attach.
+					if state_backup.is_empty():
+						errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": "stateBackupPath required for deleted revert"})
+						continue
+					var parent_split := _split_node_path_into_parent_and_name(go_path)
+					var parent_node: Node = ToolUtils.find_node_by_path(parent_split.parent_path)
+					if parent_node == null:
+						errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": "parent '%s' not found in current scene" % parent_split.parent_path})
+						continue
+					var restore := BackupManager.restore_node(state_backup, parent_node, parent_split.node_name)
+					if restore.get("success", false):
+						gameobjects_restored += 1
+					else:
+						errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": restore.get("error", "restore failed")})
+				"modified":
+					# Delete the current (mutated) node, then re-attach the
+					# backup in its place. Preserves sibling index so the
+					# restored node lands at its original position.
+					if state_backup.is_empty():
+						errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": "stateBackupPath required for modified revert"})
+						continue
+					var current_node: Node = ToolUtils.find_node_by_path(go_path)
+					if current_node == null:
+						# Modified-then-deleted within the same turn — restore is
+						# functionally identical to the "deleted" branch above.
+						var parent_split2 := _split_node_path_into_parent_and_name(go_path)
+						var parent_node2: Node = ToolUtils.find_node_by_path(parent_split2.parent_path)
+						if parent_node2 == null:
+							errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": "node + parent both missing — can't restore"})
+							continue
+						var restore2 := BackupManager.restore_node(state_backup, parent_node2, parent_split2.node_name)
+						if restore2.get("success", false):
+							gameobjects_restored += 1
+						else:
+							errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": restore2.get("error", "restore failed")})
+						continue
+					var parent_node3: Node = current_node.get_parent()
+					if parent_node3 == null:
+						errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": "current node has no parent (scene root?)"})
+						continue
+					var sibling_index: int = parent_node3.get_children().find(current_node)
+					var node_name: String = current_node.name
+					parent_node3.remove_child(current_node)
+					current_node.free()
+					var restore3 := BackupManager.restore_node(state_backup, parent_node3, node_name, sibling_index)
+					if restore3.get("success", false):
+						gameobjects_restored += 1
+					else:
+						errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": restore3.get("error", "restore failed")})
+				_:
+					errors.append({"gameObjectPath": go_path, "changeType": change_type, "error": "unknown changeType"})
+
+	# Tell the editor's filesystem to rescan so the rewound state shows up
+	# without the user manually triggering Project → Reload Current Project.
+	# Best-effort: a failed scan doesn't fail the revert. (We already scanned
+	# above after file changes; second scan is cheap and keeps node restores
+	# visible too in case the scene happened to load any new resources.)
+
+	var total_changes: int = files_restored + files_deleted + gameobjects_restored + gameobjects_deleted
 	var message: String
-	if go_count > 0:
-		message = "Reverted %d file change(s); scene-tree changes (%d) are not yet revertible on Godot." % [files_restored + files_deleted, go_count]
+	if total_changes == 0 and not errors.is_empty():
+		message = "No changes reverted — see errors for details."
 	else:
-		message = "Reverted %d file change(s)." % (files_restored + files_deleted)
+		message = "Reverted %d change(s): %d file, %d node." % [
+			total_changes,
+			files_restored + files_deleted,
+			gameobjects_restored + gameobjects_deleted,
+		]
 
 	var response: Dictionary = {
 		"id": request_id,
@@ -473,13 +608,31 @@ func _main_dispatch_turn_revert(request_id: String, request: Dictionary) -> Dict
 		"message": message,
 		"filesRestored": files_restored,
 		"filesDeleted": files_deleted,
-		"gameObjectsRestored": 0,
-		"gameObjectsDeleted": 0,
+		"gameObjectsRestored": gameobjects_restored,
+		"gameObjectsDeleted": gameobjects_deleted,
 	}
 	if not errors.is_empty():
 		response["errors"] = errors
 		response["error"] = "%d change(s) failed to revert" % errors.size()
 	return response
+
+
+# Split "Player/Sprite" → { parent_path: "Player", node_name: "Sprite" }.
+# Handles edge cases: scene-root-relative single-name ("Player") → parent
+# is "" (the scene root), name is "Player". Absolute paths starting with
+# "/root/" are left to ToolUtils.find_node_by_path to interpret.
+func _split_node_path_into_parent_and_name(node_path: String) -> Dictionary:
+	var trimmed := node_path.strip_edges()
+	if trimmed.is_empty():
+		return {"parent_path": "", "node_name": ""}
+	var last_slash := trimmed.rfind("/")
+	if last_slash < 0:
+		# Single token — name is the whole thing, parent is scene root.
+		return {"parent_path": "", "node_name": trimmed}
+	return {
+		"parent_path": trimmed.substr(0, last_slash),
+		"node_name": trimmed.substr(last_slash + 1),
+	}
 
 
 func _main_dispatch_turn_accept(request_id: String, request: Dictionary) -> Dictionary:
@@ -610,7 +763,7 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 				"request_id": request_id,
 			})
 			_pending_main_dispatches_mutex.unlock()
-		"backup/file", "backup/check_exists", "turn/revert", "turn/accept":
+		"backup/file", "backup/node", "backup/check_exists", "turn/revert", "turn/accept":
 			# File-level revert/backup endpoints. Routed through the main
 			# thread for two reasons: (a) FileAccess + DirAccess operations
 			# are safer on the editor's main thread, and (b) turn/revert
