@@ -15,6 +15,7 @@ extends RefCounted
 # case is one at a time.
 
 const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
+const RuntimeLogStream = preload("res://addons/com.gladekit.mcp-bridge/services/runtime_log_stream.gd")
 
 # Maps session_id (auto-incrementing int as string) → session dict.
 # Session dict shape:
@@ -81,7 +82,9 @@ static func drain(session_id: String) -> Dictionary:
 		return {"error": "no session with id '%s'" % session_id}
 	var s: Dictionary = _sessions[session_id]
 	_drain_pipe(s, "stdio", "stdout_buffer")
-	_drain_pipe(s, "stderr", "stderr_buffer")
+	var stderr_chunk: String = _drain_pipe(s, "stderr", "stderr_buffer")
+	if not stderr_chunk.is_empty():
+		RuntimeLogStream.ingest_chunk(session_id, stderr_chunk)
 	var running := OS.is_process_running(int(s["pid"]))
 	if not running and s["exit_code"] == null:
 		# Process exited; capture the exit code if available. Godot's
@@ -111,22 +114,41 @@ static func drain(session_id: String) -> Dictionary:
 # Caveat: we cap each drain at 64KB. If the running process is spewing
 # output faster than the agent drains, lines will accumulate in the OS
 # pipe buffer; the next drain picks up the next 64KB chunk.
-static func _drain_pipe(s: Dictionary, pipe_key: String, buf_key: String) -> void:
+#
+# Returns the just-read chunk (or "" when nothing was available). Callers
+# can forward stderr chunks to RuntimeLogStream for structured parsing;
+# the stdout chunk is consumed only by the user-facing buffer.
+static func _drain_pipe(s: Dictionary, pipe_key: String, buf_key: String) -> String:
 	var pipe = s.get(pipe_key, null)
 	if pipe == null:
-		return
+		return ""
 	if not (pipe is FileAccess):
-		return
+		return ""
 	const CHUNK_BYTES := 65536
 	# get_buffer reads up to N bytes from whatever the OS has ready;
 	# returns fewer if the pipe is currently empty (does not block).
 	var bytes: PackedByteArray = pipe.get_buffer(CHUNK_BYTES)
 	if bytes.is_empty():
-		return
+		return ""
 	var text := bytes.get_string_from_utf8()
 	if text.is_empty():
-		return
+		return ""
 	s[buf_key] = String(s[buf_key]) + text
+	return text
+
+
+# Passive pump used by get_runtime_events to refresh the structured stream
+# without consuming the user-facing stdout/stderr buffers. Each pipe is
+# read once per call (OS pipes are destructive — bytes go into the
+# per-session buffer for get_debug_output to consume on its next call,
+# AND into RuntimeLogStream for structured parsing).
+static func tick_all_sessions() -> void:
+	for sid in _sessions.keys():
+		var s: Dictionary = _sessions[sid]
+		_drain_pipe(s, "stdio", "stdout_buffer")
+		var stderr_chunk: String = _drain_pipe(s, "stderr", "stderr_buffer")
+		if not stderr_chunk.is_empty():
+			RuntimeLogStream.ingest_chunk(String(sid), stderr_chunk)
 
 
 # Kill a running session. Returns the final drained output + exit info.
@@ -137,7 +159,12 @@ static func stop(session_id: String) -> Dictionary:
 	var pid: int = int(s["pid"])
 	# Final drain before killing so the caller sees any last-second output.
 	_drain_pipe(s, "stdio", "stdout_buffer")
-	_drain_pipe(s, "stderr", "stderr_buffer")
+	var stderr_chunk: String = _drain_pipe(s, "stderr", "stderr_buffer")
+	if not stderr_chunk.is_empty():
+		RuntimeLogStream.ingest_chunk(session_id, stderr_chunk)
+	# Flush any in-progress error event whose trailing stack frame was the
+	# last line of stderr — otherwise it'd sit in the parser forever.
+	RuntimeLogStream.flush_session(session_id)
 	var was_running := OS.is_process_running(pid)
 	if was_running:
 		OS.kill(pid)
@@ -166,3 +193,32 @@ static func list_sessions() -> Array:
 			"started_unix": s["started_unix"],
 		})
 	return out
+
+
+# Diagnostic accessor for get_runtime_events. Returns aggregate stderr/stdout
+# byte counts across all active sessions plus a short tail string so the
+# agent can tell whether the bridge captured ANY output even when the
+# structured parser came up empty. Empty events with raw_stderr_bytes > 0
+# means a parser miss (likely a new Godot prefix); empty events with
+# raw_stderr_bytes == 0 means the bytes never reached the bridge (libc
+# stderr buffering on the subprocess, no scene errors, etc.).
+static func get_buffer_diagnostics(tail_chars: int = 500) -> Dictionary:
+	var total_stderr: int = 0
+	var total_stdout: int = 0
+	var longest_stderr: String = ""
+	for sid in _sessions.keys():
+		var s: Dictionary = _sessions[sid]
+		var stderr_buf: String = String(s.get("stderr_buffer", ""))
+		var stdout_buf: String = String(s.get("stdout_buffer", ""))
+		total_stderr += stderr_buf.length()
+		total_stdout += stdout_buf.length()
+		if stderr_buf.length() > longest_stderr.length():
+			longest_stderr = stderr_buf
+	var tail: String = longest_stderr
+	if tail_chars > 0 and tail.length() > tail_chars:
+		tail = tail.substr(tail.length() - tail_chars)
+	return {
+		"raw_stderr_bytes": total_stderr,
+		"raw_stdout_bytes": total_stdout,
+		"raw_stderr_tail": tail,
+	}

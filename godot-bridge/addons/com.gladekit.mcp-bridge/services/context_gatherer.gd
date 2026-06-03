@@ -1,8 +1,8 @@
 extends RefCounted
 
-# Gathers project + editor context for the cloud loop / system prompt.
-# Read-only — never mutates state. Mirrors GladeAgenticAI.Services.
-# UnityContextGatherer for Unity.
+# Gathers project + editor context for an MCP client to embed in a system
+# prompt prefix. Read-only — never mutates state. Mirrors the Unity bridge's
+# UnityContextGatherer service.
 #
 # The returned dictionary is JSON-serializable and small enough to embed
 # in a system prompt prefix.

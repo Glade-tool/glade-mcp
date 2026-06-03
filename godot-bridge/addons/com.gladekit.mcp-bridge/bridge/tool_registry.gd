@@ -28,9 +28,13 @@ const GetScriptContentTool   = preload("res://addons/com.gladekit.mcp-bridge/too
 const FindScriptsTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/find_scripts.gd")
 const AttachScriptToNodeTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/attach_script_to_node.gd")
 
-# ── Camera / Light tools (Phase 3) ─────────────────────────────────────────
-const CreateCamera3DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_camera_3d.gd")
-const CreateLightTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_light.gd")
+# ── Camera / Lighting / Environment tools (Phase 3 + v0.5.3) ───────────────
+const CreateCamera3DTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_camera_3d.gd")
+const CreateLightTool         = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_light.gd")
+const SetLightPropertiesTool  = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/set_light_properties.gd")
+const GetLightInfoTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/get_light_info.gd")
+const SetWorldEnvironmentTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/set_world_environment.gd")
+const GetWorldEnvironmentTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/get_world_environment.gd")
 
 # ── Resource tools (Phase 3 + 7) ───────────────────────────────────────────
 const CreateMaterialTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/resource/create_material.gd")
@@ -54,6 +58,11 @@ const RunProjectTool          = preload("res://addons/com.gladekit.mcp-bridge/to
 const StopProjectTool         = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/stop_project.gd")
 const GetDebugOutputTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/get_debug_output.gd")
 const LaunchEditorTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/launch_editor.gd")
+
+# ── Structured runtime-event observation (v0.5.2) ──────────────────────────
+const StartRuntimeObservationTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/start_runtime_observation.gd")
+const StopRuntimeObservationTool  = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/stop_runtime_observation.gd")
+const GetRuntimeEventsTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/get_runtime_events.gd")
 
 # ── UID tools (Phase 3, Godot 4.4+ only) ───────────────────────────────────
 const GetUidTool            = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/uid/get_uid.gd")
@@ -102,9 +111,13 @@ func _register_all() -> void:
 	register_tool(GetScriptContentTool.new())
 	register_tool(FindScriptsTool.new())
 	register_tool(AttachScriptToNodeTool.new())
-	# Camera / Light (2)
+	# Camera / Lighting / Environment (6) — 2 Phase 3 + 4 (v0.5.3)
 	register_tool(CreateCamera3DTool.new())
 	register_tool(CreateLightTool.new())
+	register_tool(SetLightPropertiesTool.new())
+	register_tool(GetLightInfoTool.new())
+	register_tool(SetWorldEnvironmentTool.new())
+	register_tool(GetWorldEnvironmentTool.new())
 	# Resource (3) — Material has its own dedicated tool; create_resource
 	# handles every other built-in Resource subclass (Mesh, Shape3D, Curve, etc.)
 	register_tool(CreateMaterialTool.new())
@@ -117,7 +130,7 @@ func _register_all() -> void:
 	register_tool(OpenSceneTool.new())
 	register_tool(SaveSceneTool.new())
 	register_tool(InstantiateSceneTool.new())
-	# Runtime / process (7)
+	# Runtime / process (10) — 7 Phase 3 + 3 structured observation (v0.5.2)
 	register_tool(GetPlayModeStateTool.new())
 	register_tool(GetSelectionTool.new())
 	register_tool(GetGodotConsoleLogsTool.new())
@@ -125,6 +138,9 @@ func _register_all() -> void:
 	register_tool(StopProjectTool.new())
 	register_tool(GetDebugOutputTool.new())
 	register_tool(LaunchEditorTool.new())
+	register_tool(StartRuntimeObservationTool.new())
+	register_tool(StopRuntimeObservationTool.new())
+	register_tool(GetRuntimeEventsTool.new())
 	# UID (2, 4.4+)
 	register_tool(GetUidTool.new())
 	register_tool(UpdateProjectUidsTool.new())
@@ -145,6 +161,15 @@ func _register_all() -> void:
 
 
 func register_tool(tool_instance) -> void:
+	# Defensive guard against null. The most common cause is a preloaded
+	# script that failed to parse — preload() returns null, then `.new()`
+	# blows up the surrounding _register_all() and silently drops every
+	# tool registered after it. Bailing out with push_error keeps the rest
+	# of the catalog intact and screams in the Godot Output panel so the
+	# next person catches it before it ships.
+	if tool_instance == null:
+		push_error("[GladeKit MCP Bridge] register_tool received null — a tool script likely failed to parse. Check the Output panel for the original parse error.")
+		return
 	var n: String = tool_instance.tool_name
 	if n.is_empty():
 		push_error("[GladeKit MCP Bridge] Cannot register tool with empty name (instance: %s)" % tool_instance)

@@ -1,5 +1,5 @@
 """
-Godot runtime / process control tools (7 tools).
+Godot runtime / process control tools (10 tools).
 
 Three observability tools (get_play_mode_state, get_selection,
 get_godot_console_logs) plus a four-tool process control surface:
@@ -13,6 +13,13 @@ get_godot_console_logs) plus a four-tool process control surface:
 
   launch_editor — spawn a separate editor instance on a different
     project (useful for opening a freshly-scaffolded project).
+
+Plus three structured runtime-event observation tools
+(start_runtime_observation, stop_runtime_observation,
+get_runtime_events) that surface play-session errors as cursored,
+fingerprinted events for incremental polling. The bridge parses
+ERROR / SCRIPT ERROR / USER SCRIPT ERROR lines + their stack frames
+out of each session's stderr; warnings and plain stdout are dropped.
 
 Session lifecycle: run_project returns a session_id; pass it to
 get_debug_output (drain new output, non-blocking) and stop_project
@@ -81,7 +88,18 @@ TOOLS: List[Dict] = [
                 "scene) and start draining its stdout/stderr in the background. Returns "
                 "a session_id immediately; the editor stays alive and responsive while "
                 "the child runs. Use get_debug_output to drain new output, stop_project "
-                "to kill it. Use this for live playtest feedback loops."
+                "to kill it. Use this for live playtest feedback loops. "
+                "\n\n"
+                "Auto-saves the edited scene before spawning (auto_save=true default) "
+                "so the subprocess loads the latest in-memory edits, not the stale disk "
+                "state. Refuses a second concurrent session by default to prevent the "
+                "'two play windows' footgun when retrying; pass allow_multiple=true if "
+                "you genuinely need two sessions. "
+                "\n\n"
+                "Recommended workflow for diagnostics: run_project → start_runtime_observation "
+                "(if not already) → wait briefly (the subprocess takes ~1-2s to boot and "
+                "fire _ready) → get_runtime_events → stop_project LAST (stop erases the "
+                "session, so call get_debug_output / get_runtime_events first)."
             ),
             "parameters": {
                 "type": "object",
@@ -98,6 +116,22 @@ TOOLS: List[Dict] = [
                         "items": {"type": "string"},
                         "description": "Additional CLI args to pass through to godot.",
                     },
+                    "auto_save": {
+                        "type": "boolean",
+                        "description": (
+                            "Save the edited scene before spawning so the subprocess loads "
+                            "your latest changes from disk. Default true. Set false to run "
+                            "the on-disk version as-is."
+                        ),
+                    },
+                    "allow_multiple": {
+                        "type": "boolean",
+                        "description": (
+                            "Allow a second concurrent play session. Default false — without "
+                            "this the tool refuses if any session is still running, so a retry "
+                            "doesn't open a second game window."
+                        ),
+                    },
                 },
             },
         },
@@ -108,17 +142,33 @@ TOOLS: List[Dict] = [
             "name": "stop_project",
             "description": (
                 "Kill a play session started by run_project. Returns final drained "
-                "stdout/stderr so the agent sees any last-second output."
+                "stdout/stderr so the agent sees any last-second output. "
+                "Call this LAST in a diagnostics flow — it erases the session from "
+                "the manager, so any subsequent get_debug_output(session_id) returns "
+                "'session not found'. Call get_runtime_events / get_debug_output "
+                "before stop_project, not after. "
+                "\n\n"
+                "Pass session_id (the string from run_project, e.g. '1') — NOT pid "
+                "(the OS process id, e.g. 23696). If you only have the pid, pass it "
+                "as the pid arg instead — the tool resolves either."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "Session id returned by run_project.",
+                        "description": (
+                            "Bridge session identifier from run_project's response (e.g. '1', '2', …). NOT the OS pid."
+                        ),
+                    },
+                    "pid": {
+                        "type": "integer",
+                        "description": (
+                            "Fallback: kill whichever session is running this OS pid. "
+                            "Use only when you have the pid but not the session_id."
+                        ),
                     },
                 },
-                "required": ["session_id"],
             },
         },
     },
@@ -161,6 +211,94 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["project_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "start_runtime_observation",
+            "description": (
+                "Arm structured runtime-event observation. Snapshots the current "
+                "runtime-event cursor so subsequent get_runtime_events polls return only "
+                "events from this point forward — arming should not retroactively "
+                "surface a 10-minute-old error. Idempotent: re-arming refreshes the "
+                "baseline cursor (useful after a reconnect). Read-only — safe in any "
+                "mode. The bridge parses errors out of active play-session stderr; "
+                "warnings and plain stdout are dropped. Returns observation_active, "
+                "start_cursor, ring_buffer_size, is_playing."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stop_runtime_observation",
+            "description": (
+                "Disarm structured runtime-event observation. The ring buffer keeps "
+                "recording errors from any active play sessions; this just tells the "
+                "bridge the caller is no longer interested. Read-only — safe in any "
+                "mode."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_runtime_events",
+            "description": (
+                "Pull structured runtime errors captured since since_cursor. Read-only. "
+                "Each event has cursor (monotonic int), message, stack_trace, log_type "
+                "(ERROR | SCRIPT_ERROR | USER_ERROR | USER_SCRIPT_ERROR), timestamp "
+                "(unix seconds), and fingerprint (message + stack hash, stable within "
+                "a session for client-side dedup). Designed for incremental polling — "
+                "pass the prior response's next_cursor on each call so you only see new "
+                "events. When play_mode_active is false, the runner should stop polling. "
+                "Pulls fresh stderr from active play sessions before reading the ring "
+                "buffer, without consuming the user-facing buffer that get_debug_output "
+                "reads. "
+                "\n\n"
+                "When called immediately after run_project, pass wait_ms (e.g. 2000) — "
+                "the subprocess takes ~500ms-2s to boot and fire _ready, so a non-waiting "
+                "poll right after spawn returns empty even when errors are about to fire. "
+                "\n\n"
+                "Self-diagnosis fields in the response: raw_stderr_bytes/raw_stdout_bytes "
+                "show how many bytes the bridge captured from subprocess pipes. If events "
+                "is empty AND raw_stderr_bytes > 0, the parser missed a new prefix — check "
+                "raw_stderr_tail. If both are 0, the subprocess didn't write anything to "
+                "stderr (libc buffering, no errors fired, or pipe issue)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "since_cursor": {
+                        "type": "integer",
+                        "description": (
+                            "Return events with cursor > this value. Pass 0 to read "
+                            "every event currently in the buffer; pass the prior "
+                            "next_cursor for incremental polls."
+                        ),
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": (
+                            "Maximum events returned per call. Default 200, hard-capped "
+                            "at 2000. Events past the limit remain for the next poll."
+                        ),
+                    },
+                    "wait_ms": {
+                        "type": "integer",
+                        "description": (
+                            "Optional blocking wait (0-5000ms) for new events to arrive. "
+                            "The tool re-drains every 100ms until events appear or the "
+                            "deadline passes. Use right after run_project (try 2000-3000) "
+                            "so the first poll doesn't beat the subprocess to _ready. "
+                            "Default 0 = no wait."
+                        ),
+                    },
+                },
             },
         },
     },

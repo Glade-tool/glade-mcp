@@ -5,7 +5,7 @@ scene, node, script, and resource tools so AI assistants can read and modify
 the active project. Designed to be addressed by an MCP server (for use with
 Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 
-**Status:** 39 tools registered across 10 categories.
+**Status:** 53 tools registered across 11 categories.
 
 | Phase | Tools | Cumulative | Status |
 | --- | --- | --- | --- |
@@ -17,6 +17,13 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 | 7 | + 1 Resource assignment (`set_node_resource`); `readOnlyHint` on read-only tools | 38 | shipped (v0.4.4) |
 | 8 | + 1 Generic resource factory (`create_resource`) | 39 | shipped (v0.4.5) |
 | 9 | `context/gather` aggregating endpoint (project + scene tree + recent errors in one round-trip) | 39 | shipped (v0.4.6) |
+| 10 | + 6 UI / Control tools (`create_control`, `set_control_anchors`, `set_control_text`, `set_control_size`, `list_ui_hierarchy`, `create_theme`); Window dialog support | 46 | shipped (v0.5.1) |
+| 11 | + 3 Structured runtime-event observation (`start_runtime_observation`, `stop_runtime_observation`, `get_runtime_events`) — cursored, fingerprinted error stream parsed from active play-session stderr | 49 | shipped (v0.5.2) |
+| 12 | + 4 Lighting & WorldEnvironment (`set_light_properties`, `get_light_info`, `set_world_environment`, `get_world_environment`) — mutate/read existing lights and the scene's sky / ambient / fog / tonemap / glow / SSAO | 53 | shipped (v0.5.3) |
+| 13 | `run_project` auto-saves the edited scene before spawning + refuses duplicate concurrent sessions (prevents stale-disk and double-window footguns) | 53 | shipped (v0.5.4) |
+| 14 | Diagnostics workflow hardening: `get_runtime_events` gains `wait_ms` (blocking poll up to 5s so the first call after `run_project` doesn't beat the subprocess to `_ready`); `stop_project` accepts either `session_id` or `pid` and tolerates the model's "pid 23696" string mangling | 53 | shipped (v0.5.5) |
+| 15 | Parser catches Godot 4 `USER ERROR:` prefix (was matching Godot 3's `USER SCRIPT ERROR:` only, silently dropping every `push_error` event); `get_runtime_events` adds `raw_stderr_bytes` + `raw_stderr_tail` self-diagnosis fields so an empty response distinguishes "parser missed a prefix" from "subprocess wrote nothing" | 53 | shipped (v0.5.6) |
+| 16 | `get_runtime_events` message field surfaces the byte-count diagnostic inline so it can't be missed by models that only quote `message` back | 53 | shipped (v0.5.7) |
 
 ### New in Phase 3
 
@@ -124,7 +131,7 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 3. Enable **GladeKit MCP Bridge**.
 4. Confirm the bridge is up: the editor Output panel should print
    ```
-   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.4.6, 39 tools registered, thread-polled at 200Hz)
+   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.5.7, 53 tools registered, thread-polled at 200Hz)
    ```
 
 The server stops automatically when you disable the plugin or close Godot.

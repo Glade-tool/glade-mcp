@@ -50,12 +50,14 @@ const DEFAULT_PORT := 8766
 const BIND_ADDRESS := "127.0.0.1"
 const THREAD_POLL_SLEEP_MSEC := 5  # ~200Hz worker loop (never throttled)
 
-const ToolRegistry   = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_registry.gd")
-const ToolUtils      = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
-const EngineMode     = preload("res://addons/com.gladekit.mcp-bridge/bridge/engine_mode.gd")
-const ReadOnlyGuard  = preload("res://addons/com.gladekit.mcp-bridge/services/read_only_guard.gd")
-const ErrorTracker   = preload("res://addons/com.gladekit.mcp-bridge/services/error_tracker.gd")
-const BackupManager  = preload("res://addons/com.gladekit.mcp-bridge/services/backup_manager.gd")
+const ToolRegistry      = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_registry.gd")
+const ToolUtils         = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
+const EngineMode        = preload("res://addons/com.gladekit.mcp-bridge/bridge/engine_mode.gd")
+const ReadOnlyGuard     = preload("res://addons/com.gladekit.mcp-bridge/services/read_only_guard.gd")
+const ErrorTracker      = preload("res://addons/com.gladekit.mcp-bridge/services/error_tracker.gd")
+const BackupManager     = preload("res://addons/com.gladekit.mcp-bridge/services/backup_manager.gd")
+const RuntimeLogStream  = preload("res://addons/com.gladekit.mcp-bridge/services/runtime_log_stream.gd")
+const PlaySessionManager = preload("res://addons/com.gladekit.mcp-bridge/services/play_session_manager.gd")
 
 # ── Bridge state ─────────────────────────────────────────────────────────
 # Populated once in start() from plugin.cfg, then read-only for the rest of
@@ -247,9 +249,9 @@ func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
 		ErrorTracker.record(tool_name, bad_msg, args)
 		return _make_error(request_id, bad_msg)
 	# Tool result already carries success/message/error — inject id and forward.
-	# Also feed failures into the per-session ErrorTracker so the cloud loop
-	# can see the recent failure pattern via the bridge's recent_errors
-	# endpoint and avoid repeating mistakes on retry.
+	# Also feed failures into the per-session ErrorTracker so callers can read
+	# the recent failure pattern via the bridge's recent_errors endpoint and
+	# avoid repeating mistakes on retry.
 	if result.has("success") and not bool(result["success"]):
 		var err_msg: String = str(result.get("error", result.get("message", "tool failed")))
 		ErrorTracker.record(tool_name, err_msg, args)
@@ -276,13 +278,18 @@ func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
 #       Defaults to 10.
 #
 # Response payload:
-#   project:     Dictionary — get_project_info's `project` payload, or
-#                {} on failure with an `errors.project` entry.
-#   scene_tree:  Dictionary — get_scene_tree's payload (tree, tree_text,
-#                scene_path, node_count), or null on failure.
-#   recent_errors: Array — most-recent-first list of {tool, message, args_summary}.
-#   errors:      Dictionary — sub-fetch failure messages keyed by source
-#                ("project" | "scene_tree"). Absent when all three succeed.
+#   project:        Dictionary — get_project_info's `project` payload, or
+#                   {} on failure with an `errors.project` entry.
+#   scene_tree:     Dictionary — get_scene_tree's payload (tree, tree_text,
+#                   scene_path, node_count), or null on failure.
+#   recent_errors:  Array — most-recent-first list of bridge tool-dispatch
+#                   failures: {tool, message, args_summary}.
+#   runtime_events: Array — most-recent-first list of structured runtime
+#                   errors parsed from play-session stderr: {cursor, message,
+#                   stack_trace, log_type, timestamp, fingerprint}. Empty
+#                   when no play sessions have run this editor session.
+#   errors:         Dictionary — sub-fetch failure messages keyed by source
+#                   ("project" | "scene_tree"). Absent when all three succeed.
 func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> Dictionary:
 	var project_format: String = str(request.get("project_response_format", "concise"))
 	var scene_max_depth_raw = request.get("scene_max_depth", null)
@@ -295,6 +302,7 @@ func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> D
 		"project": {},
 		"scene_tree": null,
 		"recent_errors": [],
+		"runtime_events": [],
 	}
 	var sub_errors: Dictionary = {}
 
@@ -334,6 +342,18 @@ func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> D
 	# retry-context prompt without a second round-trip.
 	if errors_limit > 0:
 		response["recent_errors"] = ErrorTracker.recent(errors_limit)
+		# Runtime events — structured play-session errors from RuntimeLogStream.
+		# Pump active session pipes first so any output that landed since the
+		# last drain is reflected. Walk the tail of the ring for the most-recent
+		# `errors_limit` entries; the order matches the agent-facing convention
+		# (most-recent first) used by recent_errors above.
+		PlaySessionManager.tick_all_sessions()
+		var all_runtime: Array = RuntimeLogStream.get_events_since_cursor(0, RuntimeLogStream.MAX_ENTRIES)
+		var runtime_tail: Array = all_runtime
+		if all_runtime.size() > errors_limit:
+			runtime_tail = all_runtime.slice(all_runtime.size() - errors_limit)
+		runtime_tail.reverse()  # most-recent first
+		response["runtime_events"] = runtime_tail
 
 	if not sub_errors.is_empty():
 		response["errors"] = sub_errors
@@ -751,8 +771,8 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 			})
 			_pending_main_dispatches_mutex.unlock()
 		"context/gather":
-			# One-shot project orientation snapshot for clients (Electron's
-			# pre-prompt context, primarily). Aggregates get_project_info +
+			# One-shot project orientation snapshot for clients that want a
+			# pre-prompt context bundle. Aggregates get_project_info +
 			# get_scene_tree + recent_errors so the agent doesn't burn
 			# 2-3 round-trips on every Godot session's first turn.
 			# Scene-tree access requires the main thread.

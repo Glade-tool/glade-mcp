@@ -23,8 +23,11 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# Phase 2 scene/node (11, incl. set_node_resource) + script (5) = 16;
 	# Phase 3 camera/light (2) + resource (2) + physics (1) + scene_io (4)
 	# + runtime (7) + uid (2) = 18; Phase 5 signal (3); create_resource (1);
-	# project introspection get_project_info + list_assets (2) = 40 total.
-	assert_eq(registry.get_tool_count(), 40, "Catalog should register exactly 40 tools")
+	# project introspection get_project_info + list_assets (2) = 40;
+	# v0.5.0 UI/Control (6) = 46; v0.5.2 structured runtime-event
+	# observation (3) = 49; v0.5.3 lighting & environment (4 — set/get
+	# light_properties + set/get world_environment) = 53 total.
+	assert_eq(registry.get_tool_count(), 53, "Catalog should register exactly 53 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -53,6 +56,15 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"connect_signal", "list_signal_connections", "disconnect_signal",
 		# Project introspection
 		"get_project_info", "list_assets",
+		# v0.5.0 — UI / Control
+		"create_control", "set_control_anchors", "set_control_text",
+		"set_control_size", "list_ui_hierarchy", "create_theme",
+		# v0.5.2 — Structured runtime-event observation
+		"start_runtime_observation", "stop_runtime_observation",
+		"get_runtime_events",
+		# v0.5.3 — Lighting & environment
+		"set_light_properties", "get_light_info",
+		"set_world_environment", "get_world_environment",
 	]
 	for expected in expected_names:
 		assert_true(registry.has_tool(expected), "Missing registration for tool '%s'" % expected)

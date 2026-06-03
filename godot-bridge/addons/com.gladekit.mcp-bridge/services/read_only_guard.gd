@@ -27,6 +27,9 @@ const READ_ONLY_TOOLS: Array[String] = [
 	"get_play_mode_state",
 	"get_selection",
 	"get_debug_output",
+	"get_runtime_events",
+	"start_runtime_observation",
+	"stop_runtime_observation",
 	# UID reads
 	"get_uid",
 	# Signal reads
@@ -36,6 +39,9 @@ const READ_ONLY_TOOLS: Array[String] = [
 	"list_assets",
 	# UI reads (v0.5.0)
 	"list_ui_hierarchy",
+	# Lighting / Environment reads (v0.5.3)
+	"get_light_info",
+	"get_world_environment",
 ]
 
 const SETTING_KEY := "gladekit/read_only_mode"

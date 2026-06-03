@@ -13,21 +13,22 @@ Categories follow the Godot bridge's own directory layout under
     scene     — Node creation, hierarchy queries, transforms,
                 resource assignment                              (11 tools)
     script    — GDScript file CRUD + node attachment           ( 5 tools)
-    camera    — Camera3D + Light3D                              ( 2 tools)
+    camera    — Camera3D + Light3D + WorldEnvironment           ( 6 tools)
     resource  — Material creation, generic Resource creation,
                 property updates                                ( 3 tools)
     physics   — PhysicsBody3D + auto-collision-shape            ( 1 tool)
     scene_io  — .tscn create/open/save/instantiate              ( 4 tools)
-    runtime   — Play-mode + selection + console + play session  ( 7 tools)
+    runtime   — Play-mode + selection + console + play session
+                + structured runtime-event observation          (10 tools)
     uid       — Godot 4.4+ ResourceUID handling                 ( 2 tools)
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
     project   — Project introspection + asset listing           ( 2 tools)
     ui        — Control-tree creation + anchor / text helpers   ( 6 tools)
                                                                 ───────
-                                                                46 tools
+                                                                53 tools
 
 Unlike the Unity side (~222 tools across 17 categories) we expose the
-full Godot catalog directly — 46 tools is well within Claude Code's
+full Godot catalog directly — 53 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 """
 
@@ -89,6 +90,9 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
         "get_play_mode_state",
         "get_selection",
         "get_debug_output",
+        "get_runtime_events",
+        "start_runtime_observation",
+        "stop_runtime_observation",
         # UID reads
         "get_uid",
         # Signal reads
@@ -98,12 +102,15 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
         "list_assets",
         # UI reads (v0.5.0)
         "list_ui_hierarchy",
+        # Lighting / Environment reads (v0.5.3)
+        "get_light_info",
+        "get_world_environment",
     }
 )
 
 
 def get_godot_tool_schemas() -> List[Dict]:
-    """Return all 46 Godot tool schemas as a flat list (OpenAI function format)."""
+    """Return all 53 Godot tool schemas as a flat list (OpenAI function format)."""
     all_tools: List[Dict] = []
     for _, tools in ALL_CATEGORIES:
         all_tools.extend(tools)

@@ -1,9 +1,10 @@
 extends RefCounted
 
-# Accumulates tool failures per Godot session so the cloud loop can read
-# the recent error history and avoid repeating mistakes on retry.
+# Accumulates tool failures per Godot session so an MCP client can read the
+# recent error history (via the bridge's diagnostics/recent_errors endpoint)
+# and avoid repeating mistakes on retry.
 #
-# Mirrors GladeAgenticAI.Services.ErrorTracker from the Unity bridge.
+# Mirrors the ErrorTracker service from the Unity bridge.
 # State is process-local — wiped on editor restart or addon hot-reload.
 # That's intentional: a fresh editor is a fresh session.
 
