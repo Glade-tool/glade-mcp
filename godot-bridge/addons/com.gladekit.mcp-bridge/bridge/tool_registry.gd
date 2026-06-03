@@ -68,6 +68,14 @@ const DisconnectSignalTool      = preload("res://addons/com.gladekit.mcp-bridge/
 const GetProjectInfoTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/project/get_project_info.gd")
 const ListAssetsTool            = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/project/list_assets.gd")
 
+# ── UI / Control tools (v0.5.0) ────────────────────────────────────────────
+const CreateControlTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_control.gd")
+const SetControlAnchorsTool  = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/set_control_anchors.gd")
+const SetControlTextTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/set_control_text.gd")
+const SetControlSizeTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/set_control_size.gd")
+const ListUiHierarchyTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/list_ui_hierarchy.gd")
+const CreateThemeTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_theme.gd")
+
 var _tools: Dictionary = {}
 
 
@@ -127,6 +135,13 @@ func _register_all() -> void:
 	# Project introspection (2)
 	register_tool(GetProjectInfoTool.new())
 	register_tool(ListAssetsTool.new())
+	# UI / Control (6, v0.5.0)
+	register_tool(CreateControlTool.new())
+	register_tool(SetControlAnchorsTool.new())
+	register_tool(SetControlTextTool.new())
+	register_tool(SetControlSizeTool.new())
+	register_tool(ListUiHierarchyTool.new())
+	register_tool(CreateThemeTool.new())
 
 
 func register_tool(tool_instance) -> void:

@@ -2,9 +2,9 @@
 
 Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients directly to your Unity or Godot editor.
 
-**Unity:** 235+ tools, full Unity-aware system prompt, GLADE.md project context, script semantic search, skill calibration, free CC0 asset pipeline (Kenney), cloud intelligence layer with RAG and cross-session memory.
+**Unity:** 235+ tools, full Unity-aware system prompt, GLADE.md project context, script semantic search, skill calibration, free CC0 asset pipeline, cloud intelligence layer with RAG and cross-session memory.
 
-**Godot (4.3+):** 38 native tools across scene/node, scripts, resources, signals, runtime, and project introspection. Read-only tools advertise the MCP `readOnlyHint` annotation for auto-approval.
+**Godot (4.3+):** 46 native tools across scene/node, scripts, resources, signals, runtime, project introspection, and Control / Window UI.
 
 The MCP server auto-detects which editor is running (Unity on `:8765`, Godot on `:8766`) and exposes the matching tool set.
 
@@ -33,7 +33,7 @@ The Unity bridge starts automatically on `localhost:8765`.
 The Godot bridge starts automatically on `localhost:8766`. You should see a confirmation line in the editor Output panel:
 
 ```
-[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.4.4, 38 tools registered, thread-polled at 200Hz)
+[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.5.1, 46 tools registered, thread-polled at 200Hz)
 ```
 
 **Supported:** Godot 4.3+ GDScript projects, Forward+ and Compatibility renderers, 2D and 3D. **Not yet supported:** Godot Mono / C# projects, web export targets, headless server builds. The bridge is editor-only; it never runs in exported games.

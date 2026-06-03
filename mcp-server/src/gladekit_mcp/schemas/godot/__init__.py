@@ -22,11 +22,12 @@ Categories follow the Godot bridge's own directory layout under
     uid       — Godot 4.4+ ResourceUID handling                 ( 2 tools)
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
     project   — Project introspection + asset listing           ( 2 tools)
+    ui        — Control-tree creation + anchor / text helpers   ( 6 tools)
                                                                 ───────
-                                                                39 tools
+                                                                46 tools
 
 Unlike the Unity side (~222 tools across 17 categories) we expose the
-full Godot catalog directly — 39 tools is well within Claude Code's
+full Godot catalog directly — 46 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 """
 
@@ -41,6 +42,7 @@ from .scene import TOOLS as SCENE_TOOLS
 from .scene_io import TOOLS as SCENE_IO_TOOLS
 from .script import TOOLS as SCRIPT_TOOLS
 from .signal import TOOLS as SIGNAL_TOOLS
+from .ui import TOOLS as UI_TOOLS
 from .uid import TOOLS as UID_TOOLS
 
 ALL_CATEGORIES = [
@@ -54,6 +56,7 @@ ALL_CATEGORIES = [
     ("uid", UID_TOOLS),
     ("signal", SIGNAL_TOOLS),
     ("project", PROJECT_TOOLS),
+    ("ui", UI_TOOLS),
 ]
 
 
@@ -93,12 +96,14 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
         # Project introspection reads
         "get_project_info",
         "list_assets",
+        # UI reads (v0.5.0)
+        "list_ui_hierarchy",
     }
 )
 
 
 def get_godot_tool_schemas() -> List[Dict]:
-    """Return all 38 Godot tool schemas as a flat list (OpenAI function format)."""
+    """Return all 46 Godot tool schemas as a flat list (OpenAI function format)."""
     all_tools: List[Dict] = []
     for _, tools in ALL_CATEGORIES:
         all_tools.extend(tools)
