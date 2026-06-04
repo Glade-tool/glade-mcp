@@ -6,6 +6,12 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ### Added
 
+- **Godot bridge addon v0.6.1 — `add_input_action` (InputMap action setup).** A fresh Godot project ships with only the engine `ui_*` defaults, so a movement/jump/interact script that calls `Input.is_action_pressed("move_forward")` or `Input.get_vector(...)` against custom action names errors on every frame — and there was previously no tool to define those actions. `add_input_action` registers (or replaces) a custom action and binds keyboard keys to it: the action is saved to `project.godot` (survives restarts, appears under Project Settings > Input Map) and mirrored into the live `InputMap` so it fires the moment the project runs. Keys bind as physical keys (WASD survives non-QWERTY layouts), key names accept editor-style strings (`"W"`, `"Space"`, `"Escape"`, arrow keys), unrecognized names return `possible_solutions[]`, and re-running with `overwrite=true` (the default) is idempotent. Refused during play mode.
+
+### Fixed
+
+- **Scene-root node-path resolution.** Path-targeting tools (`create_primitive_3d`, `set_node_transform`, `set_node_parent`, and others that resolve a `parent_path` / node path) failed with `Parent node '<Name>' not found` when an agent named the scene root itself — e.g. `parent_path: "Main"` when the edited scene root is `Main`. The resolver's descendant search never matched the root node, so the most natural way to reference the root broke. It now resolves a bare root name, and strips a leading root-name segment from a slash path (`"Main/Player"` → `Player` under root), removing a class of avoidable failures.
+
 - **Godot bridge addon v0.6.0 — AnimationPlayer + Animation .tres scaffolding (5 tools).** Closes the gap between an empty AnimationPlayer + an empty Animation resource and a playable, scene-saved animation library:
   - `add_animation_to_player` — register an Animation .tres with a player under a library + name (default library `""`, the conventional setup). Creates the library on first registration; refuses to overwrite an existing entry.
   - `add_animation_track` — add a track to an Animation. Five track types: `value` (any property — path `Node:property`), `position_3d` / `rotation_3d` / `scale_3d` (Node3D transform — more efficient than value-track equivalents), `method` (calls a function at keyframes).

@@ -1,5 +1,5 @@
 """
-Godot project introspection (1 tool).
+Godot project tools (3): introspection + input map setup.
 
 `get_project_info` answers "what is this Godot project?" in a single
 call — name, version, renderer, main scene, currently edited scene,
@@ -11,7 +11,10 @@ makes when dropped into an unknown project. Consolidates the kind of
 discovery that competitor MCP servers expose as separate
 list-scenes / list-scripts / get-project-version tools.
 
-Read-only and safe in play mode.
+`list_assets` enumerates referenceable media; both are read-only and safe
+in play mode. `add_input_action` is the one mutating tool here — it defines
+custom InputMap actions (WASD, jump, etc.) so action-based input scripts
+have actions to reference.
 """
 
 from typing import Dict, List
@@ -103,6 +106,60 @@ TOOLS: List[Dict] = [
                         "description": ("Include assets under res://addons/. Default false."),
                     },
                 },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_input_action",
+            "description": (
+                "Define (or replace) a custom InputMap action and bind keyboard "
+                "keys to it. A fresh Godot project ships with only the engine "
+                "`ui_*` defaults, so a script that calls "
+                '`Input.is_action_pressed("move_forward")` or '
+                "`Input.get_vector(...)` with custom action names errors every "
+                "frame unless the action exists. Call this FIRST to register "
+                "movement / jump / interact actions, then write input code "
+                "against them.\n\n"
+                "The action is saved to project.godot (survives restarts, shows "
+                "under Project Settings > Input Map) AND registered live so it "
+                "fires the moment the project runs. Keys bind as PHYSICAL keys "
+                "so WASD stays put on non-QWERTY layouts. Re-running with "
+                "overwrite=true (the default) is idempotent. Mutating; refused "
+                "during play mode."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action_name": {
+                        "type": "string",
+                        "description": ("Action identifier, e.g. 'move_forward', 'jump'. snake_case by convention."),
+                    },
+                    "keys": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Key names to bind, e.g. ['W', 'Up']. Editor-style "
+                            "names: letters/digits, 'Space', 'Escape', 'Shift', "
+                            "'Enter', 'Tab', arrow keys "
+                            "('Up'/'Down'/'Left'/'Right'). Case-insensitive."
+                        ),
+                    },
+                    "deadzone": {
+                        "type": "number",
+                        "description": "Analog deadzone, 0..1 (default 0.5).",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "When the action already exists, replace its "
+                            "bindings (default true). Set false to fail instead "
+                            "of clobbering an existing action."
+                        ),
+                    },
+                },
+                "required": ["action_name", "keys"],
             },
         },
     },

@@ -287,7 +287,23 @@ static func find_node_by_path(node_path: String) -> Node:
 		var rest := relative.substr(slash_index + 1)
 		return root.get_node_or_null(rest)
 	if p.contains("/"):
+		# Agents frequently prefix a scene-relative path with the root's own
+		# name (e.g. "Main/Player" when the edited scene root is "Main").
+		# A NodePath relative to root must NOT include the root segment, so
+		# get_node_or_null("Main/Player") would miss. Strip a leading
+		# root-name segment before resolving.
+		var first_slash := p.find("/")
+		if p.substr(0, first_slash) == String(root.name):
+			var rest := p.substr(first_slash + 1)
+			return root if rest.is_empty() else root.get_node_or_null(rest)
 		return root.get_node_or_null(p)
+	# Bare name. get_scene_tree renders the scene root flush-left as
+	# "<Name> (<Type>)", so agents routinely pass the root's own name as a
+	# parent/target. find_child searches descendants only and never matches
+	# the root itself — resolve the root name here before falling back to a
+	# descendant search.
+	if p == String(root.name):
+		return root
 	return root.find_child(p, true, false)
 
 

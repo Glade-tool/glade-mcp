@@ -22,14 +22,14 @@ Categories follow the Godot bridge's own directory layout under
                 + structured runtime-event observation          (10 tools)
     uid       — Godot 4.4+ ResourceUID handling                 ( 2 tools)
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
-    project   — Project introspection + asset listing           ( 2 tools)
+    project   — Introspection + asset listing + input actions   ( 3 tools)
     ui        — Control-tree creation + anchor / text helpers   ( 6 tools)
     animation — AnimationPlayer + Animation .tres scaffolding   ( 5 tools)
                                                                 ───────
-                                                                58 tools
+                                                                59 tools
 
 Unlike the Unity side (~222 tools across 17 categories) we expose the
-full Godot catalog directly — 58 tools is well within Claude Code's
+full Godot catalog directly — 59 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 """
 

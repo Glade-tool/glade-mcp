@@ -76,6 +76,7 @@ const DisconnectSignalTool      = preload("res://addons/com.gladekit.mcp-bridge/
 # ── Project introspection tools ────────────────────────────────────────────
 const GetProjectInfoTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/project/get_project_info.gd")
 const ListAssetsTool            = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/project/list_assets.gd")
+const AddInputActionTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/project/add_input_action.gd")
 
 # ── UI / Control tools (v0.5.0) ────────────────────────────────────────────
 const CreateControlTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_control.gd")
@@ -162,9 +163,10 @@ func _register_all() -> void:
 	register_tool(ConnectSignalTool.new())
 	register_tool(ListSignalConnectionsTool.new())
 	register_tool(DisconnectSignalTool.new())
-	# Project introspection (2)
+	# Project introspection + input map (3)
 	register_tool(GetProjectInfoTool.new())
 	register_tool(ListAssetsTool.new())
+	register_tool(AddInputActionTool.new())
 	# UI / Control (6, v0.5.0)
 	register_tool(CreateControlTool.new())
 	register_tool(SetControlAnchorsTool.new())

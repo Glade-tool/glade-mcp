@@ -204,6 +204,34 @@ func test_create_primitive_3d_unknown_primitive() -> void:
 	assert_string_contains(r.error, "Unknown primitive")
 
 
+func test_create_primitive_3d_parent_is_scene_root_name() -> void:
+	# get_scene_tree renders the scene root flush-left, so agents routinely
+	# pass the root's own name as parent_path. find_child searches descendants
+	# only and would miss the root itself; the resolver must special-case it.
+	var root_name := String(EditorInterface.get_edited_scene_root().name)
+	var r := _run("create_primitive_3d", {
+		"primitive": "box",
+		"name": "RootChild",
+		"parent_path": root_name,
+	})
+	assert_true(r.success, "naming the scene root as parent should resolve to root")
+	assert_eq(r.node_path, "RootChild")
+
+
+func test_create_primitive_3d_parent_path_prefixed_with_root_name() -> void:
+	# Agents also prefix a scene-relative path with the root's own name
+	# (e.g. "Main/_GladeKitTestSandbox"). A NodePath relative to root must not
+	# include the root segment; the resolver strips a leading root-name part.
+	var root_name := String(EditorInterface.get_edited_scene_root().name)
+	var r := _run("create_primitive_3d", {
+		"primitive": "box",
+		"name": "Nested",
+		"parent_path": "%s/%s" % [root_name, SANDBOX_NAME],
+	})
+	assert_true(r.success, "root-prefixed path should resolve under the sandbox")
+	assert_eq(r.node_path, "%s/Nested" % SANDBOX_NAME)
+
+
 # ── delete_node ───────────────────────────────────────────────────────────
 
 func test_delete_node_happy() -> void:

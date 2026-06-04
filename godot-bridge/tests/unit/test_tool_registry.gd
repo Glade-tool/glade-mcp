@@ -29,8 +29,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# light_properties + set/get world_environment) = 53;
 	# v0.6.0 animation (5 — add_animation_to_player + add_animation_track +
 	# add_animation_keyframe + set_animation_properties +
-	# get_animation_player_info) = 58 total.
-	assert_eq(registry.get_tool_count(), 58, "Catalog should register exactly 58 tools")
+	# get_animation_player_info) = 58; add_input_action (1) = 59 total.
+	assert_eq(registry.get_tool_count(), 59, "Catalog should register exactly 59 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -57,8 +57,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"get_uid", "update_project_uids",
 		# Phase 5 — Signal wiring (persistent, scene-saved)
 		"connect_signal", "list_signal_connections", "disconnect_signal",
-		# Project introspection
-		"get_project_info", "list_assets",
+		# Project introspection + input map
+		"get_project_info", "list_assets", "add_input_action",
 		# v0.5.0 — UI / Control
 		"create_control", "set_control_anchors", "set_control_text",
 		"set_control_size", "list_ui_hierarchy", "create_theme",

@@ -58,7 +58,7 @@ TOOLS: List[Dict] = [
             "description": (
                 "Register an Animation .tres with an AnimationPlayer so the player can "
                 "play it by name. If the library doesn't exist on the player, it's "
-                "created (default library is \"\" — the conventional setup, where "
+                'created (default library is "" — the conventional setup, where '
                 "play('jump') resolves to /jump on the default library).\n\n"
                 "The Animation .tres must already exist — create it via "
                 "create_resource(type='Animation', path='res://...') first. The library "
@@ -88,7 +88,7 @@ TOOLS: List[Dict] = [
                     "library_name": {
                         "type": "string",
                         "description": (
-                            "Animation library name. Default \"\" (the conventional "
+                            'Animation library name. Default "" (the conventional '
                             "default library). Multi-library splits are rare — typically "
                             "used for character variants."
                         ),
@@ -124,7 +124,7 @@ TOOLS: List[Dict] = [
                 "  method       — call a method at each keyframe. The key's value is "
                 "{method, args}.\n\n"
                 "Track paths are resolved relative to the AnimationPlayer's "
-                "`root_node` (default \"..\", i.e. the player's parent). To target the "
+                '`root_node` (default "..", i.e. the player\'s parent). To target the '
                 "player's parent directly, use node_path='.'. To target a sibling of "
                 "the parent, use the sibling name. Call get_animation_player_info to "
                 "see the current root_node setting."
