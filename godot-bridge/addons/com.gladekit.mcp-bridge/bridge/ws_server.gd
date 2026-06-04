@@ -50,6 +50,14 @@ const DEFAULT_PORT := 8766
 const BIND_ADDRESS := "127.0.0.1"
 const THREAD_POLL_SLEEP_MSEC := 5  # ~200Hz worker loop (never throttled)
 
+# Unknown-tool typo recovery — when tools/execute fails to resolve a name,
+# surface up to MAX nearest tool names within DISTANCE_THRESHOLD edits so the
+# agent can self-correct on the next turn instead of flailing. Threshold of 4
+# catches single character drops/swaps in 12–20 char tool names without
+# spamming unrelated suggestions on a genuinely unknown query.
+const UNKNOWN_TOOL_SUGGESTION_MAX := 3
+const UNKNOWN_TOOL_SUGGESTION_DISTANCE_THRESHOLD := 4
+
 const ToolRegistry      = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_registry.gd")
 const ToolUtils         = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 const EngineMode        = preload("res://addons/com.gladekit.mcp-bridge/bridge/engine_mode.gd")
@@ -212,7 +220,16 @@ func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
 		return _make_error(request_id, "Missing 'toolName' field")
 	var tool_instance = _registry.get_tool(tool_name)
 	if tool_instance == null:
-		return _make_error(request_id, "Unknown tool '%s'" % tool_name)
+		# Surface levenshtein-ranked neighbors so the agent can recover from a
+		# typo'd tool name on the next turn without a round-trip through
+		# tools/list. Matches the recovery pattern already used inside
+		# create_resource (unknown class names) and connect_signal (unknown
+		# signal names).
+		var response := _make_error(request_id, "Unknown tool '%s'" % tool_name)
+		var suggestions := _suggest_tool_names(tool_name)
+		if not suggestions.is_empty():
+			response["possible_solutions"] = suggestions
+		return response
 
 	# 'arguments' may arrive as a Dictionary or a JSON-encoded string.
 	var raw_args = request.get("arguments", {})
@@ -893,6 +910,26 @@ func _make_error(request_id: String, message: String) -> Dictionary:
 		"error": message,
 		"message": message,
 	}
+
+
+# Levenshtein-ranked tool names within UNKNOWN_TOOL_SUGGESTION_DISTANCE_THRESHOLD
+# of `query`, capped at UNKNOWN_TOOL_SUGGESTION_MAX. Returns [] when nothing
+# qualifies — the dispatcher then drops the `possible_solutions` field so a
+# wild-miss error stays clean instead of spamming unrelated guesses.
+func _suggest_tool_names(query: String) -> Array:
+	var ql := query.to_lower()
+	var scored: Array = []
+	for n in _registry.get_tool_names():
+		var dist := ToolUtils.levenshtein(ql, String(n).to_lower())
+		if dist <= UNKNOWN_TOOL_SUGGESTION_DISTANCE_THRESHOLD:
+			scored.append([dist, String(n)])
+	if scored.is_empty():
+		return []
+	scored.sort_custom(func(a, b): return a[0] < b[0])
+	var out: Array = []
+	for i in range(min(UNKNOWN_TOOL_SUGGESTION_MAX, scored.size())):
+		out.append(scored[i][1])
+	return out
 
 
 # ── Version + port resolution + bind-failure UX ──────────────────────────

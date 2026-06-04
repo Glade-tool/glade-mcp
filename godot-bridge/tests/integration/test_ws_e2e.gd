@@ -169,6 +169,47 @@ func test_unknown_tool_returns_structured_error() -> void:
 	ws.close()
 
 
+# Dispatcher should surface levenshtein-ranked neighbors when the tool name
+# is a near-miss of a real tool, so the agent can self-correct without an
+# extra tools/list round-trip. Distance threshold is wide enough to catch a
+# single-character drop ('get_node_inf' → 'get_node_info', edit distance 1).
+func test_unknown_tool_suggests_levenshtein_neighbors() -> void:
+	var ws: WebSocketPeer = await _connect()
+	var resp: Dictionary = await _request(ws, {
+		"id": "uts-1",
+		"endpoint": "tools/execute",
+		"toolName": "get_node_inf",
+		"arguments": {},
+	})
+	assert_false(resp.get("success", true), "unknown tool must still fail")
+	var solutions = resp.get("possible_solutions", null)
+	assert_true(solutions is Array, "near-miss tool name should surface possible_solutions[], got: %s" % resp)
+	assert_true(
+		(solutions as Array).has("get_node_info"),
+		"expected 'get_node_info' in suggestions, got: %s" % solutions,
+	)
+	ws.close()
+
+
+# Inverse contract — a query that's nowhere near any real tool should NOT
+# spam unrelated guesses. The dispatcher drops possible_solutions entirely
+# when no tool name is within the configured distance threshold.
+func test_unknown_tool_no_suggestion_for_far_miss() -> void:
+	var ws: WebSocketPeer = await _connect()
+	var resp: Dictionary = await _request(ws, {
+		"id": "utf-1",
+		"endpoint": "tools/execute",
+		"toolName": "xyzzy_completely_unrelated_query_string",
+		"arguments": {},
+	})
+	assert_false(resp.get("success", true))
+	assert_false(
+		resp.has("possible_solutions"),
+		"far-miss query should not carry possible_solutions, got: %s" % resp.get("possible_solutions"),
+	)
+	ws.close()
+
+
 # Regression: context/gather now reports atomic success (success=false when
 # any sub-fetch failed). Verify the happy-path shape AND the no-op-when-all-
 # succeed contract — agents that only check `success` must be able to trust
