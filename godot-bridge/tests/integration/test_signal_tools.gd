@@ -7,6 +7,7 @@ extends GutTest
 # (missing signal, missing method, double-disconnect).
 
 const Registry = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_registry.gd")
+const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 
 const SANDBOX_NAME := "_GladeKitSignalSandbox"
 const EMITTER_NAME := "TestTimer"
@@ -16,12 +17,20 @@ var _registry = null
 var _sandbox: Node = null
 
 
+func should_skip_script():
+	# Integration tests require a live editor + edited scene. Under GUT's
+	# play_custom_scene runner, EditorInterface isn't accessible — every
+	# test in this file would crash on the first scene-tree call. Skip
+	# the whole script with a clear message instead. To exercise these
+	# tests, drive the bridge through an MCP client with the editor open.
+	if ToolUtils.get_edited_scene_root_safe() == null:
+		return "requires editor context (skipped under GUT play_custom_scene; verify by driving the bridge through an MCP client with the editor open)"
+	return false
+
+
 func before_each() -> void:
 	_registry = Registry.new()
 	var scene_root := EditorInterface.get_edited_scene_root()
-	if scene_root == null:
-		pending("No edited scene open")
-		return
 	# Clean any leftover from a previous test.
 	var leftover := scene_root.find_child(SANDBOX_NAME, false, false)
 	if leftover:

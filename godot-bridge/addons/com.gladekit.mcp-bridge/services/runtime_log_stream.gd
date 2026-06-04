@@ -53,7 +53,13 @@ const _ERROR_PREFIXES := [
 const _STACK_FRAME_MARKER := "at:"
 
 static var _ring: Array = []
-static var _next_cursor: int = 0
+# Cursors are 1-indexed so cursor=0 can serve as the "no baseline yet"
+# sentinel that get_events_since_cursor(0) treats as "return everything"
+# (its filter is `cursor <= since_cursor → skip`, so a 0-indexed first
+# event would never be returned to a fresh caller). The on-the-wire
+# default in get_runtime_events.since_cursor (and context/gather's
+# implicit 0) relies on this.
+static var _next_cursor: int = 1
 static var _dropped_due_to_overflow: int = 0
 static var _total_observed: int = 0
 
@@ -135,7 +141,8 @@ static func total_events_observed() -> int:
 # Test / diagnostic helper. Wipes state. Not called from production paths.
 static func reset() -> void:
 	_ring.clear()
-	_next_cursor = 0
+	# Match the 1-indexed convention at module init — see _next_cursor decl.
+	_next_cursor = 1
 	_dropped_due_to_overflow = 0
 	_total_observed = 0
 	_session_residue.clear()

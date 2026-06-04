@@ -123,6 +123,17 @@ func execute(args: Dictionary) -> Dictionary:
 			+ "(retry with wait_ms=3000 right after run_project), subprocess stderr is "
 			+ "libc-buffered (Windows), or no play session is currently running.)")
 
+	# Surface overflow drops in msg so noisy sessions don't hide pre-tail
+	# errors in the structured payload alone. Without this, the agent sees
+	# the recent tail and assumes nothing earlier matters.
+	var dropped: int = RuntimeLogStream.dropped_due_to_overflow()
+	if dropped > 0:
+		msg += (" WARNING: %d earlier event(s) were dropped from the ring buffer "
+			+ "(buffer cap = 500). The earliest captured event in this response "
+			+ "may already be partway through the failure cascade — for a complete "
+			+ "history of this session, poll more frequently with a smaller "
+			+ "since_cursor delta.") % dropped
+
 	return ToolUtils.success(msg, {
 		"events": events,
 		"next_cursor": next_cursor,

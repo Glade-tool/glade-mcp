@@ -202,7 +202,7 @@ func _convert_for_type(value, expected_type: int):
 		TYPE_VECTOR4:
 			return _vec4_from(value)
 		TYPE_COLOR:
-			return _color_from(value)
+			return ToolUtils.parse_color_arg(value, Color.WHITE)
 		TYPE_INT:
 			if value is int:
 				return value
@@ -239,7 +239,7 @@ func _suggest_resource_classes(query: String) -> Array:
 	for c in resource_classes:
 		if not ClassDB.can_instantiate(c):
 			continue
-		var dist := _levenshtein(ql, String(c).to_lower())
+		var dist := ToolUtils.levenshtein(ql, String(c).to_lower())
 		scored.append([dist, String(c)])
 	scored.sort_custom(func(a, b): return a[0] < b[0])
 	var out: Array = []
@@ -258,30 +258,6 @@ func _concrete_subclasses(abstract_type: String, limit: int) -> Array:
 		if out.size() >= limit:
 			break
 	return out
-
-
-# Two-row Levenshtein. Good enough for short class names — we never compare
-# strings longer than ~30 chars here so the O(n*m) cost is trivial.
-func _levenshtein(a: String, b: String) -> int:
-	var n := a.length()
-	var m := b.length()
-	if n == 0:
-		return m
-	if m == 0:
-		return n
-	var prev := PackedInt32Array()
-	prev.resize(m + 1)
-	for j in range(m + 1):
-		prev[j] = j
-	for i in range(1, n + 1):
-		var curr := PackedInt32Array()
-		curr.resize(m + 1)
-		curr[0] = i
-		for j in range(1, m + 1):
-			var cost := 0 if a[i - 1] == b[j - 1] else 1
-			curr[j] = min(curr[j - 1] + 1, min(prev[j] + 1, prev[j - 1] + cost))
-		prev = curr
-	return prev[m]
 
 
 # ── Value converters (agent-friendly string forms) ───────────────────────────
@@ -320,22 +296,6 @@ func _vec4_from(v) -> Vector4:
 		if parts.size() >= 4:
 			return Vector4(float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]))
 	return Vector4.ZERO
-
-
-func _color_from(v) -> Color:
-	if v is Color:
-		return v
-	if v is String:
-		var s: String = (v as String).strip_edges()
-		if s.is_empty():
-			return Color.WHITE
-		if s.begins_with("#"):
-			return Color.html(s) if Color.html_is_valid(s) else Color.WHITE
-		var parts: PackedStringArray = s.split(",", false)
-		if parts.size() >= 3:
-			var a := 1.0 if parts.size() < 4 else float(parts[3])
-			return Color(float(parts[0]), float(parts[1]), float(parts[2]), a)
-	return Color.WHITE
 
 
 func _bool_from(v) -> bool:

@@ -5,10 +5,20 @@ extends GutTest
 
 const Registry = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_registry.gd")
 const SessionTracker = preload("res://addons/com.gladekit.mcp-bridge/bridge/session_tracker.gd")
+const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 
 const SANDBOX_DIR := "res://_gk_test_scratch"
 
 var _registry = null
+
+
+func should_skip_script():
+	# Script tools call EditorInterface.get_resource_filesystem() to register
+	# newly-created scripts with the editor — unreachable under GUT's
+	# play_custom_scene runner. See test_signal_tools.gd::should_skip_script.
+	if ToolUtils.get_edited_scene_root_safe() == null:
+		return "requires editor context (skipped under GUT play_custom_scene; verify by driving the bridge through an MCP client with the editor open)"
+	return false
 
 
 func before_each() -> void:

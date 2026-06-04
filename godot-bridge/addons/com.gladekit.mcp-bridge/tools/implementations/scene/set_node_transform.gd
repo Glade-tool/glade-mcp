@@ -33,6 +33,20 @@ func execute(args: Dictionary) -> Dictionary:
 	if node == null:
 		return ToolUtils.error("Node '%s' not found" % node_path)
 
+	# At least one transform component must be present — a call with only
+	# node_path silently mutates nothing, which makes the agent believe
+	# the transform was set and then act on stale values. Refuse instead.
+	if not (args.has("position") or args.has("rotation") or args.has("scale")):
+		return ToolUtils.error_with_solutions(
+			"set_node_transform needs at least one of position, rotation, or scale",
+			[
+				"Pass position as 'x,y,z' (or [x,y,z]) to move the node",
+				"Pass rotation as 'x,y,z' Euler degrees (or scalar degrees for 2D)",
+				"Pass scale as 'x,y,z' (1,1,1 = no scaling)",
+				"To inspect the current transform, call get_node_info instead",
+			]
+		)
+
 	var space: String = ToolUtils.parse_string_arg(args, "space", "local").to_lower()
 	if space != "local" and space != "global":
 		return ToolUtils.error("space must be 'local' or 'global' (got '%s')" % space)

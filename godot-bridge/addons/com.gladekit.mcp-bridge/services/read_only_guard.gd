@@ -11,6 +11,19 @@ extends RefCounted
 #
 # Mirrors the Unity bridge's READ_ONLY_TOOLS constant. New read-only tools
 # must be added here AND have requires_edit_mode=false on the tool itself.
+#
+# Read-only contract — bridge definition:
+#   This list defines read-only as "the tool does not mutate the user's
+#   project files / scene tree / resources." Tools that flip bridge-only
+#   state (start_runtime_observation, stop_runtime_observation) ARE listed
+#   here because they don't touch the project.
+#
+#   Downstream consumers may choose a stricter rule — a UI client or
+#   orchestrator that wants "absolutely nothing changes" semantics is free
+#   to maintain its own narrower allowlist that excludes the bridge-state
+#   toggles. The bridge intentionally takes the looser stance (no project
+#   mutation = read) so audit / inspection sessions can still arm and
+#   disarm runtime observation.
 
 # Typed Array[String] literal (a constant expression) rather than a
 # PackedStringArray(...) constructor (which is NOT const-evaluable in GDScript).

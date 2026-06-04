@@ -173,6 +173,88 @@ static func serialize_vector3(v: Vector3) -> String:
 	return "%s,%s,%s" % [v.x, v.y, v.z]
 
 
+# ── Color parsing ──────────────────────────────────────────────────────────
+# Tolerates four wire shapes:
+#   Color object        — passed through
+#   "#rrggbb[aa]" hex   — parsed via Color.html (returns default on invalid)
+#   "r,g,b[,a]" CSV     — comma-separated floats
+#   [r, g, b[, a]] array — typically 0..1 floats
+# Returns the default when input is null, empty, or unrecognized — callers
+# decide whether to treat that as "leave existing color alone" (pass current
+# value as default) or as an error (compare against a sentinel default).
+static func parse_color_arg(v, default_value: Color = Color.WHITE) -> Color:
+	if v == null:
+		return default_value
+	if v is Color:
+		return v
+	if v is String:
+		var s: String = (v as String).strip_edges()
+		if s.is_empty():
+			return default_value
+		if s.begins_with("#"):
+			return Color.html(s) if Color.html_is_valid(s) else default_value
+		var parts: PackedStringArray = s.split(",", false)
+		if parts.size() < 3:
+			return default_value
+		var a := 1.0 if parts.size() < 4 else float(parts[3])
+		return Color(float(parts[0]), float(parts[1]), float(parts[2]), a)
+	if v is Array:
+		var arr: Array = v
+		if arr.size() < 3:
+			return default_value
+		var a2 := 1.0 if arr.size() < 4 else _num(arr[3])
+		return Color(_num(arr[0]), _num(arr[1]), _num(arr[2]), a2)
+	return default_value
+
+
+# ── Levenshtein edit distance ──────────────────────────────────────────────
+# Iterative two-row Levenshtein. O(m*n) time, O(n) memory. Used by
+# error-recovery code paths (signal connect, resource class lookup) to suggest
+# the closest typo'd name; inputs are short (<32 chars) so this is trivial.
+static func levenshtein(a: String, b: String) -> int:
+	var m: int = a.length()
+	var n: int = b.length()
+	if m == 0:
+		return n
+	if n == 0:
+		return m
+	var prev := PackedInt32Array()
+	prev.resize(n + 1)
+	for j in range(n + 1):
+		prev[j] = j
+	for i in range(1, m + 1):
+		var curr := PackedInt32Array()
+		curr.resize(n + 1)
+		curr[0] = i
+		for j in range(1, n + 1):
+			var cost: int = 0 if a[i - 1] == b[j - 1] else 1
+			curr[j] = min(min(prev[j] + 1, curr[j - 1] + 1), prev[j - 1] + cost)
+		prev = curr
+	return prev[n]
+
+
+# Safely resolve the currently-edited scene root. Returns null in non-editor
+# contexts (e.g. GUT runs tests via play_custom_scene where EditorInterface
+# isn't available).
+#
+# The trick: GDScript parses the bare identifier `EditorInterface` at
+# compile time as a class reference. In non-editor contexts that class has
+# no `get_edited_scene_root` static method, so `EditorInterface.<anything>`
+# raises "Nonexistent function in base 'EditorInterface'" — even when the
+# call is gated by Engine.has_singleton(), because the parse-time
+# resolution doesn't depend on runtime singleton state.
+#
+# Workaround: fetch the singleton via Engine.get_singleton(name) and call
+# through the returned variable. The variable's type is inferred at
+# runtime, so the method lookup happens against the actual singleton
+# instance (in editor mode) instead of the bare class symbol (in test mode).
+static func get_edited_scene_root_safe() -> Node:
+	var ei: Object = Engine.get_singleton("EditorInterface") if Engine.has_singleton("EditorInterface") else null
+	if ei == null:
+		return null
+	return ei.get_edited_scene_root()
+
+
 # ── Node-path resolution ───────────────────────────────────────────────────
 # Looks up a node within the currently-edited scene by either an explicit
 # NodePath ("Player/Sprite", "/root/Main/Player") or a node name to search
@@ -183,7 +265,7 @@ static func serialize_vector3(v: Vector3) -> String:
 #   2. Path containing "/" → get_node_or_null relative to root (or absolute)
 #   3. Single token → root.find_child(name, recursive=true, owned=false)
 static func find_node_by_path(node_path: String) -> Node:
-	var root: Node = EditorInterface.get_edited_scene_root()
+	var root: Node = get_edited_scene_root_safe()
 	if root == null:
 		return null
 	var p: String = node_path.strip_edges()
@@ -378,7 +460,7 @@ static func _split_version(v: String) -> Array:
 static func node_relative_path(node: Node) -> String:
 	if node == null:
 		return ""
-	var root: Node = EditorInterface.get_edited_scene_root()
+	var root: Node = get_edited_scene_root_safe()
 	if root == null or node == root:
 		return ""
 	var parts: PackedStringArray = []

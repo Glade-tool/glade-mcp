@@ -63,8 +63,11 @@ func execute(args: Dictionary) -> Dictionary:
 		light.light_energy = ToolUtils.parse_float_arg(args, "energy", light.light_energy)
 		applied.append("energy")
 	if args.has("color"):
-		var c = _color_from(args["color"])  # untyped: returns Color or null
-		if c == null:
+		# Sentinel: a transparent-magenta no real caller would supply. Lets us
+		# detect "unparseable" without conflating with a legitimate white.
+		const COLOR_SENTINEL := Color(1.0, 0.0, 1.0, 0.0)
+		var c := ToolUtils.parse_color_arg(args["color"], COLOR_SENTINEL)
+		if c == COLOR_SENTINEL:
 			ignored.append({"name": "color", "reason": "could not parse '%s' as a color" % str(args["color"])})
 		else:
 			light.light_color = c
@@ -143,24 +146,3 @@ func _current_state(light: Light3D) -> Dictionary:
 
 func _color_to_hex(c: Color) -> String:
 	return "#%02x%02x%02x" % [int(round(c.r * 255)), int(round(c.g * 255)), int(round(c.b * 255))]
-
-
-func _color_from(v):
-	if v == null:
-		return null
-	if v is Color:
-		return v
-	if v is String:
-		var s: String = (v as String).strip_edges()
-		if s.is_empty():
-			return null
-		if s.begins_with("#"):
-			return Color.html(s) if Color.html_is_valid(s) else null
-		var parts: PackedStringArray = s.split(",", false)
-		if parts.size() < 3:
-			return null
-		return Color(float(parts[0]), float(parts[1]), float(parts[2]))
-	if v is Array and (v as Array).size() >= 3:
-		var a: Array = v
-		return Color(float(a[0]), float(a[1]), float(a[2]))
-	return null

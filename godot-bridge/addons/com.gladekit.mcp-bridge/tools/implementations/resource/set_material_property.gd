@@ -83,22 +83,25 @@ func execute(args: Dictionary) -> Dictionary:
 # Coerce the agent's `value` into the right type for common StandardMaterial3D
 # properties. Falls back to a generic set() for everything else.
 func _set_property(mat: Material, prop: String, value) -> bool:
+	# Sentinel: a fully-transparent magenta no real caller would set. Lets us
+	# distinguish "unparseable color" (return false) from "legitimately white".
+	const SENTINEL := Color(1.0, 0.0, 1.0, 0.0)
 	if mat is StandardMaterial3D:
 		var std: StandardMaterial3D = mat
 		match prop:
 			"albedo", "albedo_color":
-				var c = _color_from(value)
-				if c != null:
-					std.albedo_color = c
-					return true
-				return false
+				var c := ToolUtils.parse_color_arg(value, SENTINEL)
+				if c == SENTINEL:
+					return false
+				std.albedo_color = c
+				return true
 			"emission":
-				var c2 = _color_from(value)
-				if c2 != null:
-					std.emission_enabled = true
-					std.emission = c2
-					return true
-				return false
+				var c2 := ToolUtils.parse_color_arg(value, SENTINEL)
+				if c2 == SENTINEL:
+					return false
+				std.emission_enabled = true
+				std.emission = c2
+				return true
 			"metallic":
 				std.metallic = clamp(float(value), 0.0, 1.0)
 				return true
@@ -108,24 +111,3 @@ func _set_property(mat: Material, prop: String, value) -> bool:
 	# Generic fallback — Godot will silently drop unknown props.
 	mat.set(prop, value)
 	return true
-
-
-func _color_from(v):
-	if v == null:
-		return null
-	if v is Color:
-		return v
-	if v is String:
-		var s: String = (v as String).strip_edges()
-		if s.is_empty():
-			return null
-		if s.begins_with("#"):
-			return Color.html(s) if Color.html_is_valid(s) else null
-		var parts: PackedStringArray = s.split(",", false)
-		if parts.size() < 3:
-			return null
-		return Color(float(parts[0]), float(parts[1]), float(parts[2]))
-	if v is Array and (v as Array).size() >= 3:
-		var a: Array = v
-		return Color(float(a[0]), float(a[1]), float(a[2]))
-	return null

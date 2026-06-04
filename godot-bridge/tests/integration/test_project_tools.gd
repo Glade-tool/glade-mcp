@@ -9,8 +9,18 @@ extends GutTest
 # without breaking the tool.
 
 const Registry = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_registry.gd")
+const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 
 var _registry = null
+
+
+func should_skip_script():
+	# get_project_info walks the edited scene root + uses
+	# EditorInterface.get_resource_filesystem. See test_signal_tools.gd::
+	# should_skip_script for the full story.
+	if ToolUtils.get_edited_scene_root_safe() == null:
+		return "requires editor context (skipped under GUT play_custom_scene; verify by driving the bridge through an MCP client with the editor open)"
+	return false
 
 
 func before_each() -> void:

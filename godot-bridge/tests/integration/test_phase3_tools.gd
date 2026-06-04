@@ -18,12 +18,18 @@ var _registry = null
 var _sandbox: Node = null
 
 
+func should_skip_script():
+	# See test_signal_tools.gd::should_skip_script for the full story —
+	# integration tests need editor context, GUT runs in play_custom_scene
+	# where EditorInterface is unreachable, so we skip the entire file.
+	if ToolUtils.get_edited_scene_root_safe() == null:
+		return "requires editor context (skipped under GUT play_custom_scene; verify by driving the bridge through an MCP client with the editor open)"
+	return false
+
+
 func before_each() -> void:
 	_registry = Registry.new()
 	var scene_root := EditorInterface.get_edited_scene_root()
-	if scene_root == null:
-		pending("No edited scene open")
-		return
 	var leftover := scene_root.find_child(SANDBOX_NAME, false, false)
 	if leftover:
 		scene_root.remove_child(leftover)
@@ -133,6 +139,9 @@ func test_set_material_property_happy() -> void:
 func test_set_material_property_missing_path() -> void:
 	var r := _run("set_material_property", {"property": "metallic", "value": 0.5})
 	assert_false(r.success)
+	# Error must name the missing arg so the agent can fix its call without
+	# guessing which of property/value/material_path is the problem.
+	assert_string_contains(r.error, "material_path")
 
 
 # ── create_resource (generic Resource factory) ────────────────────────────
@@ -263,11 +272,13 @@ func test_create_resource_unknown_property_lands_in_unapplied() -> void:
 func test_create_resource_missing_path() -> void:
 	var r := _run("create_resource", {"type": "BoxMesh"})
 	assert_false(r.success)
+	assert_string_contains(r.error, "path")
 
 
 func test_create_resource_missing_type() -> void:
 	var r := _run("create_resource", {"path": SCRATCH_DIR + "/cr_no_type.tres"})
 	assert_false(r.success)
+	assert_string_contains(r.error, "type")
 
 
 # ── Physics ───────────────────────────────────────────────────────────────
@@ -297,6 +308,9 @@ func test_create_physics_body_happy_rigid_with_mass() -> void:
 func test_create_physics_body_unknown_type() -> void:
 	var r := _run("create_physics_body", {"body_type": "marshmallow", "parent_path": SANDBOX_NAME})
 	assert_false(r.success)
+	# Error should namedrop the invalid value AND list the valid set so the
+	# agent's retry self-corrects without a query-then-fix cycle.
+	assert_string_contains(r.error, "marshmallow")
 
 
 # ── Scene I/O ─────────────────────────────────────────────────────────────
@@ -312,6 +326,9 @@ func test_create_scene_happy() -> void:
 func test_create_scene_rejects_non_scene_extension() -> void:
 	var r := _run("create_scene", {"path": SCRATCH_DIR + "/probe.txt", "open": false})
 	assert_false(r.success)
+	# Error should mention the offending extension so the agent knows to
+	# switch from .txt to .tscn rather than guessing what's wrong with the path.
+	assert_string_contains(r.error.to_lower(), "tscn")
 
 
 func test_save_scene_unsaved_needs_path() -> void:
@@ -352,16 +369,21 @@ func test_run_project_missing_godot_exe_returns_error() -> void:
 func test_stop_project_missing_session_id() -> void:
 	var r := _run("stop_project", {})
 	assert_false(r.success)
+	assert_string_contains(r.error, "session_id")
 
 
 func test_get_debug_output_unknown_session_id() -> void:
 	var r := _run("get_debug_output", {"session_id": "definitely_not_a_session"})
 	assert_false(r.success)
+	# Echo the bad ID back so the agent can tell its lookup raised vs. its
+	# arg name was wrong.
+	assert_string_contains(r.error, "definitely_not_a_session")
 
 
 func test_launch_editor_missing_project_path() -> void:
 	var r := _run("launch_editor", {})
 	assert_false(r.success)
+	assert_string_contains(r.error, "project_path")
 
 
 # ── UID (4.4+) — basic registration smoke ─────────────────────────────────
@@ -372,6 +394,7 @@ func test_get_uid_missing_path() -> void:
 	# it. We just verify the missing-arg path.
 	var r := _run("get_uid", {})
 	assert_false(r.success)
+	assert_string_contains(r.error, "path")
 
 
 func test_update_project_uids_runs_or_skips() -> void:

@@ -13,9 +13,25 @@ extends RefCounted
 # State is process-local (static dictionary keyed by an internal session
 # id). Multiple concurrent play sessions are supported, though the common
 # case is one at a time.
+#
+# Plugin-reload survival: editing any bridge .gd file makes Godot
+# re-instantiate static state, which would orphan every running child
+# process (we'd lose the PIDs and never kill them). On `start()` we mirror
+# the PID + project path into user://gladekit-godot-bridge/sessions.json
+# (writes are best-effort; never block the tool). On bridge boot, the WS
+# server calls `reap_orphans()` to read that file, OS.is_process_running()
+# each PID, and kill any survivor. The pipe FDs from the previous process
+# instance are gone, so we can't re-attach output capture — but we can at
+# least prevent the zombie buildup.
 
 const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 const RuntimeLogStream = preload("res://addons/com.gladekit.mcp-bridge/services/runtime_log_stream.gd")
+
+# Where the PID mirror lives. user:// resolves to the editor's user data dir
+# (~/Library/Application Support/Godot/app_userdata/<project>/ on macOS,
+# %APPDATA%\Godot\app_userdata\<project>\ on Windows, etc.) — outside res://
+# so the project's filesystem scanner doesn't try to import it.
+const SESSIONS_PERSIST_PATH := "user://gladekit-godot-bridge/sessions.json"
 
 # Maps session_id (auto-incrementing int as string) → session dict.
 # Session dict shape:
@@ -68,6 +84,7 @@ static func start(project_path: String, scene: String = "", extra_args: Array = 
 		"exit_code": null,
 		"project_path": project_path,
 	}
+	_persist_sessions()
 	return {
 		"session_id": session_id,
 		"pid": int(pipe["pid"]),
@@ -172,6 +189,7 @@ static func stop(session_id: String) -> Dictionary:
 	var final_stdout: String = s["stdout_buffer"]
 	var final_stderr: String = s["stderr_buffer"]
 	_sessions.erase(session_id)
+	_persist_sessions()
 	return {
 		"pid": pid,
 		"stdout": final_stdout,
@@ -222,3 +240,86 @@ static func get_buffer_diagnostics(tail_chars: int = 500) -> Dictionary:
 		"raw_stdout_bytes": total_stdout,
 		"raw_stderr_tail": tail,
 	}
+
+
+# ── Plugin-reload survival ────────────────────────────────────────────────
+# Mirror the PID + minimal metadata of currently-tracked sessions to disk so
+# a plugin hot-reload (which clears `_sessions`) can detect and kill the
+# orphaned children. We don't try to re-attach output capture — the pipe
+# FDs are owned by the previous plugin instance and are gone. The goal is
+# zombie prevention, not stdout/stderr continuity.
+
+static func _persist_sessions() -> void:
+	# Best-effort. A failure here doesn't break the spawn — it just means
+	# we'll leak this session if the plugin hot-reloads before stop().
+	var dir_path: String = SESSIONS_PERSIST_PATH.get_base_dir()
+	var dir_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir_path))
+	if dir_err != OK and dir_err != ERR_ALREADY_EXISTS:
+		push_warning("[GladeKit MCP Bridge] PlaySessionManager: could not create %s (err %d)" % [dir_path, dir_err])
+		return
+	var snapshot: Array = []
+	for sid in _sessions.keys():
+		var s: Dictionary = _sessions[sid]
+		snapshot.append({
+			"session_id": String(sid),
+			"pid": int(s.get("pid", 0)),
+			"command": String(s.get("command", "")),
+			"project_path": String(s.get("project_path", "")),
+			"started_unix": float(s.get("started_unix", 0.0)),
+		})
+	var f := FileAccess.open(SESSIONS_PERSIST_PATH, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify(snapshot))
+	f.close()
+
+
+# Read the on-disk PID mirror and reap any session that's still running. Call
+# once from the WS server's start() before any new sessions can be spawned.
+# Returns a list of {pid, killed: bool, project_path} for diagnostics; the
+# bridge logs a one-line summary so the user sees what we cleaned up.
+static func reap_orphans() -> Array:
+	var reaped: Array = []
+	if not FileAccess.file_exists(SESSIONS_PERSIST_PATH):
+		return reaped
+	var f := FileAccess.open(SESSIONS_PERSIST_PATH, FileAccess.READ)
+	if f == null:
+		return reaped
+	var text := f.get_as_text()
+	f.close()
+	var parsed = JSON.parse_string(text)
+	if not (parsed is Array):
+		# Corrupt mirror — wipe it so it doesn't keep tripping us up.
+		_clear_persisted()
+		return reaped
+	for entry in parsed:
+		if not (entry is Dictionary):
+			continue
+		var pid: int = int(entry.get("pid", 0))
+		var project_path: String = String(entry.get("project_path", ""))
+		if pid <= 0:
+			continue
+		var was_running := OS.is_process_running(pid)
+		var killed := false
+		if was_running:
+			# OS.kill may fail (permissions, already exited between is_running
+			# and kill, etc.); we still report the attempt.
+			var kill_err := OS.kill(pid)
+			killed = kill_err == OK
+		reaped.append({
+			"pid": pid,
+			"project_path": project_path,
+			"was_running": was_running,
+			"killed": killed,
+		})
+	_clear_persisted()
+	return reaped
+
+
+static func _clear_persisted() -> void:
+	if not FileAccess.file_exists(SESSIONS_PERSIST_PATH):
+		return
+	var dir := DirAccess.open(SESSIONS_PERSIST_PATH.get_base_dir())
+	if dir == null:
+		return
+	dir.remove(SESSIONS_PERSIST_PATH.get_file())

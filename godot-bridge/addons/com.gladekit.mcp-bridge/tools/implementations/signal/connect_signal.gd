@@ -245,31 +245,6 @@ func _similarity(a: String, b: String) -> float:
 		return 0.85
 	if a.contains(b) or b.contains(a):
 		return 0.7
-	var ed := _levenshtein(a, b)
+	var ed := ToolUtils.levenshtein(a, b)
 	var max_len: int = max(a.length(), b.length())
 	return 1.0 - float(ed) / float(max_len)
-
-
-# Iterative two-row Levenshtein. O(m*n) time, O(n) memory. Names are
-# short (<32 chars) and candidate sets are small (<50 signals/methods) so
-# performance is a non-issue.
-func _levenshtein(a: String, b: String) -> int:
-	var m: int = a.length()
-	var n: int = b.length()
-	if m == 0:
-		return n
-	if n == 0:
-		return m
-	var prev: Array = []
-	prev.resize(n + 1)
-	for j in range(n + 1):
-		prev[j] = j
-	for i in range(1, m + 1):
-		var curr: Array = []
-		curr.resize(n + 1)
-		curr[0] = i
-		for j in range(1, n + 1):
-			var cost: int = 0 if a[i - 1] == b[j - 1] else 1
-			curr[j] = min(min(prev[j] + 1, curr[j - 1] + 1), prev[j - 1] + cost)
-		prev = curr
-	return prev[n]

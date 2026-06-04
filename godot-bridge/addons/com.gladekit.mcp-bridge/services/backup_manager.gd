@@ -36,15 +36,41 @@ extends RefCounted
 const BACKUP_DIR_NAME := ".gladekit-backups"
 const MAX_BACKUPS_PER_PATH := 10
 
+# One-shot flag for the "backup root unavailable" push_error. ProjectSettings
+# can't be re-resolved mid-session (it's the project root), so once it fails
+# it stays failed. Spamming push_error on every backup call would drown the
+# Output panel — emit once per editor session and let the message stand.
+static var _root_unavailable_logged: bool = false
 
+
+# Resolve <project_root>/<BACKUP_DIR_NAME>. Returns "" only when
+# ProjectSettings can't globalize res:// — which is a hard editor-state
+# failure (read-only mount, no project, etc.). Callers MUST treat "" as a
+# hard error: every backup will silently degrade, and the revert UI loses
+# its undo capability without warning. The push_error (once per session)
+# makes the failure visible in the Output panel even when in-process
+# callers can't surface their own error.
 static func _backup_root() -> String:
-	# Resolve project root via res:// → absolute, then append the backup
-	# directory name. Stays outside res:// so the editor importer leaves
-	# it alone.
 	var project_root := ProjectSettings.globalize_path("res://")
 	if project_root.is_empty():
+		if not _root_unavailable_logged:
+			_root_unavailable_logged = true
+			push_error(
+				"[GladeKit MCP Bridge] BackupManager: could not resolve project root "
+				+ "via ProjectSettings.globalize_path(\"res://\"). All backups will be "
+				+ "silently disabled this session — revert / undo will not work. Check "
+				+ "that the project directory is writable and that the editor has a "
+				+ "valid open project."
+			)
 		return ""
 	return project_root.path_join(BACKUP_DIR_NAME)
+
+
+# Public preflight check. Returns true if backups can be written this session.
+# Callers that want to fail-fast (e.g. the WS revert handler) can probe this
+# before committing to a turn rather than discovering the failure mid-mutation.
+static func is_available() -> bool:
+	return not _backup_root().is_empty()
 
 
 static func _turn_subdir(turn_id: String) -> String:
@@ -390,8 +416,17 @@ static func restore_node(backup_abs_path: String, parent_in_scene: Node, node_na
 	# restored node is in the scene tree at runtime but vanishes the
 	# next time the user saves (Godot drops owner=null nodes during
 	# serialization).
-	var scene_root: Node = EditorInterface.get_edited_scene_root()
-	if scene_root != null and instance != scene_root:
+	#
+	# Owner target derivation: in production parent_in_scene was loaded as
+	# part of the edited scene, so parent_in_scene.owner IS the edited
+	# scene root (same value EditorInterface.get_edited_scene_root() would
+	# return). Deriving from the parent instead of calling EditorInterface
+	# keeps this method runnable from non-editor contexts (e.g. GUT runs
+	# tests via play_custom_scene, where EditorInterface is unreachable).
+	# Falls back to parent_in_scene itself when parent has no owner (the
+	# parent IS the scene root) — same semantic as the original call.
+	var scene_root: Node = parent_in_scene.owner if parent_in_scene.owner != null else parent_in_scene
+	if instance != scene_root:
 		instance.owner = scene_root
 		_assign_owner_recursive(instance, scene_root)
 
@@ -418,16 +453,19 @@ static func restore_node(backup_abs_path: String, parent_in_scene: Node, node_na
 static func delete_node_at(node_path_in_scene: String) -> Dictionary:
 	if node_path_in_scene.is_empty():
 		return {"success": false, "error": "node_path_in_scene is empty"}
-	var root: Node = EditorInterface.get_edited_scene_root()
-	if root == null:
-		return {"success": false, "error": "no edited scene open"}
 	# Reuse the bridge's resolver so the same NodePath conventions
-	# (absolute, scene-relative, single-name search) work here.
+	# (absolute, scene-relative, single-name search) work here. The
+	# resolver returns null both when the scene is closed AND when the
+	# node legitimately doesn't exist — for this revert path both are
+	# the same outcome (the "created" change has nothing to undo because
+	# the node isn't there), so we collapse both into the idempotent
+	# success/deleted=false response.
 	var ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 	var node: Node = ToolUtils.find_node_by_path(node_path_in_scene)
 	if node == null:
 		return {"success": true, "deleted": false, "reason": "node already absent at '%s'" % node_path_in_scene}
-	if node == root:
+	var root: Node = ToolUtils.get_edited_scene_root_safe()
+	if root != null and node == root:
 		return {"success": false, "error": "refusing to delete scene root via revert"}
 	var parent: Node = node.get_parent()
 	if parent != null:

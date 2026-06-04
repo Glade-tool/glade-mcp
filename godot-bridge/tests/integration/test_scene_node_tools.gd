@@ -20,12 +20,18 @@ var _registry = null
 var _sandbox: Node = null
 
 
+func should_skip_script():
+	# See test_signal_tools.gd::should_skip_script for the full story —
+	# integration tests need editor context, GUT runs in play_custom_scene
+	# where EditorInterface is unreachable, so we skip the entire file.
+	if ToolUtils.get_edited_scene_root_safe() == null:
+		return "requires editor context (skipped under GUT play_custom_scene; verify by driving the bridge through an MCP client with the editor open)"
+	return false
+
+
 func before_each() -> void:
 	_registry = Registry.new()
 	var scene_root := EditorInterface.get_edited_scene_root()
-	if scene_root == null:
-		pending("No edited scene open — open any scene before running integration tests")
-		return
 	# Remove any leftover sandbox from a prior crashed run.
 	var leftover := scene_root.find_child(SANDBOX_NAME, false, false)
 	if leftover:
@@ -102,6 +108,9 @@ func test_get_node_info_missing_arg() -> void:
 func test_get_node_info_unknown_node() -> void:
 	var r := _run("get_node_info", {"node_path": "DoesNotExistAnywhere_xyz"})
 	assert_false(r.success)
+	# Error must namedrop the requested path so the agent can tell whether
+	# it's a missing node vs. a misspelled arg name.
+	assert_string_contains(r.error, "DoesNotExistAnywhere_xyz")
 
 
 # ── find_nodes ────────────────────────────────────────────────────────────
@@ -150,12 +159,18 @@ func test_create_node_missing_type() -> void:
 func test_create_node_unknown_type() -> void:
 	var r := _run("create_node", {"type": "NotARealClassName"})
 	assert_false(r.success)
+	# Error must namedrop the class the agent typed so it can self-correct
+	# (vs. assuming its `type` arg was missing).
+	assert_string_contains(r.error, "NotARealClassName")
 
 
 func test_create_node_uninstantiable_type() -> void:
 	# Object is the root non-Node class — exists but not a Node.
 	var r := _run("create_node", {"type": "Object"})
 	assert_false(r.success)
+	# Distinguish "not a Node" from "unknown class" — these are different
+	# recovery paths for the agent.
+	assert_string_contains(r.error, "Object")
 
 
 # ── create_primitive_3d ───────────────────────────────────────────────────
@@ -321,6 +336,29 @@ func test_set_node_transform_happy_3d() -> void:
 func test_set_node_transform_missing_node_path() -> void:
 	var r := _run("set_node_transform", {"position": "0,0,0"})
 	assert_false(r.success)
+	assert_string_contains(r.error, "node_path")
+
+
+# Regression: a call with node_path but none of position/rotation/scale used to
+# silently no-op (succeed without mutating anything), tricking the agent into
+# thinking the transform was set. The tool now refuses such calls outright with
+# a recovery hint listing the three accepted args.
+func test_set_node_transform_no_components_is_refused() -> void:
+	var n := Node3D.new()
+	n.name = "NoOpProbe"
+	_sandbox.add_child(n)
+	n.owner = EditorInterface.get_edited_scene_root()
+	var r := _run("set_node_transform", {
+		"node_path": "%s/NoOpProbe" % SANDBOX_NAME,
+	})
+	assert_false(r.success, "missing all three transform components must error, not no-op")
+	assert_true(r.has("possible_solutions"), "should hand the agent a recovery path")
+	# Recovery hints must point at the three real parameter names so the
+	# agent's next call self-corrects without further round-trips.
+	var hints_text: String = "\n".join(r.possible_solutions)
+	assert_string_contains(hints_text, "position")
+	assert_string_contains(hints_text, "rotation")
+	assert_string_contains(hints_text, "scale")
 
 
 func test_set_node_transform_non_spatial_node_refused() -> void:

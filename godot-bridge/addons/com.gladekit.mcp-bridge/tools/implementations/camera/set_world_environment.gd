@@ -124,8 +124,8 @@ func execute(args: Dictionary) -> Dictionary:
 		else:
 			ignored.append({"name": "background_mode", "reason": "unknown value '%s' (use one of: %s)" % [mode, ", ".join(_BACKGROUND_MODES)]})
 	if args.has("background_color"):
-		var c = _color_from(args["background_color"])  # untyped: Color or null
-		if c == null:
+		var c := ToolUtils.parse_color_arg(args["background_color"], _COLOR_SENTINEL)
+		if c == _COLOR_SENTINEL:
 			ignored.append({"name": "background_color", "reason": "could not parse '%s' as a color" % str(args["background_color"])})
 		else:
 			env.background_color = c
@@ -141,8 +141,8 @@ func execute(args: Dictionary) -> Dictionary:
 		else:
 			ignored.append({"name": "ambient_light_source", "reason": "unknown value '%s' (use one of: %s)" % [src, ", ".join(_AMBIENT_SOURCES)]})
 	if args.has("ambient_light_color"):
-		var c = _color_from(args["ambient_light_color"])  # untyped: Color or null
-		if c == null:
+		var c := ToolUtils.parse_color_arg(args["ambient_light_color"], _COLOR_SENTINEL)
+		if c == _COLOR_SENTINEL:
 			ignored.append({"name": "ambient_light_color", "reason": "could not parse '%s' as a color" % str(args["ambient_light_color"])})
 		else:
 			env.ambient_light_color = c
@@ -156,8 +156,8 @@ func execute(args: Dictionary) -> Dictionary:
 		env.fog_enabled = ToolUtils.parse_bool_arg(args, "fog_enabled", env.fog_enabled)
 		applied.append("fog_enabled")
 	if args.has("fog_light_color"):
-		var c = _color_from(args["fog_light_color"])  # untyped: Color or null
-		if c == null:
+		var c := ToolUtils.parse_color_arg(args["fog_light_color"], _COLOR_SENTINEL)
+		if c == _COLOR_SENTINEL:
 			ignored.append({"name": "fog_light_color", "reason": "could not parse '%s' as a color" % str(args["fog_light_color"])})
 		else:
 			env.fog_light_color = c
@@ -271,22 +271,6 @@ func _find_world_environment(root: Node) -> WorldEnvironment:
 	return null
 
 
-func _color_from(v):
-	if v == null:
-		return null
-	if v is Color:
-		return v
-	if v is String:
-		var s: String = (v as String).strip_edges()
-		if s.is_empty():
-			return null
-		if s.begins_with("#"):
-			return Color.html(s) if Color.html_is_valid(s) else null
-		var parts: PackedStringArray = s.split(",", false)
-		if parts.size() < 3:
-			return null
-		return Color(float(parts[0]), float(parts[1]), float(parts[2]))
-	if v is Array and (v as Array).size() >= 3:
-		var a: Array = v
-		return Color(float(a[0]), float(a[1]), float(a[2]))
-	return null
+# Transparent-magenta sentinel used to distinguish "unparseable color" from
+# a legitimate transparent or white value. No real caller would supply this.
+const _COLOR_SENTINEL := Color(1.0, 0.0, 1.0, 0.0)

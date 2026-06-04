@@ -111,6 +111,22 @@ func start() -> void:
 	_pending_sends_mutex = Mutex.new()
 	_cached_mutex = Mutex.new()
 	_refresh_cached_engine_mode()  # seed before thread starts reading it
+	# Reap any orphaned play-session PIDs from a previous plugin instance
+	# (hot-reload survival — see PlaySessionManager.reap_orphans comment).
+	# Runs synchronously on the main thread before we start accepting tool
+	# calls so new run_project calls can't race with the cleanup.
+	var reaped: Array = PlaySessionManager.reap_orphans()
+	if not reaped.is_empty():
+		var killed_count: int = 0
+		for entry in reaped:
+			if bool(entry.get("killed", false)):
+				killed_count += 1
+		print_rich(
+			"[color=yellow][GladeKit MCP Bridge][/color] "
+			+ "reaped %d orphan play session(s) from a previous plugin instance "
+			+ "(%d still running and killed). This is expected after a plugin hot-reload."
+			% [reaped.size(), killed_count]
+		)
 	_thread_should_exit = false
 	_thread = Thread.new()
 	_thread.start(_thread_main)
@@ -243,11 +259,34 @@ func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
 	# collisions). See ToolUtils.normalize_args for the rationale.
 	args = ToolUtils.normalize_args(args)
 
+	# GDScript has no try/catch, so we can't wrap execute() — but a runtime
+	# error inside a tool halts the call and returns null. The is-Dictionary
+	# check below catches that case (null is not Dictionary), plus the
+	# legitimate "tool returned the wrong shape" misuse. We surface a more
+	# specific diagnostic for null than for a wrong-typed Dict so the agent
+	# can distinguish "tool crashed" from "tool author returned the wrong
+	# value." Both also push_error to the editor output panel so the user
+	# can correlate with whatever stack trace Godot already logged.
 	var result = tool_instance.execute(args)
+	if result == null:
+		var crash_msg := (
+			"Tool '%s' crashed during execute() — the call halted and "
+			+ "returned null. Check the Godot Output panel for the underlying "
+			+ "stack trace (push_error / nil deref / etc.)."
+		) % tool_name
+		push_error("[GladeKit MCP Bridge] " + crash_msg)
+		ErrorTracker.record(tool_name, crash_msg, args)
+		return _make_error(request_id, crash_msg)
 	if not (result is Dictionary):
-		var bad_msg := "Tool '%s' returned non-Dictionary" % tool_name
+		var bad_msg := "Tool '%s' returned %s; expected Dictionary" % [tool_name, typeof(result)]
+		push_error("[GladeKit MCP Bridge] " + bad_msg)
 		ErrorTracker.record(tool_name, bad_msg, args)
 		return _make_error(request_id, bad_msg)
+	if not (result as Dictionary).has("success"):
+		var shape_msg := "Tool '%s' returned a Dictionary missing the required 'success' field" % tool_name
+		push_error("[GladeKit MCP Bridge] " + shape_msg)
+		ErrorTracker.record(tool_name, shape_msg, args)
+		return _make_error(request_id, shape_msg)
 	# Tool result already carries success/message/error — inject id and forward.
 	# Also feed failures into the per-session ErrorTracker so callers can read
 	# the recent failure pattern via the bridge's recent_errors endpoint and
@@ -264,9 +303,14 @@ func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
 # Aggregate the bridge's three first-turn signals (project metadata, scene
 # tree, recent failure history) into one round-trip. Used by clients that
 # would otherwise spend 2-3 separate tools/execute calls to orient the
-# agent on each session's first turn. Returns success-shaped even when
-# individual sub-fetches fail — the caller treats this as best-effort
-# orientation, not a hard precondition.
+# agent on each session's first turn.
+#
+# `success` reflects whether ALL sub-fetches succeeded (atomic shape). When
+# any sub-fetch fails, `success=false` AND the per-source error is recorded
+# in `errors`, so clients that only check `success` won't silently consume
+# partial context as if it were complete. Callers that want the
+# best-effort partial payload can still inspect `project`, `scene_tree`,
+# `recent_errors`, and `runtime_events` regardless of `success`.
 #
 # Args (all optional):
 #   project_response_format: "concise" (default) | "detailed" — passed
@@ -308,10 +352,14 @@ func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> D
 
 	# Project info — reuse the existing tool's execute() rather than
 	# re-implementing the file walk. Tool returns its own success/error envelope.
+	# A null return indicates a crashed sub-tool (GDScript halt + nil return);
+	# treat the same as a structured failure so context/gather still answers.
 	var project_tool = _registry.get_tool("get_project_info")
 	if project_tool != null:
 		var project_result = project_tool.execute({"response_format": project_format})
-		if project_result is Dictionary and project_result.get("success", false):
+		if project_result == null:
+			sub_errors["project"] = "get_project_info crashed (returned null)"
+		elif project_result is Dictionary and project_result.get("success", false):
 			response["project"] = project_result.get("project", {})
 		else:
 			sub_errors["project"] = str(project_result.get("error", project_result.get("message", "get_project_info failed")))
@@ -325,7 +373,9 @@ func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> D
 	var scene_tool = _registry.get_tool("get_scene_tree")
 	if scene_tool != null:
 		var scene_result = scene_tool.execute(scene_args)
-		if scene_result is Dictionary and scene_result.get("success", false):
+		if scene_result == null:
+			sub_errors["scene_tree"] = "get_scene_tree crashed (returned null)"
+		elif scene_result is Dictionary and scene_result.get("success", false):
 			response["scene_tree"] = {
 				"tree":       scene_result.get("tree"),
 				"tree_text":  scene_result.get("tree_text", ""),
@@ -356,7 +406,18 @@ func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> D
 		response["runtime_events"] = runtime_tail
 
 	if not sub_errors.is_empty():
+		response["success"] = false
 		response["errors"] = sub_errors
+		# Bake the failure summary into message so chat-only readers don't
+		# miss it. Without this, an agent reading "context gathered" assumes
+		# the payload is complete and proceeds with stale assumptions.
+		var failed_sources: Array = []
+		for source in sub_errors.keys():
+			failed_sources.append(str(source))
+		response["message"] = "context/gather: %d of N sub-fetches failed: %s" % [
+			sub_errors.size(), ", ".join(failed_sources),
+		]
+		response["error"] = response["message"]
 
 	return response
 

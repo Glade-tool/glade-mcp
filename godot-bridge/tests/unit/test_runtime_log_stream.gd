@@ -285,9 +285,9 @@ func test_start_observation_snapshots_latest_cursor() -> void:
 func test_re_arming_refreshes_baseline_cursor() -> void:
 	PlayModeObserver.start_observation()
 	var first_baseline := PlayModeObserver.observation_start_cursor()
-	# Two events so latest_cursor() actually advances past the first baseline
-	# (first event has cursor 0, which is indistinguishable from the empty
-	# buffer's 0 — two events lift latest_cursor to 1 unambiguously).
+	# Cursors are 1-indexed (the empty-buffer sentinel is 0), so a single
+	# ingested event would already advance latest_cursor past the baseline.
+	# We push two anyway to keep the test exercising the multi-event path.
 	RuntimeLogStream.ingest_chunk(_SID, "ERROR: first\nclose\nERROR: second\nclose\n")
 	var after_cursor := RuntimeLogStream.latest_cursor()
 	assert_gt(after_cursor, first_baseline, "buffer must have advanced before re-arming")

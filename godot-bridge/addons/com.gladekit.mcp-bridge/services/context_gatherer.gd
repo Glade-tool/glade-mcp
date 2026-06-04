@@ -38,7 +38,10 @@ static func _project_info() -> Dictionary:
 
 
 static func _edited_scene_info() -> Dictionary:
-	var root := EditorInterface.get_edited_scene_root()
+	# Safe wrapper — see ToolUtils.get_edited_scene_root_safe. EditorInterface
+	# is unreachable from non-editor contexts (test runner, etc.); the safe
+	# helper returns null there, which is the same path as "no scene open."
+	var root := ToolUtils.get_edited_scene_root_safe()
 	if root == null:
 		return {"open": false}
 	return {
@@ -58,7 +61,14 @@ static func _count_nodes(node: Node) -> int:
 
 
 static func _selection_paths() -> Array:
-	var selection := EditorInterface.get_selection()
+	# Same singleton-via-Engine pattern as ToolUtils.get_edited_scene_root_safe.
+	# Bare `EditorInterface.<method>` parses as a static call on the class,
+	# which doesn't have the method outside editor context. Fetching the
+	# singleton via Engine routes the call through the actual instance.
+	var ei: Object = Engine.get_singleton("EditorInterface") if Engine.has_singleton("EditorInterface") else null
+	if ei == null:
+		return []
+	var selection := ei.get_selection()
 	if selection == null:
 		return []
 	var nodes := selection.get_selected_nodes()
