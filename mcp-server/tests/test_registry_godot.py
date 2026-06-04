@@ -137,11 +137,13 @@ def test_tool_count_matches_canonical_catalog():
     v0.5.2 added 3 structured runtime-event observation tools
     (start/stop_runtime_observation + get_runtime_events) → 49;
     v0.5.3 added 4 lighting/environment tools (set_light_properties +
-    get_light_info + set_world_environment + get_world_environment) → 53
-    total. A change here is a real change — update this test and the schema
-    package together."""
+    get_light_info + set_world_environment + get_world_environment) → 53;
+    v0.6.0 added 5 animation tools (add_animation_to_player +
+    add_animation_track + add_animation_keyframe + set_animation_properties
+    + get_animation_player_info) → 58. A change here is a real change —
+    update this test and the schema package together."""
     bridge_names = _bridge_tool_names()
-    expected = 53
+    expected = 58
     assert len(bridge_names) == expected, (
         f"Expected {expected} Godot bridge tools, got {len(bridge_names)}. "
         f"If the catalog grew or shrank, update this test and the schema package."

@@ -55,6 +55,8 @@ const READ_ONLY_TOOLS: Array[String] = [
 	# Lighting / Environment reads (v0.5.3)
 	"get_light_info",
 	"get_world_environment",
+	# Animation reads (v0.6.0)
+	"get_animation_player_info",
 ]
 
 const SETTING_KEY := "gladekit/read_only_mode"

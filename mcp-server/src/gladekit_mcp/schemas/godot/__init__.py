@@ -24,16 +24,18 @@ Categories follow the Godot bridge's own directory layout under
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
     project   — Project introspection + asset listing           ( 2 tools)
     ui        — Control-tree creation + anchor / text helpers   ( 6 tools)
+    animation — AnimationPlayer + Animation .tres scaffolding   ( 5 tools)
                                                                 ───────
-                                                                53 tools
+                                                                58 tools
 
 Unlike the Unity side (~222 tools across 17 categories) we expose the
-full Godot catalog directly — 53 tools is well within Claude Code's
+full Godot catalog directly — 58 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 """
 
 from typing import Dict, List
 
+from .animation import TOOLS as ANIMATION_TOOLS
 from .camera import TOOLS as CAMERA_TOOLS
 from .physics import TOOLS as PHYSICS_TOOLS
 from .project import TOOLS as PROJECT_TOOLS
@@ -58,6 +60,7 @@ ALL_CATEGORIES = [
     ("signal", SIGNAL_TOOLS),
     ("project", PROJECT_TOOLS),
     ("ui", UI_TOOLS),
+    ("animation", ANIMATION_TOOLS),
 ]
 
 
@@ -105,6 +108,8 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
         # Lighting / Environment reads (v0.5.3)
         "get_light_info",
         "get_world_environment",
+        # Animation reads (v0.6.0)
+        "get_animation_player_info",
     }
 )
 

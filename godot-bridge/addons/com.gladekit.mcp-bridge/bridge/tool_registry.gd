@@ -85,6 +85,20 @@ const SetControlSizeTool     = preload("res://addons/com.gladekit.mcp-bridge/too
 const ListUiHierarchyTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/list_ui_hierarchy.gd")
 const CreateThemeTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_theme.gd")
 
+# ── Animation tools (v0.6.0) ───────────────────────────────────────────────
+# AnimationPlayer scaffolding: register Animation .tres files with a player,
+# add tracks (value / position_3d / rotation_3d / scale_3d / method), insert
+# keyframes, set per-Animation properties (length / loop_mode / step), and
+# read player state for inspection. The AnimationPlayer node itself + the
+# Animation .tres are created via existing create_node + create_resource —
+# these 5 tools close the gap between "I have an empty player + an empty
+# animation" and "I have a playable animation library."
+const AddAnimationToPlayerTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/add_animation_to_player.gd")
+const AddAnimationTrackTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/add_animation_track.gd")
+const AddAnimationKeyframeTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/add_animation_keyframe.gd")
+const SetAnimationPropertiesTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/set_animation_properties.gd")
+const GetAnimationPlayerInfoTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/get_animation_player_info.gd")
+
 var _tools: Dictionary = {}
 
 
@@ -158,6 +172,12 @@ func _register_all() -> void:
 	register_tool(SetControlSizeTool.new())
 	register_tool(ListUiHierarchyTool.new())
 	register_tool(CreateThemeTool.new())
+	# Animation (5, v0.6.0)
+	register_tool(AddAnimationToPlayerTool.new())
+	register_tool(AddAnimationTrackTool.new())
+	register_tool(AddAnimationKeyframeTool.new())
+	register_tool(SetAnimationPropertiesTool.new())
+	register_tool(GetAnimationPlayerInfoTool.new())
 
 
 func register_tool(tool_instance) -> void:
