@@ -186,29 +186,48 @@ jobs:
           fi
 
       - name: Build addon zip
-        # Zip layout matches the manual releases (v0.4.8 etc.): top-level
-        # com.gladekit.mcp-bridge/ directory containing plugin.cfg. The
-        # GladeKit desktop app installer's findAddonRoot walker expects
-        # this shape.
+        # Filename is intentionally version-free and the contents are
+        # packaged at the zip ROOT (no wrapper folder). Combined, this makes
+        # the Windows Explorer "Extract All" UX self-correcting: a user who
+        # right-clicks com.gladekit.mcp-bridge.zip and picks Extract All
+        # gets a single com.gladekit.mcp-bridge/ folder containing
+        # plugin.cfg + the rest of the addon — exactly the
+        # res://addons/<addon_name>/ shape Godot expects. macOS Archive
+        # Utility behaves identically (folder named after the zip).
+        #
+        # Before this change the filename was com.gladekit.mcp-bridge-
+        # X.Y.Z.zip with a wrapper folder inside, so Windows' Extract All
+        # produced res://addons/com.gladekit.mcp-bridge-X.Y.Z/com.gladekit
+        # .mcp-bridge/plugin.cfg — the doubled nesting silently broke the
+        # addon load with "Unable to load addon script" in the editor.
+        #
+        # Version still lives in plugin.cfg + the GitHub Release title.
+        # The desktop installer's findAddonRoot walker handles both flat-at
+        # -root and wrapped layouts, so this change is fully back-compat
+        # with existing clients.
         run: |
-          cd godot-bridge/addons
-          zip -r "/tmp/com.gladekit.mcp-bridge-${{ steps.version.outputs.VERSION }}.zip" \
-            com.gladekit.mcp-bridge
+          cd godot-bridge/addons/com.gladekit.mcp-bridge
+          zip -r "/tmp/com.gladekit.mcp-bridge.zip" .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Godot bridge v${{ steps.version.outputs.VERSION }}"
-          files: /tmp/com.gladekit.mcp-bridge-${{ steps.version.outputs.VERSION }}.zip
+          files: /tmp/com.gladekit.mcp-bridge.zip
           body: |
             ## Installation
 
-            **UPM-style git URL (Godot 4.4+ via addon folder copy):**
+            **Recommended: UPM-style git URL** (pinned to this release):
             ```
             https://github.com/Glade-tool/glade-mcp.git?path=godot-bridge/addons/com.gladekit.mcp-bridge#godot-v${{ steps.version.outputs.VERSION }}
             ```
 
-            **Manual install:** download `com.gladekit.mcp-bridge-${{ steps.version.outputs.VERSION }}.zip` below, extract it into your project's `addons/` directory, then enable in *Project → Project Settings → Plugins*.
+            **Manual install:**
 
-            See the [README](README.md) for full setup instructions.
+            1. Download `com.gladekit.mcp-bridge.zip` below.
+            2. Extract it. The result is a single `com.gladekit.mcp-bridge/` folder.
+            3. Move that folder into your project's `addons/` directory so the final path is `res://addons/com.gladekit.mcp-bridge/plugin.cfg`.
+            4. In Godot: *Project → Project Settings → Plugins* → toggle **GladeKit MCP Bridge** on.
+
+            See the [README](README.md) for MCP client configuration.
           generate_release_notes: true
