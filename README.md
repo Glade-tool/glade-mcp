@@ -8,7 +8,7 @@ Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients dire
 
 The MCP server auto-detects which editor is running (Unity on `:8765`, Godot on `:8766`) and exposes the matching tool set.
 
-![GladeKit MCP Demo](GladeKitMCP_DemoGIF.gif)
+![GladeKit MCP Demo](https://raw.githubusercontent.com/Glade-tool/glade-mcp/main/assets/demo.gif)
 
 ---
 
