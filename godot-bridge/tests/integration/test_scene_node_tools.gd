@@ -1,6 +1,6 @@
 extends GutTest
 
-# Integration tests for the 10 Scene / Node tools. Each tool has:
+# Integration tests for the 11 Scene / Node tools. Each tool has:
 #   - happy path
 #   - missing-required-arg returns an error and does not crash
 #   - wrong-type / wrong-value arg returns an error and does not crash
@@ -535,3 +535,143 @@ func test_set_node_resource_nonexistent_path() -> void:
 	})
 	assert_false(r.success)
 	assert_string_contains(r.error, "does not exist")
+
+
+# ── set_node_property ──────────────────────────────────────────────────────
+
+func _make_camera(node_name: String) -> Camera3D:
+	var c := Camera3D.new()
+	c.name = node_name
+	_sandbox.add_child(c)
+	c.owner = EditorInterface.get_edited_scene_root()
+	return c
+
+
+func test_set_node_property_happy_float() -> void:
+	var cam := _make_camera("PropCamFloat")
+	var r := _run("set_node_property", {
+		"node_path": "%s/PropCamFloat" % SANDBOX_NAME,
+		"property": "fov",
+		"value": 55.0,
+	})
+	assert_true(r.success, str(r))
+	assert_almost_eq(cam.fov, 55.0, 0.001)
+	assert_eq(r.property, "fov")
+	assert_eq(r.value_type, "float")
+	assert_eq(r.value, 55.0)
+
+
+func test_set_node_property_coerces_numeric_string() -> void:
+	var cam := _make_camera("PropCamStr")
+	var r := _run("set_node_property", {
+		"node_path": "%s/PropCamStr" % SANDBOX_NAME,
+		"property": "fov",
+		"value": "42.5",  # arrives as a string, must coerce to float
+	})
+	assert_true(r.success, str(r))
+	assert_almost_eq(cam.fov, 42.5, 0.001)
+
+
+func test_set_node_property_happy_bool() -> void:
+	var cam := _make_camera("PropCamBool")
+	var r := _run("set_node_property", {
+		"node_path": "%s/PropCamBool" % SANDBOX_NAME,
+		"property": "current",
+		"value": true,
+	})
+	assert_true(r.success, str(r))
+	assert_true(cam.current)
+	assert_eq(r.value_type, "bool")
+
+
+func test_set_node_property_resolves_enum_label() -> void:
+	var cam := _make_camera("PropCamEnum")
+	# Camera3D.projection: Perspective:0, Orthogonal:1, Frustum:2 (implicit idx).
+	var r := _run("set_node_property", {
+		"node_path": "%s/PropCamEnum" % SANDBOX_NAME,
+		"property": "projection",
+		"value": "Orthogonal",
+	})
+	assert_true(r.success, str(r))
+	assert_eq(cam.projection, Camera3D.PROJECTION_ORTHOGONAL)
+
+
+func test_set_node_property_coerces_vector() -> void:
+	var n := Node3D.new()
+	n.name = "PropVec"
+	_sandbox.add_child(n)
+	n.owner = EditorInterface.get_edited_scene_root()
+	var r := _run("set_node_property", {
+		"node_path": "%s/PropVec" % SANDBOX_NAME,
+		"property": "position",
+		"value": "1,2,3",
+	})
+	assert_true(r.success, str(r))
+	assert_eq(n.position, Vector3(1, 2, 3))
+	# Vectors serialize back to the bridge's "x,y,z" float convention.
+	assert_eq(r.value, "1.0,2.0,3.0")
+
+
+func test_set_node_property_missing_value() -> void:
+	var _cam := _make_camera("PropCamNoVal")
+	var r := _run("set_node_property", {
+		"node_path": "%s/PropCamNoVal" % SANDBOX_NAME,
+		"property": "fov",
+	})
+	assert_false(r.success)
+	assert_string_contains(r.error, "value is required")
+
+
+func test_set_node_property_missing_node_path() -> void:
+	var r := _run("set_node_property", {"property": "fov", "value": 1.0})
+	assert_false(r.success)
+	assert_string_contains(r.error, "node_path is required")
+
+
+func test_set_node_property_unknown_property_lists_settable() -> void:
+	var _cam := _make_camera("PropCamUnknown")
+	var r := _run("set_node_property", {
+		"node_path": "%s/PropCamUnknown" % SANDBOX_NAME,
+		"property": "not_a_real_property",
+		"value": 1,
+	})
+	assert_false(r.success)
+	assert_has(r, "settable_properties")
+	assert_true((r.settable_properties as Array).has("fov"),
+		"settable_properties should include 'fov'")
+
+
+func test_set_node_property_resource_property_redirects() -> void:
+	var _cam := _make_camera("PropCamRes")
+	# Camera3D.environment is Resource-typed — must redirect, not attempt a set.
+	var r := _run("set_node_property", {
+		"node_path": "%s/PropCamRes" % SANDBOX_NAME,
+		"property": "environment",
+		"value": "res://whatever.tres",
+	})
+	assert_false(r.success)
+	assert_string_contains(r.error, "Resource-typed")
+	assert_string_contains(str(r), "set_node_resource")
+
+
+func test_get_node_info_include_properties() -> void:
+	var cam := _make_camera("PropCamInfo")
+	cam.fov = 33.0
+	var r := _run("get_node_info", {
+		"node_path": "%s/PropCamInfo" % SANDBOX_NAME,
+		"include_properties": true,
+	})
+	assert_true(r.success, str(r))
+	assert_has(r, "properties")
+	assert_true(r.properties.has("fov"), "properties should expose scalar 'fov'")
+	# Resource-typed properties are excluded — they go through set_node_resource.
+	assert_false(r.properties.has("environment"),
+		"properties must omit Resource-typed 'environment'")
+
+
+func test_get_node_info_omits_properties_by_default() -> void:
+	var _cam := _make_camera("PropCamNoInfo")
+	var r := _run("get_node_info", {"node_path": "%s/PropCamNoInfo" % SANDBOX_NAME})
+	assert_true(r.success, str(r))
+	assert_false(r.has("properties"),
+		"properties must be absent unless include_properties=true")

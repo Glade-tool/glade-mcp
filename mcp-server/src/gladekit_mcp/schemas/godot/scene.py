@@ -1,5 +1,5 @@
 """
-Godot scene/hierarchy tools — Node creation, lookup, transforms (10 tools).
+Godot scene/hierarchy tools — Node creation, lookup, transforms (11 tools).
 
 Godot's scene model differs from Unity's GameObject+Component model:
 each scene is a tree of Nodes (Node3D, CharacterBody3D, Sprite2D, ...);
@@ -46,7 +46,10 @@ TOOLS: List[Dict] = [
                 "Read metadata for a single node: name, class, attached script (if any), "
                 "child count + names, groups, and (for Node3D/Node2D) transform. "
                 "Use after find_nodes to inspect a specific match, or after create_node "
-                "to confirm the result."
+                "to confirm the result. Pass include_properties=true to also return a "
+                "`properties` map of the node's settable scalar/vector/color/bool values "
+                "— the exact set set_node_property can write — to discover what's "
+                "configurable and read current values before setting."
             ),
             "parameters": {
                 "type": "object",
@@ -56,6 +59,14 @@ TOOLS: List[Dict] = [
                         "description": (
                             "Scene-relative path ('Player' or 'Player/Sprite'), absolute "
                             "('/root/Main/Player'), or empty/'.' for scene root."
+                        ),
+                    },
+                    "include_properties": {
+                        "type": "boolean",
+                        "description": (
+                            "When true, also return a `properties` map of settable "
+                            "non-Resource property values (what set_node_property writes). "
+                            "Default false."
                         ),
                     },
                 },
@@ -345,6 +356,56 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["node_path", "property", "resource_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_node_property",
+            "description": (
+                "Set a single non-Resource property to a literal value on any node — "
+                "the generic companion to the specialized setters. Where "
+                "set_node_transform owns position/rotation/scale and set_node_resource "
+                "owns Resource-typed properties (mesh, texture, stream, ...), this tool "
+                "covers everything else: scalars, vectors, colors, booleans, and enums. "
+                "Pairs with create_node to create-then-configure any node. Examples:\n"
+                "  AudioStreamPlayer.volume_db / .autoplay / .pitch_scale\n"
+                "  Camera3D.fov / .current / .cull_mask\n"
+                "  GPUParticles3D.amount / .lifetime / .emitting / .one_shot\n"
+                "  RigidBody3D.mass / .gravity_scale / .freeze\n"
+                "  Light3D.light_energy, Label.text, ...\n\n"
+                "The value is coerced to the property's declared type: numbers, bools, "
+                "and strings pass through; 'x,y,z' / [x,y,z] become Vector2/Vector3; "
+                "'#rrggbb' / [r,g,b,a] become Color; an enum label like "
+                "'PROCESS_MODE_ALWAYS' resolves to its int. Unknown property names "
+                "return the node's settable properties + the nearest match. To read "
+                "current values first, call get_node_info with include_properties=true. "
+                "For Resource-typed properties, use set_node_resource instead."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_path": {
+                        "type": "string",
+                        "description": "Target node in the edited scene.",
+                    },
+                    "property": {
+                        "type": "string",
+                        "description": (
+                            "Property name as Godot exposes it (snake_case), "
+                            "e.g. 'volume_db', 'fov', 'mass', 'emitting'."
+                        ),
+                    },
+                    "value": {
+                        "description": (
+                            "New value. Number/bool/string pass through; 'x,y,z' or "
+                            "[x,y,z] become a vector; '#rrggbb' or [r,g,b,a] become a "
+                            "color; an enum label resolves to its int."
+                        ),
+                    },
+                },
+                "required": ["node_path", "property", "value"],
             },
         },
     },

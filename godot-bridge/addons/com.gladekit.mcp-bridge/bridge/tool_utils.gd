@@ -159,6 +159,36 @@ static func parse_vector3_arg(args: Dictionary, key: String, default_value: Vect
 	return default_value
 
 
+static func parse_vector2_arg(args: Dictionary, key: String, default_value: Vector2 = Vector2.ZERO) -> Vector2:
+	if not args.has(key):
+		return default_value
+	var v = args[key]
+	if v == null:
+		return default_value
+	if v is Vector2:
+		return v
+	if v is Vector2i:
+		return Vector2(v.x, v.y)
+	if v is String:
+		var parts: PackedStringArray = (v as String).split(",", false)
+		if parts.size() < 2:
+			return default_value
+		var x: String = parts[0].strip_edges()
+		var y: String = parts[1].strip_edges()
+		if not x.is_valid_float() or not y.is_valid_float():
+			return default_value
+		return Vector2(float(x), float(y))
+	if v is Array:
+		var arr: Array = v
+		if arr.size() < 2:
+			return default_value
+		return Vector2(_num(arr[0]), _num(arr[1]))
+	if v is Dictionary:
+		var d: Dictionary = v
+		return Vector2(_num(d.get("x", 0.0)), _num(d.get("y", 0.0)))
+	return default_value
+
+
 static func _num(v) -> float:
 	if v is float:
 		return v

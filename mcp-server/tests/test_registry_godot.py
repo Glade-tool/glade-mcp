@@ -141,10 +141,11 @@ def test_tool_count_matches_canonical_catalog():
     v0.6.0 added 5 animation tools (add_animation_to_player +
     add_animation_track + add_animation_keyframe + set_animation_properties
     + get_animation_player_info) → 58; add_input_action (InputMap action
-    setup) → 59. A change here is a real change —
+    setup) → 59; set_node_property (generic non-Resource property setter) → 60.
+    A change here is a real change —
     update this test and the schema package together."""
     bridge_names = _bridge_tool_names()
-    expected = 59
+    expected = 60
     assert len(bridge_names) == expected, (
         f"Expected {expected} Godot bridge tools, got {len(bridge_names)}. "
         f"If the catalog grew or shrank, update this test and the schema package."

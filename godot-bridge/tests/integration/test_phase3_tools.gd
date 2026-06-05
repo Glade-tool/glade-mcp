@@ -313,6 +313,80 @@ func test_create_physics_body_unknown_type() -> void:
 	assert_string_contains(r.error, "marshmallow")
 
 
+func test_create_physics_body_2d_character() -> void:
+	var r := _run("create_physics_body", {
+		"space": "2d",
+		"body_type": "character",
+		"parent_path": SANDBOX_NAME,
+		"name": "Player2D",
+	})
+	assert_true(r.success, str(r))
+	assert_eq(r.type, "CharacterBody2D")
+	assert_eq(r.space, "2d")
+	assert_false(String(r.collision_shape_path).is_empty())
+
+
+func test_create_physics_body_2d_static_default_shape_is_rectangle() -> void:
+	var r := _run("create_physics_body", {
+		"space": "2d",
+		"body_type": "static",
+		"parent_path": SANDBOX_NAME,
+		"name": "Ground2D",
+	})
+	assert_true(r.success, str(r))
+	assert_eq(r.type, "StaticBody2D")
+	var shape_node := ToolUtils.find_node_by_path(String(r.collision_shape_path))
+	assert_not_null(shape_node, "collision shape node must exist")
+	assert_true(shape_node is CollisionShape2D, "2D body gets a CollisionShape2D")
+	assert_true((shape_node as CollisionShape2D).shape is RectangleShape2D,
+		"default 2D shape is a RectangleShape2D")
+
+
+func test_create_physics_body_2d_circle_shape_and_position() -> void:
+	var r := _run("create_physics_body", {
+		"space": "2d",
+		"body_type": "rigid",
+		"parent_path": SANDBOX_NAME,
+		"name": "Ball2D",
+		"shape_type": "circle",
+		"shape_size": "20,20",
+		"position": "100,50",
+		"mass": 3.0,
+	})
+	assert_true(r.success, str(r))
+	assert_eq(r.type, "RigidBody2D")
+	var body := ToolUtils.find_node_by_path(String(r.node_path)) as RigidBody2D
+	assert_not_null(body, "RigidBody2D must exist")
+	assert_eq(body.position, Vector2(100, 50), "2D position uses x,y")
+	assert_almost_eq(body.mass, 3.0, 0.001)
+	var shape_node := ToolUtils.find_node_by_path(String(r.collision_shape_path)) as CollisionShape2D
+	assert_true(shape_node.shape is CircleShape2D, "circle -> CircleShape2D")
+
+
+func test_create_physics_body_unknown_space() -> void:
+	var r := _run("create_physics_body", {
+		"space": "4d",
+		"body_type": "static",
+		"parent_path": SANDBOX_NAME,
+	})
+	assert_false(r.success)
+	assert_string_contains(r.error, "4d")
+
+
+func test_create_physics_body_explicit_3d_still_works() -> void:
+	# Regression guard: the default/explicit 3D path must be unchanged by the
+	# 2D addition.
+	var r := _run("create_physics_body", {
+		"space": "3d",
+		"body_type": "static",
+		"parent_path": SANDBOX_NAME,
+		"name": "Wall3D",
+	})
+	assert_true(r.success, str(r))
+	assert_eq(r.type, "StaticBody3D")
+	assert_eq(r.space, "3d")
+
+
 # ── Scene I/O ─────────────────────────────────────────────────────────────
 
 func test_create_scene_happy() -> void:

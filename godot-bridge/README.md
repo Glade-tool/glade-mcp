@@ -5,7 +5,7 @@ scene, node, script, and resource tools so AI assistants can read and modify
 the active project. Designed to be addressed by an MCP server (for use with
 Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 
-**Status:** 53 tools registered across 11 categories.
+**Status:** 60 tools registered across 12 categories.
 
 | Phase | Tools | Cumulative | Status |
 | --- | --- | --- | --- |
@@ -131,7 +131,7 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 3. Enable **GladeKit MCP Bridge**.
 4. Confirm the bridge is up: the editor Output panel should print
    ```
-   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.5.7, 53 tools registered, thread-polled at 200Hz)
+   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.6.3, 60 tools registered, thread-polled at 200Hz)
    ```
 
 The server stops automatically when you disable the plugin or close Godot.
