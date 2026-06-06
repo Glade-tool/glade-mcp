@@ -89,11 +89,15 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "get_script_content",
             "description": (
-                "Read a .gd file, paginated by line. Safe in any mode (read-only). "
-                "Defaults return the first 500 lines and echo `total_lines` + `truncated` "
-                "so you can request the next slice via start_line on large files instead "
-                "of pulling the whole file into context. Use before modify_script to see "
-                "what you're about to change."
+                "Read a GDScript .gd file, paginated by line. GDScript source only — "
+                "NOT for inspecting .tres resources (Animation, Material, etc.), scenes "
+                "(.tscn), or other non-script files: for those use the matching read tool "
+                "(e.g. get_animation_player_info for AnimationPlayer / Animation state, "
+                "get_material_info for materials). Safe in any mode (read-only). Defaults "
+                "return the first 500 lines and echo `total_lines` + `truncated` so you can "
+                "request the next slice via start_line on large files instead of pulling "
+                "the whole file into context. Use before modify_script to see what you're "
+                "about to change."
             ),
             "parameters": {
                 "type": "object",

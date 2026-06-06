@@ -135,7 +135,10 @@ TOOLS: List[Dict] = [
                 "edited scene. The `type` arg is any instantiable ClassDB class name OR "
                 "a user-declared `class_name` from a project script. Sets owner=scene_root "
                 "so the new node persists when the scene is saved. For mesh primitives use "
-                "create_primitive_3d instead — it bundles a MeshInstance3D + PrimitiveMesh."
+                "create_primitive_3d instead — it bundles a MeshInstance3D + PrimitiveMesh. "
+                "For UI nodes (Control subclasses — Button, Label, Panel, containers, "
+                "popup dialogs) use create_control instead — it handles CanvasLayer auto-wrap "
+                "and accepts inline text + anchor_preset args."
             ),
             "parameters": {
                 "type": "object",
