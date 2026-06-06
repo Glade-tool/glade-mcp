@@ -5,7 +5,7 @@ scene, node, script, and resource tools so AI assistants can read and modify
 the active project. Designed to be addressed by an MCP server (for use with
 Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 
-**Status:** 60 tools registered across 12 categories.
+**Status:** 60 tools registered across 12 categories (v0.6.4: context-engineering polish on `get_script_content` + `get_scene_tree`; no new tools).
 
 | Phase | Tools | Cumulative | Status |
 | --- | --- | --- | --- |
@@ -24,6 +24,7 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 | 14 | Diagnostics workflow hardening: `get_runtime_events` gains `wait_ms` (blocking poll up to 5s so the first call after `run_project` doesn't beat the subprocess to `_ready`); `stop_project` accepts either `session_id` or `pid` and tolerates the model's "pid 23696" string mangling | 53 | shipped (v0.5.5) |
 | 15 | Parser catches Godot 4 `USER ERROR:` prefix (was matching Godot 3's `USER SCRIPT ERROR:` only, silently dropping every `push_error` event); `get_runtime_events` adds `raw_stderr_bytes` + `raw_stderr_tail` self-diagnosis fields so an empty response distinguishes "parser missed a prefix" from "subprocess wrote nothing" | 53 | shipped (v0.5.6) |
 | 16 | `get_runtime_events` message field surfaces the byte-count diagnostic inline so it can't be missed by models that only quote `message` back | 53 | shipped (v0.5.7) |
+| 17 | Context-engineering polish: `get_script_content` is now paginated by line (default 500-line cap, `total_lines` + `truncated` echoed so the agent can request the next slice); `get_scene_tree` gains `response_format` (`"both"` default, `"tree_text_only"` halves payload, `"tree_only"` for programmatic callers) | 60 | shipped (v0.6.4) |
 
 ### New in Phase 3
 
@@ -131,7 +132,7 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 3. Enable **GladeKit MCP Bridge**.
 4. Confirm the bridge is up: the editor Output panel should print
    ```
-   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.6.3, 60 tools registered, thread-polled at 200Hz)
+   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.6.4, 60 tools registered, thread-polled at 200Hz)
    ```
 
 The server stops automatically when you disable the plugin or close Godot.

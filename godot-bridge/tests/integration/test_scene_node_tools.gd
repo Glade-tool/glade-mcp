@@ -85,6 +85,46 @@ func test_get_scene_tree_wrong_type_max_depth_falls_back() -> void:
 	assert_true(r.success)
 
 
+# ── get_scene_tree response_format (v0.6.4) ───────────────────────────────
+
+func test_get_scene_tree_format_both_is_default() -> void:
+	var both := _run("get_scene_tree", {})
+	assert_true(both.success)
+	assert_true(both.has("tree"), "default must include tree")
+	assert_true(both.has("tree_text"), "default must include tree_text")
+
+
+func test_get_scene_tree_format_tree_text_only_drops_tree() -> void:
+	var r := _run("get_scene_tree", {"response_format": "tree_text_only"})
+	assert_true(r.success)
+	assert_false(r.has("tree"), "tree_text_only must drop the nested tree")
+	assert_true(r.has("tree_text"))
+	assert_true(r.tree_text is String and not (r.tree_text as String).is_empty())
+	# Scene metadata stays.
+	assert_true(r.has("scene_path"))
+	assert_true(r.has("node_count"))
+
+
+func test_get_scene_tree_format_tree_only_drops_tree_text() -> void:
+	var r := _run("get_scene_tree", {"response_format": "tree_only"})
+	assert_true(r.success)
+	assert_true(r.has("tree"))
+	assert_false(r.has("tree_text"), "tree_only must drop the ASCII tree_text")
+	assert_true(r.has("scene_path"))
+	assert_true(r.has("node_count"))
+
+
+func test_get_scene_tree_unknown_format_returns_structured_error() -> void:
+	var r := _run("get_scene_tree", {"response_format": "garbage"})
+	assert_false(r.success)
+	assert_true(r.has("possible_solutions"))
+	# At least one suggestion must name one of the valid formats so the agent
+	# can self-correct on the next call.
+	var solutions: Array = r.possible_solutions
+	var joined: String = " ".join(solutions)
+	assert_true(joined.contains("tree_text_only") or joined.contains("both"))
+
+
 # ── get_node_info ─────────────────────────────────────────────────────────
 
 func test_get_node_info_happy() -> void:

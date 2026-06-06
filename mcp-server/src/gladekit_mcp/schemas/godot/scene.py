@@ -25,7 +25,9 @@ TOOLS: List[Dict] = [
                 "scene), and a nested `tree` of {name, type, path, children[], "
                 "script_path?} for programmatic use. Safe to call any time (read-only, "
                 "works in both edit and play mode). Call this first to understand what's "
-                "in the scene before mutating it."
+                "in the scene before mutating it. To save context on large scenes, pass "
+                "response_format='tree_text_only' — the ASCII view is enough for almost "
+                "all reasoning, and dropping the nested JSON halves the response size."
             ),
             "parameters": {
                 "type": "object",
@@ -33,6 +35,16 @@ TOOLS: List[Dict] = [
                     "max_depth": {
                         "type": "integer",
                         "description": "Recursion cap against pathological scenes. Default 50.",
+                    },
+                    "response_format": {
+                        "type": "string",
+                        "description": (
+                            "Which views to return. 'both' (default) returns tree + "
+                            "tree_text. 'tree_text_only' drops the nested JSON tree "
+                            "and is the token-efficient choice for agent reasoning. "
+                            "'tree_only' drops the ASCII tree_text for programmatic callers."
+                        ),
+                        "enum": ["both", "tree_text_only", "tree_only"],
                     },
                 },
             },

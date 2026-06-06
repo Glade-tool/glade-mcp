@@ -180,6 +180,10 @@ func test_get_script_content_happy() -> void:
 	var r := _run("get_script_content", {"script_path": path})
 	assert_true(r.success)
 	assert_string_contains(r.content, "hello")
+	# v0.6.4 pagination fields always present.
+	assert_eq(r.start_line, 1)
+	assert_true(r.has("total_lines"))
+	assert_false(r.truncated, "Short file must not be marked truncated")
 
 
 func test_get_script_content_missing_arg() -> void:
@@ -190,6 +194,84 @@ func test_get_script_content_missing_arg() -> void:
 func test_get_script_content_nonexistent() -> void:
 	var r := _run("get_script_content", {"script_path": SANDBOX_DIR + "/none.gd"})
 	assert_false(r.success)
+
+
+# ── get_script_content pagination (v0.6.4) ────────────────────────────────
+
+func _make_lined_script(path: String, line_count: int) -> void:
+	# Produce a script with `line_count` distinct lines so slice boundaries
+	# are easy to verify by content (each line uniquely names its index).
+	var lines: PackedStringArray = []
+	for i in line_count:
+		lines.append("var line_%d := %d" % [i + 1, i + 1])
+	_run("create_script", {"script_path": path, "content": "\n".join(lines)})
+
+
+func test_get_script_content_default_truncates_large_file() -> void:
+	var path := SANDBOX_DIR + "/big.gd"
+	_make_lined_script(path, 600)
+	var r := _run("get_script_content", {"script_path": path})
+	assert_true(r.success)
+	assert_true(r.truncated, "600-line file must be truncated under default 500-line cap")
+	assert_eq(r.start_line, 1)
+	assert_eq(r.end_line, 500)
+	assert_eq(r.total_lines, 600)
+	assert_string_contains(r.content, "var line_1 :=")
+	assert_string_contains(r.content, "var line_500 :=")
+	# Must NOT have leaked past the cap.
+	assert_false(r.content.contains("var line_501"))
+
+
+func test_get_script_content_start_line_slice() -> void:
+	var path := SANDBOX_DIR + "/big.gd"
+	_make_lined_script(path, 600)
+	var r := _run("get_script_content", {"script_path": path, "start_line": 501})
+	assert_true(r.success)
+	assert_eq(r.start_line, 501)
+	assert_eq(r.end_line, 600)
+	assert_false(r.truncated, "Final slice must not be marked truncated")
+	assert_string_contains(r.content, "var line_501")
+	assert_string_contains(r.content, "var line_600")
+	assert_false(r.content.contains("var line_500 :="))
+
+
+func test_get_script_content_explicit_end_line_inclusive() -> void:
+	var path := SANDBOX_DIR + "/big.gd"
+	_make_lined_script(path, 50)
+	var r := _run("get_script_content", {
+		"script_path": path,
+		"start_line": 10,
+		"end_line": 12,
+	})
+	assert_true(r.success)
+	assert_eq(r.start_line, 10)
+	assert_eq(r.end_line, 12)
+	assert_string_contains(r.content, "var line_10 :=")
+	assert_string_contains(r.content, "var line_12 :=")
+	assert_false(r.content.contains("var line_13"))
+
+
+func test_get_script_content_max_lines_clamps_to_hard_cap() -> void:
+	var path := SANDBOX_DIR + "/small.gd"
+	_make_lined_script(path, 10)
+	var r := _run("get_script_content", {
+		"script_path": path,
+		"max_lines": 999999,  # absurd request → clamp to HARD_CAP (5000)
+	})
+	assert_true(r.success)
+	assert_eq(r.total_lines, 10)
+	assert_false(r.truncated)
+
+
+func test_get_script_content_start_past_eof_returns_diagnostic() -> void:
+	var path := SANDBOX_DIR + "/short.gd"
+	_make_lined_script(path, 5)
+	var r := _run("get_script_content", {"script_path": path, "start_line": 100})
+	assert_true(r.success, "Past-EOF returns success with empty content + diagnostic")
+	assert_eq(r.content, "")
+	assert_eq(r.total_lines, 5)
+	assert_false(r.truncated)
+	assert_string_contains(r.message, "past EOF")
 
 
 # ── find_scripts ──────────────────────────────────────────────────────────

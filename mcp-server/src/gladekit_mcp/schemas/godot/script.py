@@ -89,8 +89,11 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "get_script_content",
             "description": (
-                "Read the full text contents of a .gd file. Safe in any mode (read-only). "
-                "Use before modify_script to see what you're about to change."
+                "Read a .gd file, paginated by line. Safe in any mode (read-only). "
+                "Defaults return the first 500 lines and echo `total_lines` + `truncated` "
+                "so you can request the next slice via start_line on large files instead "
+                "of pulling the whole file into context. Use before modify_script to see "
+                "what you're about to change."
             ),
             "parameters": {
                 "type": "object",
@@ -98,6 +101,21 @@ TOOLS: List[Dict] = [
                     "script_path": {
                         "type": "string",
                         "description": "res:// path to the .gd file.",
+                    },
+                    "start_line": {
+                        "type": "integer",
+                        "description": "1-indexed start line. Default 1.",
+                    },
+                    "end_line": {
+                        "type": "integer",
+                        "description": (
+                            "1-indexed inclusive end line. Default 0 = until EOF or "
+                            "max_lines, whichever is smaller."
+                        ),
+                    },
+                    "max_lines": {
+                        "type": "integer",
+                        "description": "Cap on lines returned. Default 500, clamped 1..5000.",
                     },
                 },
                 "required": ["script_path"],

@@ -5,15 +5,26 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #
 # Args:
 #   max_depth: int (optional, default 50) — safety cap against pathological scenes.
+#   response_format: String (optional, default "both") — controls which views
+#                    of the tree are returned. One of:
+#                      "both"           — both `tree` (nested) and `tree_text`
+#                                         (ASCII). Backward-compatible default.
+#                      "tree_text_only" — drop `tree`; keep `tree_text` only.
+#                                         Recommended for agent calls: half the
+#                                         payload tokens on large scenes.
+#                      "tree_only"      — drop `tree_text`; keep `tree` only.
+#                                         For programmatic callers that walk
+#                                         children[] arrays.
+#                    `scene_path` and `node_count` are returned in every mode.
 #
 # Response payload:
-#   tree:       Dictionary or null (null if no scene open) — nested structure
+#   tree:       Dictionary or null (null if no scene open, or if format dropped it)
 #   tree_text:  String — flat, indented ASCII rendering of the whole tree.
 #               This is the model-friendly view: it lists every node top to
 #               bottom so an LLM can enumerate the scene without having to walk
 #               nested `children[]` arrays (which weaker/faster models routinely
-#               under-read, reporting only the root). `tree` stays for
-#               programmatic callers.
+#               under-read, reporting only the root). Returned as "" when the
+#               format dropped it.
 #   scene_path: String  ("" for ad-hoc / unsaved scenes)
 #   node_count: int  — also echoed in the success message.
 #
@@ -26,6 +37,10 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 
 const DEFAULT_MAX_DEPTH := 50
+const FORMAT_BOTH := "both"
+const FORMAT_TREE_TEXT_ONLY := "tree_text_only"
+const FORMAT_TREE_ONLY := "tree_only"
+const _VALID_FORMATS := [FORMAT_BOTH, FORMAT_TREE_TEXT_ONLY, FORMAT_TREE_ONLY]
 
 
 func _init() -> void:
@@ -34,28 +49,45 @@ func _init() -> void:
 
 
 func execute(args: Dictionary) -> Dictionary:
+	var format: String = ToolUtils.parse_string_arg(args, "response_format", FORMAT_BOTH)
+	if not _VALID_FORMATS.has(format):
+		return ToolUtils.error_with_solutions(
+			"Unknown response_format '%s'" % format,
+			[
+				"Use response_format='both' (default — tree + tree_text)",
+				"Use response_format='tree_text_only' to drop the nested JSON tree",
+				"Use response_format='tree_only' to drop the ASCII tree_text",
+			]
+		)
+
 	var root: Node = EditorInterface.get_edited_scene_root()
 	if root == null:
-		return ToolUtils.success("No scene currently open in the editor", {
-			"tree": null,
-			"tree_text": "",
+		var empty: Dictionary = {
 			"scene_path": "",
 			"node_count": 0,
-		})
+		}
+		if format != FORMAT_TREE_TEXT_ONLY:
+			empty["tree"] = null
+		if format != FORMAT_TREE_ONLY:
+			empty["tree_text"] = ""
+		return ToolUtils.success("No scene currently open in the editor", empty)
 	var max_depth: int = ToolUtils.parse_int_arg(args, "max_depth", DEFAULT_MAX_DEPTH)
 	if max_depth <= 0:
 		max_depth = DEFAULT_MAX_DEPTH
-	var tree := _serialize(root, 0, max_depth)
 	var count := _count_nodes(root)
-	var lines: Array = []
-	_render_lines(root, 0, max_depth, "", true, true, lines)
 	var noun: String = "node" if count == 1 else "nodes"
-	return ToolUtils.success("Scene tree retrieved (%d %s)" % [count, noun], {
-		"tree": tree,
-		"tree_text": "\n".join(lines),
+
+	var payload: Dictionary = {
 		"scene_path": root.scene_file_path,
 		"node_count": count,
-	})
+	}
+	if format != FORMAT_TREE_TEXT_ONLY:
+		payload["tree"] = _serialize(root, 0, max_depth)
+	if format != FORMAT_TREE_ONLY:
+		var lines: Array = []
+		_render_lines(root, 0, max_depth, "", true, true, lines)
+		payload["tree_text"] = "\n".join(lines)
+	return ToolUtils.success("Scene tree retrieved (%d %s)" % [count, noun], payload)
 
 
 func _serialize(node: Node, depth: int, max_depth: int) -> Dictionary:

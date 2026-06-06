@@ -384,7 +384,9 @@ func _main_dispatch_context_gather(request_id: String, request: Dictionary) -> D
 		sub_errors["project"] = "get_project_info tool not registered"
 
 	# Scene tree — same pattern. tree + tree_text + scene_path + node_count.
-	var scene_args: Dictionary = {}
+	# Pin response_format="both" so this aggregating endpoint keeps returning
+	# both shapes even if get_scene_tree's default ever changes.
+	var scene_args: Dictionary = {"response_format": "both"}
 	if scene_max_depth_raw != null:
 		scene_args["max_depth"] = scene_max_depth_raw
 	var scene_tool = _registry.get_tool("get_scene_tree")
