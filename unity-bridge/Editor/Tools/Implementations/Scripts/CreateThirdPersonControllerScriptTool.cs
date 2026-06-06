@@ -8,24 +8,22 @@ using GladeAgenticAI.Services;
 namespace GladeAgenticAI.Core.Tools.Implementations.Scripts
 {
     /// <summary>
-    /// Writes a Play-tested third-person player controller into the project by
+    /// Writes a ready-to-use third-person player controller into the project by
     /// copying two vetted template scripts VERBATIM — ThirdPersonController.cs
     /// (CharacterController movement + grounded jump) and FollowCamera.cs
     /// (stable fixed-offset follow).
     ///
-    /// Why a template tool instead of letting the model write the controller:
-    /// the 2026-06-01 multi-system spike showed the model composes scenes
-    /// flawlessly but RE-DERIVES subtly-broken gameplay code every run — a
-    /// self-referential camera offset that sends the player in circles, and a
-    /// fragile isGrounded that kills the jump. Both passed every structural
-    /// assertion; only Play-mode caught them. Copying the vetted code verbatim
-    /// removes the broken step: the model only has to instantiate + wire, which
-    /// it already does reliably.
+    /// Why a template tool instead of generating the controller from scratch:
+    /// an AI client asked to write a third-person controller tends to re-derive
+    /// subtly-broken gameplay code — most commonly a self-referential camera
+    /// offset that makes the player circle, and a fragile grounded-check that
+    /// blocks the jump. Both compile cleanly and look correct, so they slip past
+    /// a quick review and only show up in Play mode. Copying known-good code
+    /// verbatim removes that failure mode: the caller only has to instantiate
+    /// and attach the components.
     ///
-    /// The template files are the single source of truth for this code. The
-    /// human-readable spec (tool sequence, acceptance criteria, anti-patterns)
-    /// lives in Proxy/app/lib/system_recipes/player_controller_third_person.md,
-    /// which references these templates rather than duplicating them.
+    /// The .cs.txt template files in Editor/Tools/Templates/ are the single
+    /// source of truth for this code.
     /// </summary>
     public class CreateThirdPersonControllerScriptTool : ITool
     {
