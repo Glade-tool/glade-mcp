@@ -1,0 +1,67 @@
+using UnityEngine;
+using UnityEngine.InputSystem; // project inputSystem is BOTH/NEW
+
+[RequireComponent(typeof(CharacterController))]
+public class ThirdPersonController : MonoBehaviour
+{
+    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float jumpHeight = 1.5f;
+    [SerializeField] private float gravity = -20f;
+    [SerializeField] private float turnSpeed = 12f;
+    [SerializeField] private Transform cameraTransform;
+
+    private CharacterController controller;
+    private float verticalVelocity;
+
+    private void Awake()
+    {
+        controller = GetComponent<CharacterController>();
+        if (cameraTransform == null && Camera.main != null)
+            cameraTransform = Camera.main.transform;
+    }
+
+    private void Update()
+    {
+        // --- input (new InputSystem) ---
+        Vector2 input = Vector2.zero;
+        var kb = Keyboard.current;
+        if (kb != null)
+        {
+            if (kb.wKey.isPressed) input.y += 1f;
+            if (kb.sKey.isPressed) input.y -= 1f;
+            if (kb.dKey.isPressed) input.x += 1f;
+            if (kb.aKey.isPressed) input.x -= 1f;
+        }
+
+        // --- camera-relative basis, flattened to the ground plane ---
+        Vector3 fwd = Vector3.forward, right = Vector3.right;
+        if (cameraTransform != null)
+        {
+            fwd = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+            right = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
+        }
+        Vector3 horizontal = fwd * input.y + right * input.x;
+        if (horizontal.sqrMagnitude > 1f) horizontal.Normalize();
+
+        // --- grounded check + jump, GROUPED, before the single Move ---
+        if (controller.isGrounded)
+        {
+            if (verticalVelocity < 0f) verticalVelocity = -2f; // stick to ground
+            if (kb != null && kb.spaceKey.wasPressedThisFrame)
+                verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+        }
+        verticalVelocity += gravity * Time.deltaTime;
+
+        // --- EXACTLY ONE controller.Move per frame (horizontal + vertical) ---
+        Vector3 velocity = horizontal * moveSpeed + Vector3.up * verticalVelocity;
+        controller.Move(velocity * Time.deltaTime);
+
+        // --- face the move direction (camera is fixed-offset, so this is safe) ---
+        if (horizontal.sqrMagnitude > 0.001f)
+        {
+            Quaternion target = Quaternion.LookRotation(horizontal, Vector3.up);
+            transform.rotation = Quaternion.Slerp(transform.rotation, target,
+                                                  turnSpeed * Time.deltaTime);
+        }
+    }
+}

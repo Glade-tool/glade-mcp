@@ -1055,6 +1055,52 @@ namespace GladeAgenticAI.Core.Tools
         }
 
         /// <summary>
+        /// Resolves a bundled tool template file (e.g. "ThirdPersonController.cs.txt") to a
+        /// readable path, working across BOTH bridge install layouts:
+        ///   - UPM / dev bridge:   Packages/com.gladekit.mcp-bridge/Editor/Tools/Templates/
+        ///   - Desktop DLL bridge: Packages/com.gladekit.agenticai/Editor/Tools/Templates/
+        ///                         (and the legacy in-Assets location)
+        /// Falls back to an AssetDatabase name search so a layout change does not silently
+        /// break template tools. Returns null if no candidate exists.
+        ///
+        /// Templates are stored as .cs.txt (not .cs) so they are NOT compiled into the bridge
+        /// assembly — only the copy written into the user's project compiles.
+        /// </summary>
+        public static string ResolveTemplatePath(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return null;
+
+            var candidates = new[]
+            {
+                "Packages/com.gladekit.mcp-bridge/Editor/Tools/Templates/" + fileName,
+                "Packages/com.gladekit.agenticai/Editor/Tools/Templates/" + fileName,
+                "Assets/Editor/GladeAgenticAI/Tools/Templates/" + fileName,
+            };
+            foreach (var c in candidates)
+            {
+                if (File.Exists(c)) return c;
+            }
+
+            // Last resort: search the AssetDatabase by leaf name. FindAssets does not index
+            // by extension, so match on the full leaf under any /Templates/ folder.
+            string leaf = Path.GetFileName(fileName);
+            string searchName = leaf;
+            int dot = searchName.IndexOf('.');
+            if (dot > 0) searchName = searchName.Substring(0, dot);
+            foreach (var guid in AssetDatabase.FindAssets(searchName))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!string.IsNullOrEmpty(path)
+                    && path.Replace('\\', '/').EndsWith("/Templates/" + leaf, StringComparison.OrdinalIgnoreCase)
+                    && File.Exists(path))
+                {
+                    return path;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Validates that all required keys exist in args with non-null, non-empty-string values.
         /// Returns null if all present; otherwise returns a ready-to-return CreateErrorResponse JSON.
         /// Usage:  var err = ToolUtils.ValidateRequiredArgs(args, "gameObjectPath", "componentType");

@@ -58,6 +58,7 @@ namespace GladeAgenticAI.Services
             Register(new CompileScriptsTool());
             Register(new GetUnityConsoleLogsTool());
             Register(new CreateScriptTool());
+            Register(new CreateThirdPersonControllerScriptTool());
             Register(new ModifyScriptTool());
 
             // Assets

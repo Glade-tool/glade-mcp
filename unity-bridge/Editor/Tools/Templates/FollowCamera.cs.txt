@@ -1,0 +1,48 @@
+using UnityEngine;
+
+public class FollowCamera : MonoBehaviour
+{
+    [SerializeField] private Transform target;
+    [SerializeField] private Vector3 offset = new Vector3(0f, 4f, -7f);
+    [SerializeField] private float followSpeed = 10f;
+    [SerializeField] private float lookHeight = 1.5f;
+
+    private void Awake()
+    {
+        if (target == null) ResolveTarget();
+    }
+
+    // Auto-resolve the follow target so the camera works even when the 'target'
+    // field was never wired in the inspector. Object-reference wiring is the most
+    // error-prone step for an AI client, so the script is self-sufficient: it
+    // looks for the conventional "Player" tag first, then a GameObject named
+    // "Player". Mirrors ThirdPersonController's Camera.main fallback. ("Player"
+    // is a Unity built-in tag, so FindWithTag never throws.)
+    private void ResolveTarget()
+    {
+        var tagged = GameObject.FindWithTag("Player");
+        if (tagged != null) { target = tagged.transform; return; }
+
+        var named = GameObject.Find("Player");
+        if (named != null) target = named.transform;
+    }
+
+    private void LateUpdate() // after the player has moved this frame
+    {
+        // Late-resolve once if Awake ran before the Player existed (e.g. the
+        // camera was set up before the player was spawned).
+        if (target == null)
+        {
+            ResolveTarget();
+            if (target == null) return;
+        }
+
+        // STABLE: desired position is a FIXED WORLD-SPACE offset from the
+        // target. It never reads this camera's own transform, so there is no
+        // feedback loop with the player's rotation or the camera's aim.
+        Vector3 desired = target.position + offset;
+        transform.position = Vector3.Lerp(transform.position, desired,
+                                          followSpeed * Time.deltaTime);
+        transform.LookAt(target.position + Vector3.up * lookHeight);
+    }
+}

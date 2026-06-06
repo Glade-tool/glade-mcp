@@ -36,6 +36,13 @@ namespace GladeAgenticAI.Services
 
         private static readonly object _lock = new object();
         private static readonly List<MutationRecord> _timeline = new List<MutationRecord>();
+        // Scripts written this session by tools OTHER than create_script (e.g.
+        // template tools like create_third_person_controller). Lets the
+        // create_script / modify_script overwrite guards treat template-written
+        // files as session-created so the agent can iterate on them without
+        // tripping the "pre-existing user code" refusal.
+        private static readonly HashSet<string> _scriptsCreatedThisSession =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly DateTime _sessionStart = DateTime.UtcNow;
         private static int _totalToolCalls;
         private static int _successCount;
@@ -217,12 +224,27 @@ namespace GladeAgenticAI.Services
         /// Returns false for the empty/null path. Returns false if the
         /// session timeline has been Reset() since the create_script call.
         /// </summary>
+        /// <summary>
+        /// Mark a script as created this session by a tool other than create_script
+        /// (e.g. a template tool that writes vetted .cs verbatim). Idempotent.
+        /// </summary>
+        public static void MarkScriptCreated(string scriptPath)
+        {
+            if (string.IsNullOrEmpty(scriptPath)) return;
+            string normalized = NormalizeScriptPath(scriptPath);
+            lock (_lock)
+            {
+                _scriptsCreatedThisSession.Add(normalized);
+            }
+        }
+
         public static bool WasScriptCreatedThisSession(string scriptPath)
         {
             if (string.IsNullOrEmpty(scriptPath)) return false;
             string normalized = NormalizeScriptPath(scriptPath);
             lock (_lock)
             {
+                if (_scriptsCreatedThisSession.Contains(normalized)) return true;
                 for (int i = _timeline.Count - 1; i >= 0; i--)
                 {
                     var record = _timeline[i];
@@ -255,6 +277,7 @@ namespace GladeAgenticAI.Services
             lock (_lock)
             {
                 _timeline.Clear();
+                _scriptsCreatedThisSession.Clear();
                 _totalToolCalls = 0;
                 _successCount = 0;
                 _errorCount = 0;

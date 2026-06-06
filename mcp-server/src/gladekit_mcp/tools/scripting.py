@@ -52,6 +52,27 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "create_third_person_controller",
+            "description": "Write a Play-tested third-person player controller into the project by copying two vetted scripts VERBATIM: ThirdPersonController.cs (CharacterController movement + grounded jump, camera-relative input) and FollowCamera.cs (stable fixed-offset follow). PREFER THIS over writing a third-person/WASD player controller from scratch with create_script — the hand-written version reliably ships two bugs the templates fix: a self-referential camera offset that makes the player walk in circles, and a fragile isGrounded that kills the jump. After this returns, call compile_scripts (wait for status='idle'), then add CharacterController + ThirdPersonController to the Player and FollowCamera to the Main Camera (wiring guidance is in the response). Use create_script for any OTHER kind of controller (2D, top-down, twin-stick) — no template exists for those yet.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) to write the two scripts into. Defaults to 'Scripts'. Filenames are fixed (ThirdPersonController.cs, FollowCamera.cs) because Unity requires the MonoBehaviour class name to match the file name.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set to true ONLY when the user explicitly asked to regenerate/replace an existing controller. Required if either target file already exists and was not created in this session. Defaults to false — otherwise pass a different 'directory' so you don't clobber existing user code.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "modify_script",
             "description": "Modify an existing text-based asset file (.cs, .shader, .compute, etc.). File MUST exist in the project — verify in Unity context first. Provide the complete file content including all existing code. SAFETY: the bridge refuses modify_script against scripts the agentic loop did NOT create in this session unless confirmExistingFileModification=true is set. Set the flag ONLY when the user explicitly named the file (e.g. 'update PlayerMovement.cs') or used language like 'extend' / 'modify the existing X'. Absent that signal, do NOT set the flag and do NOT call modify_script — call create_script with a new path for fresh-scaffold prompts.",
             "parameters": {
