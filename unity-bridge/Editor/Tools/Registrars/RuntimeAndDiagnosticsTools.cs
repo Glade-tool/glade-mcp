@@ -27,6 +27,12 @@ namespace GladeAgenticAI.Services
 
             // Diagnostics — eval/automation tooling
             Register(new ResetEvalStateTool());
+
+            // Playability probe — eval-only, two-phase arm+poll. Bridge-
+            // registered but NOT in the agent schema (it enters Play mode;
+            // the harness drives it directly via /api/tools/execute).
+            Register(new StartPlayabilityProbeTool());
+            Register(new GetPlayabilityProbeResultTool());
         }
     }
 }
