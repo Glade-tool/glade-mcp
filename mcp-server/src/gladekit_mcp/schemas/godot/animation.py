@@ -57,7 +57,10 @@ TOOLS: List[Dict] = [
             "name": "add_animation_to_player",
             "description": (
                 "Register an Animation .tres with an AnimationPlayer so the player can "
-                "play it by name. If the library doesn't exist on the player, it's "
+                "play it by name. Required step after creating a fresh AnimationPlayer "
+                "+ Animation .tres — the .tres exists as a file but the player has no "
+                "reference to it until this call, so player.play('jump') would fail at "
+                "runtime. If the library doesn't exist on the player, it's "
                 'created (default library is "" — the conventional setup, where '
                 "play('jump') resolves to /jump on the default library).\n\n"
                 "The Animation .tres must already exist — create it via "
@@ -111,7 +114,11 @@ TOOLS: List[Dict] = [
             "description": (
                 "Add a track to an Animation. A track binds a node + property to a "
                 "stream of keyframes (added separately via add_animation_keyframe). "
-                "Returns the new track_index, which subsequent keyframe calls reference.\n\n"
+                "Returns the new track_index, which subsequent keyframe calls reference. "
+                "An empty track is silent during playback — follow each add_animation_track "
+                "call with ≥2 add_animation_keyframe calls (one at t=0 for the start "
+                "value and at least one more for the end value) so the track has values "
+                "to interpolate between.\n\n"
                 "Track types and node_path / property conventions:\n"
                 "  value        — animate any property. node_path='Player', "
                 "property='position:y' → addresses Player:position:y. Use for "
@@ -237,10 +244,16 @@ TOOLS: List[Dict] = [
             "description": (
                 "Set top-level properties on an Animation .tres — length, loop_mode, "
                 "and step. All args are optional but at least one must be present "
-                "(empty calls are refused noisily to avoid the silent-no-op pattern).\n\n"
+                "(empty calls are refused noisily to avoid the silent-no-op pattern). "
+                "Call AFTER the keyframes are in place — a fresh Animation defaults to "
+                "length=1.0s regardless of where your keys are, so a 0.6s jump "
+                "animation whose last key is at 0.6s will pause 0.4s at the end "
+                "during playback unless you set length=0.6 explicitly. The default "
+                "loop_mode is also Animation-default, not user-specified — set it "
+                "explicitly when the user requests looping or no-looping.\n\n"
                 "  length     animation duration in seconds. Keys past `length` are "
                 "preserved on disk but clipped during playback.\n"
-                "  loop_mode  'none' (default; stops at end), 'linear' (loops "
+                "  loop_mode  'none' (stops at end), 'linear' (loops "
                 "start→end→start), or 'ping_pong' (forward then reverse). Also "
                 "accepts 0/1/2 ints.\n"
                 "  step       editor key-snap quantization (display only, does not "
