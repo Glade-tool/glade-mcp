@@ -56,7 +56,9 @@ public class ThirdPersonController : MonoBehaviour
         Vector3 velocity = horizontal * moveSpeed + Vector3.up * verticalVelocity;
         controller.Move(velocity * Time.deltaTime);
 
-        // --- face the move direction (camera is fixed-offset, so this is safe) ---
+        // --- face the move direction (safe: the orbit camera is driven by look
+        //     input + the player's POSITION, never its rotation, so this turn
+        //     can't feed back into the camera) ---
         if (horizontal.sqrMagnitude > 0.001f)
         {
             Quaternion target = Quaternion.LookRotation(horizontal, Vector3.up);

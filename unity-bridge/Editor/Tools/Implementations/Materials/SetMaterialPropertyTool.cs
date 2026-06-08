@@ -7,6 +7,10 @@ using GladeAgenticAI.Core.Tools;
 
 namespace GladeAgenticAI.Core.Tools.Implementations.Materials
 {
+    // The modern shader-property enum (UnityEngine.Rendering) replaces the
+    // long-obsolete ShaderUtil.ShaderPropertyType. Alias it for terse use.
+    using ShaderPropertyType = UnityEngine.Rendering.ShaderPropertyType;
+
     public class SetMaterialPropertyTool : ITool
     {
         public string Name => "set_material_property";
@@ -60,7 +64,7 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Materials
             {
                 Undo.RecordObject(mat, $"Set Material Property: {materialPath}.{canonicalName}");
 
-                ShaderUtil.ShaderPropertyType propType = GetShaderPropertyType(mat, canonicalName);
+                ShaderPropertyType propType = GetShaderPropertyType(mat, canonicalName);
                 bool applied = ApplyByShaderType(mat, canonicalName, valueStr, propType, out string parseError);
                 if (!applied)
                 {
@@ -111,17 +115,17 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Materials
             return null;
         }
 
-        private static ShaderUtil.ShaderPropertyType GetShaderPropertyType(Material mat, string canonicalName)
+        private static ShaderPropertyType GetShaderPropertyType(Material mat, string canonicalName)
         {
             var shader = mat.shader;
-            int count = ShaderUtil.GetPropertyCount(shader);
+            int count = shader.GetPropertyCount();
             for (int i = 0; i < count; i++)
             {
-                if (ShaderUtil.GetPropertyName(shader, i) == canonicalName)
-                    return ShaderUtil.GetPropertyType(shader, i);
+                if (shader.GetPropertyName(i) == canonicalName)
+                    return shader.GetPropertyType(i);
             }
             // Fallback — shouldn't happen because ResolveShaderPropertyName already matched
-            return ShaderUtil.ShaderPropertyType.Float;
+            return ShaderPropertyType.Float;
         }
 
         /// <summary>
@@ -130,16 +134,16 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Materials
         /// </summary>
         private static bool ApplyByShaderType(
             Material mat, string name, string valueStr,
-            ShaderUtil.ShaderPropertyType propType, out string parseError)
+            ShaderPropertyType propType, out string parseError)
         {
             parseError = null;
             switch (propType)
             {
-                case ShaderUtil.ShaderPropertyType.Color:
+                case ShaderPropertyType.Color:
                     try { mat.SetColor(name, ToolUtils.ParseColor(valueStr)); return true; }
                     catch (Exception e) { parseError = e.Message; return false; }
 
-                case ShaderUtil.ShaderPropertyType.Vector:
+                case ShaderPropertyType.Vector:
                     try
                     {
                         // Accept "x,y,z,w", "x,y,z", or "x,y" — pad with zeros.
@@ -153,8 +157,8 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Materials
                     }
                     catch (Exception e) { parseError = e.Message; return false; }
 
-                case ShaderUtil.ShaderPropertyType.Float:
-                case ShaderUtil.ShaderPropertyType.Range:
+                case ShaderPropertyType.Float:
+                case ShaderPropertyType.Range:
                     if (float.TryParse(valueStr,
                             System.Globalization.NumberStyles.Float,
                             System.Globalization.CultureInfo.InvariantCulture,
@@ -166,7 +170,7 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Materials
                     parseError = $"could not parse '{valueStr}' as float";
                     return false;
 
-                case ShaderUtil.ShaderPropertyType.TexEnv:
+                case ShaderPropertyType.Texture:
                 {
                     // Accept clear-texture via empty string or "null".
                     var trimmed = valueStr?.Trim().Trim('"') ?? "";
@@ -208,14 +212,14 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Materials
         {
             var shader = mat.shader;
             if (shader == null) return "Shader is null.";
-            int count = ShaderUtil.GetPropertyCount(shader);
+            int count = shader.GetPropertyCount();
             if (count == 0) return "Shader exposes no properties.";
 
             var entries = new List<string>();
             for (int i = 0; i < count; i++)
             {
-                string name = ShaderUtil.GetPropertyName(shader, i);
-                var type = ShaderUtil.GetPropertyType(shader, i);
+                string name = shader.GetPropertyName(i);
+                var type = shader.GetPropertyType(i);
                 entries.Add($"{name} ({type})");
             }
             // Cap to avoid drowning the error message on shaders with dozens of props.

@@ -1,48 +1,117 @@
 using UnityEngine;
+using UnityEngine.InputSystem; // project inputSystem is BOTH/NEW
 
+// Modern third-person ORBIT camera — the AAA standard (GTA, Witcher, Elden Ring).
+// The camera orbits the player based purely on LOOK input (mouse delta or the
+// gamepad right stick) and is INDEPENDENT of the movement keys. Movement stays
+// camera-relative and is handled by ThirdPersonController, which turns the player
+// to face its heading; this script only ever moves the camera, never the player.
+//
+// No feedback loop: the orbit angle comes from look input and the pivot from the
+// player's POSITION — neither reads the player's ROTATION — so the controller
+// turning the player to face its movement direction can never feed back here.
+[DisallowMultipleComponent]
 public class FollowCamera : MonoBehaviour
 {
-    [SerializeField] private Transform target;
-    [SerializeField] private Vector3 offset = new Vector3(0f, 4f, -7f);
-    [SerializeField] private float followSpeed = 10f;
-    [SerializeField] private float lookHeight = 1.5f;
+    [Header("Target")]
+    [SerializeField] private Transform target;          // auto-resolves "Player"
+    [SerializeField] private float pivotHeight = 1.5f;  // aim at chest/head height
+
+    [Header("Orbit")]
+    [SerializeField] private float distance = 6f;
+    [SerializeField] private float mouseSensitivity = 0.12f; // degrees per pixel of delta
+    [SerializeField] private float stickSensitivity = 180f;  // degrees per second
+    [SerializeField] private float minPitch = -30f;
+    [SerializeField] private float maxPitch = 70f;
+
+    [Header("Feel")]
+    [SerializeField] private float positionSmoothTime = 0.05f;
+
+    private float yaw;
+    private float pitch = 15f;
+    private Vector3 posVelocity;   // SmoothDamp state
+    private bool initialized;
 
     private void Awake()
     {
         if (target == null) ResolveTarget();
+        yaw = transform.eulerAngles.y; // start from however the camera was placed
+        SetCursorLocked(true);
     }
 
     // Auto-resolve the follow target so the camera works even when the 'target'
-    // field was never wired in the inspector. Object-reference wiring is the most
-    // error-prone step for an AI client, so the script is self-sufficient: it
-    // looks for the conventional "Player" tag first, then a GameObject named
-    // "Player". Mirrors ThirdPersonController's Camera.main fallback. ("Player"
-    // is a Unity built-in tag, so FindWithTag never throws.)
+    // field was never wired in the inspector. Looks for the conventional "Player"
+    // tag first, then a GameObject named "Player". ("Player" is a Unity built-in
+    // tag, so FindWithTag never throws.)
     private void ResolveTarget()
     {
         var tagged = GameObject.FindWithTag("Player");
         if (tagged != null) { target = tagged.transform; return; }
-
         var named = GameObject.Find("Player");
         if (named != null) target = named.transform;
     }
 
+    private void Update()
+    {
+        // Esc toggles the cursor so the player isn't trapped in the game window.
+        var kb = Keyboard.current;
+        if (kb != null && kb.escapeKey.wasPressedThisFrame)
+            SetCursorLocked(Cursor.lockState != CursorLockMode.Locked);
+    }
+
     private void LateUpdate() // after the player has moved this frame
     {
-        // Late-resolve once if Awake ran before the Player existed (e.g. the
-        // camera was set up before the player was spawned).
-        if (target == null)
+        if (target == null) { ResolveTarget(); if (target == null) return; }
+
+        ReadLookInput();
+
+        Quaternion orbit = Quaternion.Euler(pitch, yaw, 0f);
+        Vector3 pivot = target.position + Vector3.up * pivotHeight;
+        Vector3 desired = pivot + orbit * new Vector3(0f, 0f, -distance);
+
+        if (!initialized)
         {
-            ResolveTarget();
-            if (target == null) return;
+            // Snap into place on the first frame so we never open with a swing.
+            transform.position = desired;
+            initialized = true;
+        }
+        else
+        {
+            transform.position = Vector3.SmoothDamp(
+                transform.position, desired, ref posVelocity, positionSmoothTime);
         }
 
-        // STABLE: desired position is a FIXED WORLD-SPACE offset from the
-        // target. It never reads this camera's own transform, so there is no
-        // feedback loop with the player's rotation or the camera's aim.
-        Vector3 desired = target.position + offset;
-        transform.position = Vector3.Lerp(transform.position, desired,
-                                          followSpeed * Time.deltaTime);
-        transform.LookAt(target.position + Vector3.up * lookHeight);
+        transform.LookAt(pivot);
+    }
+
+    private void ReadLookInput()
+    {
+        float dYaw = 0f, dPitch = 0f;
+
+        // Mouse only steers while the cursor is captured (standard TPS feel).
+        var mouse = Mouse.current;
+        if (mouse != null && Cursor.lockState == CursorLockMode.Locked)
+        {
+            Vector2 d = mouse.delta.ReadValue();
+            dYaw += d.x * mouseSensitivity;
+            dPitch += d.y * mouseSensitivity;
+        }
+
+        var pad = Gamepad.current;
+        if (pad != null)
+        {
+            Vector2 rs = pad.rightStick.ReadValue();
+            dYaw += rs.x * stickSensitivity * Time.deltaTime;
+            dPitch += rs.y * stickSensitivity * Time.deltaTime;
+        }
+
+        yaw += dYaw;
+        pitch = Mathf.Clamp(pitch - dPitch, minPitch, maxPitch); // up-look raises the camera
+    }
+
+    private static void SetCursorLocked(bool locked)
+    {
+        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+        Cursor.visible = !locked;
     }
 }

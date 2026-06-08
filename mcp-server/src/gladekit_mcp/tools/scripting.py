@@ -53,7 +53,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_third_person_controller",
-            "description": "ALWAYS use this — not create_script — for ANY request that wants a player that (a) moves with WASD/arrow keys AND (b) jumps AND (c) is followed by a camera, INCLUDING when the player is one of several systems being scaffolded in the same turn (e.g. 'build a player + an enemy + collectibles'). Hand-written third-person controllers reliably ship two runtime bugs the playability probe catches automatically: a self-referential camera offset that makes the player walk in circles, and a fragile collision-callback isGrounded that kills the jump. This tool copies two vetted, Play-tested scripts VERBATIM: ThirdPersonController.cs (CharacterController movement + grounded jump, camera-relative input) and FollowCamera.cs (stable fixed-offset follow). Workflow after this returns: call compile_scripts (wait for status='idle'), then add CharacterController + ThirdPersonController to the Player and FollowCamera to the Main Camera (full wiring steps are in the response). Use create_script ONLY for non-third-person controllers (2D platformer, top-down, twin-stick) — no template exists for those yet.",
+            "description": "ALWAYS use this — not create_script — for ANY request that wants a player that (a) moves with WASD/arrow keys AND (b) jumps AND (c) is followed by a camera, INCLUDING when the player is one of several systems being scaffolded in the same turn (e.g. 'build a player + an enemy + collectibles'). Hand-written third-person controllers reliably ship two runtime bugs the playability probe catches automatically: a self-referential camera offset that makes the player walk in circles, and a fragile collision-callback isGrounded that kills the jump. This tool is ATOMIC and does the whole setup for you: it copies two vetted, Play-tested scripts VERBATIM (ThirdPersonController.cs — CharacterController movement + grounded jump, camera-relative input; FollowCamera.cs — modern mouse/right-stick orbit camera), ensures a Player capsule and a Main Camera exist, adds CharacterController to the Player, and attaches ThirdPersonController + FollowCamera automatically as soon as the scripts compile. After it returns, your ONLY remaining step is to call compile_scripts and wait for status='idle' — do NOT call add_component for the controller, the follow camera, or the character controller (the tool already handled all three), and no object-reference wiring is needed (the scripts self-resolve: ThirdPersonController → Camera.main, FollowCamera → the 'Player' tag). Use create_script ONLY for non-third-person controllers (2D platformer, top-down, twin-stick) — no template exists for those yet.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -64,6 +64,14 @@ TOOLS: List[Dict] = [
                     "confirmExistingFileModification": {
                         "type": "boolean",
                         "description": "Set to true ONLY when the user explicitly asked to regenerate/replace an existing controller. Required if either target file already exists and was not created in this session. Defaults to false — otherwise pass a different 'directory' so you don't clobber existing user code.",
+                    },
+                    "playerName": {
+                        "type": "string",
+                        "description": "Name of the player GameObject to attach the controller to. Defaults to 'Player'. If a GameObject with this name (or the 'Player' tag) already exists it is reused; otherwise a Capsule with this name is created at (0,1,0) and tagged 'Player'.",
+                    },
+                    "createGround": {
+                        "type": "boolean",
+                        "description": "Whether to create a ground plane when the scene has no floor-like object. Defaults to true so a standalone call yields a player that can stand. Set false if you are building the level yourself or have already created ground.",
                     },
                 },
                 "required": [],
