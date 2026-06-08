@@ -126,8 +126,17 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Scripts
             };
 
             return ToolUtils.CreateSuccessResponse(
-                $"Wrote a Play-tested third-person controller ({createdScripts.Count} scripts) to '{directory}'. " +
-                "IMPORTANT: Unity is compiling. Call compile_scripts and wait for idle BEFORE add_component with these types.",
+                $"Wrote {createdScripts.Count} script(s) to '{directory}'. THE TASK IS NOT DONE — " +
+                "this tool only wrote files. You MUST still execute the four-step wiring sequence " +
+                "below for the player to actually move and jump. " +
+                "STEP 1 (REQUIRED NEXT): call compile_scripts and wait until status='idle'. " +
+                "STEP 2 (REQUIRED): add_component CharacterController to the Player capsule. " +
+                "STEP 3 (REQUIRED): add_component ThirdPersonController to the Player capsule (the script just written). " +
+                "STEP 4 (REQUIRED): add_component FollowCamera to the Main Camera (the other script just written) — " +
+                "without this, the camera will not follow and the player will appear stationary on screen even though it moves. " +
+                "No object-reference wiring needed afterwards — ThirdPersonController auto-resolves Camera.main and " +
+                "FollowCamera auto-resolves the Player by name/tag. Do NOT stop after compile_scripts; " +
+                "stopping there leaves the Player as a bare capsule with no controller component.",
                 extras);
         }
     }
