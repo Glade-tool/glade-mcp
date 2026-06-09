@@ -18,6 +18,9 @@ build/
 .coverage
 htmlcov/
 
+# Eval run artifacts
+eval/results/
+
 # Editor
 .vscode/
 .idea/

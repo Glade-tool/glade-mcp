@@ -113,8 +113,7 @@ TOOLS: List[Dict] = [
                     "end_line": {
                         "type": "integer",
                         "description": (
-                            "1-indexed inclusive end line. Default 0 = until EOF or "
-                            "max_lines, whichever is smaller."
+                            "1-indexed inclusive end line. Default 0 = until EOF or max_lines, whichever is smaller."
                         ),
                     },
                     "max_lines": {

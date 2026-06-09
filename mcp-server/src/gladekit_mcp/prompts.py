@@ -4,10 +4,6 @@ System prompt for Unity development — open-source MCP server edition.
 This is the basic starter prompt used by the GladeKit MCP server.
 It covers core Unity rules, render pipeline guidance, input system guidance,
 tool discipline, GLADE.md injection, and skill level blocks.
-
-The GladeKit App ships a more advanced system prompt with additional features
-(input mode lock, Cinemachine version detection, expanded C# pitfall library,
-project-aware context, etc.) on top of this baseline.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """
 Task-aware tool filtering — select relevant tool categories based on the user's message.
 
-Rather than exposing all 213 tools on every request, this module analyzes the
+Rather than exposing all 235+ tools on every request, this module analyzes the
 user's message using keyword matching and returns only the relevant tool groups
 plus always-included core categories.
 
@@ -17,7 +17,7 @@ Design:
     "make the cube red"             → materials + always (core/scene/scripting)
     "set up a blend tree"           → animation + always
     "add a rigidbody to the player" → physics + always
-    "?? (unrecognized message)"     → ALL 213 tools (fail-open)
+    "?? (unrecognized message)"     → ALL 235+ tools (fail-open)
 """
 
 import re

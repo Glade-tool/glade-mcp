@@ -1,10 +1,9 @@
 """Batch discipline telemetry.
 
 Tracks how often the AI client uses ``batch_execute`` versus issuing
-read-only tool calls one at a time. Phase 2.1 + ``batch_execute`` are
-shipped latency wins, but only if the model actually uses them — every
-sequential-when-batchable burst is wasted latency the infrastructure
-already paid to save.
+read-only tool calls one at a time. ``batch_execute`` is a latency win,
+but only if the model actually uses it — every sequential-when-batchable
+burst is wasted round-trips that batching would have collapsed.
 
 Heuristic for "should have batched":
     A read-only tool call lands within ``gap_window_s`` (default 4s) of
@@ -16,7 +15,7 @@ Heuristic for "should have batched":
 
 Counters are per MCP session and reset on session end. Each transition
 is also emitted as a structured ``BATCH_DISCIPLINE`` log line so offline
-analysis (CloudWatch / grep) can aggregate without a metrics pipeline.
+log analysis (grep / jq) can aggregate without a metrics pipeline.
 """
 
 from __future__ import annotations
@@ -347,9 +346,9 @@ def render_summary_text(session_id: str) -> str:
 def _emit(session_id: str, *, kind: str, **fields: Any) -> None:
     """Emit a structured BATCH_DISCIPLINE log line.
 
-    Logged at INFO so it surfaces alongside ``TURN_TIMING``-style structured
-    events without enabling debug logging. Failure to serialize is silently
-    swallowed — telemetry must never break the request path.
+    Logged at INFO so it surfaces without enabling debug logging. Failure to
+    serialize is silently swallowed — telemetry must never break the request
+    path.
     """
     payload = {"session_id": session_id, "kind": kind, **fields}
     try:

@@ -2,7 +2,7 @@
 Unity tool schemas organized by category.
 
 Categories allow task-aware tool filtering: only expose tools relevant
-to the current request rather than all 222 tools simultaneously.
+to the current request rather than all 235+ tools simultaneously.
 
     Task flow:
     User message

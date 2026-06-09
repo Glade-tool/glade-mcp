@@ -42,20 +42,23 @@ func execute(args: Dictionary) -> Dictionary:
 		# Snapshot before overwrite so a prior version can be recovered.
 		BackupManager.backup_file(target_path)
 
-	var packed := PackedScene.new()
-	var pack_err := packed.pack(root)
-	if pack_err != OK:
-		return ToolUtils.error("PackedScene.pack failed (err %d)" % pack_err)
-	var save_err := ResourceSaver.save(packed, target_path)
-	if save_err != OK:
-		return ToolUtils.error("ResourceSaver.save failed for '%s' (err %d)" % [target_path, save_err])
-
-	# Update the scene's path so subsequent saves don't re-prompt.
-	root.scene_file_path = target_path
-
-	var fs := EditorInterface.get_resource_filesystem()
-	if fs != null:
-		fs.update_file(target_path)
+	# Save THROUGH the editor rather than writing the file directly. A bare
+	# ResourceSaver.save() updates the .tscn on disk behind the editor's back,
+	# so the next time the editor regains focus it sees the open scene as
+	# "newer on disk" and prompts the user to reload from disk. Routing the
+	# write through the editor's own save pipeline marks the open scene as
+	# saved and in sync with disk, so no reload prompt appears.
+	if was_unsaved:
+		# First save: save_scene_as assigns the path and updates editor state.
+		# It returns void, so confirm the file landed on disk afterwards.
+		EditorInterface.save_scene_as(target_path, false)
+		if not FileAccess.file_exists(target_path):
+			return ToolUtils.error("Editor failed to save scene to '%s'" % target_path)
+	else:
+		# In-place save of the currently edited scene at its existing path.
+		var save_err := EditorInterface.save_scene()
+		if save_err != OK:
+			return ToolUtils.error("Editor save_scene failed for '%s' (err %d)" % [target_path, save_err])
 
 	return ToolUtils.success("Saved scene to '%s'" % target_path, {
 		"path": target_path,

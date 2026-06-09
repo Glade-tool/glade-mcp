@@ -4,10 +4,10 @@ Dynamic MCP tool registration from OpenAI-format tool schemas.
 Engine-aware. Probes the local bridge at first list_tools to decide
 which schema set to expose:
 
-  Unity   — 222+ tools, filtered to a curated CORE set (~80) for Claude
+  Unity   — 235+ tools, filtered to a curated CORE set (~80) for Claude
             Code's ~128-tool budget. All non-core tools remain
             dispatchable via the bridge.
-  Godot   — 33 tools (full catalog, no filtering — well under the budget).
+  Godot   — 60 tools (full catalog, no filtering — well under the budget).
 
 OpenAI format:
     {"type": "function", "function": {"name": "...", "description": "...", "parameters": {...}}}

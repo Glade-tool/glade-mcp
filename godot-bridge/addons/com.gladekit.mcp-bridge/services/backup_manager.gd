@@ -193,6 +193,17 @@ static func delete_file(target_res_path: String) -> Dictionary:
 	var err := DirAccess.remove_absolute(abs_target)
 	if err != OK:
 		return {"success": false, "error": "could not delete '%s' (DirAccess err %d)" % [target_res_path, err]}
+
+	# Remove the companion sidecars Godot generates next to a resource — the
+	# `.uid` pin and any `.import` metadata. Leaving them behind orphans dead
+	# entries in the FileSystem dock and, for a `.gd`, a stale UID that a scene
+	# may still resolve to a now-missing script (a "missing dependency" load
+	# error). Best-effort: a sidecar that won't delete does not fail the primary
+	# delete.
+	for sidecar: String in [target_res_path + ".uid", target_res_path + ".import"]:
+		if FileAccess.file_exists(sidecar):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(sidecar))
+
 	return {"success": true, "deleted": true}
 
 

@@ -8,7 +8,7 @@ With the key, these functions call GladeKit's cloud API for:
   - Convention extraction: coding patterns distilled from accumulated memories
 
 Free tier (no key needed):
-  - All 222+ Unity tools via local Unity bridge
+  - All 235+ Unity tools via local Unity bridge
   - Script semantic search (bring your own OPENAI_API_KEY)
   - GLADE.md injection (reads from Unity project root)
   - In-session memory (current conversation only)
@@ -75,7 +75,7 @@ def _handle_cloud_error(exc: Exception) -> None:
     if "401" in err_str or "403" in err_str or "unauthorized" in err_str or "forbidden" in err_str:
         logger.warning(
             "GLADEKIT_API_KEY is set but the server returned an auth error — "
-            "cloud features disabled for this session. Check your API key at gladekit.dev."
+            "cloud features disabled for this session. Check your API key at gladekit.com."
         )
         _invalid_key_warned = True
         _cloud_available = False

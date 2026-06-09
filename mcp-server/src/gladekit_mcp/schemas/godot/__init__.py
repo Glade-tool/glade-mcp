@@ -11,7 +11,7 @@ Categories follow the Godot bridge's own directory layout under
 `addons/com.gladekit.mcp-bridge/tools/implementations/`:
 
     scene     — Node creation, hierarchy queries, transforms,
-                resource assignment                              (11 tools)
+                resource assignment                              (12 tools)
     script    — GDScript file CRUD + node attachment           ( 5 tools)
     camera    — Camera3D + Light3D + WorldEnvironment           ( 6 tools)
     resource  — Material creation, generic Resource creation,
@@ -26,10 +26,10 @@ Categories follow the Godot bridge's own directory layout under
     ui        — Control-tree creation + anchor / text helpers   ( 6 tools)
     animation — AnimationPlayer + Animation .tres scaffolding   ( 5 tools)
                                                                 ───────
-                                                                59 tools
+                                                                60 tools
 
-Unlike the Unity side (~222 tools across 17 categories) we expose the
-full Godot catalog directly — 59 tools is well within Claude Code's
+Unlike the Unity side (~235 tools across 17 categories) we expose the
+full Godot catalog directly — 60 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 """
 
@@ -115,7 +115,7 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
 
 
 def get_godot_tool_schemas() -> List[Dict]:
-    """Return all 53 Godot tool schemas as a flat list (OpenAI function format)."""
+    """Return all 60 Godot tool schemas as a flat list (OpenAI function format)."""
     all_tools: List[Dict] = []
     for _, tools in ALL_CATEGORIES:
         all_tools.extend(tools)

@@ -558,6 +558,14 @@ func _main_dispatch_turn_revert(request_id: String, request: Dictionary) -> Dict
 	var files_restored: int = 0
 	var files_deleted: int = 0
 	var errors: Array = []
+	# Open scenes whose .tscn we rewind on disk — reloaded through the editor
+	# after the node pass so the user isn't prompted to reload from disk.
+	var restored_scene_paths: Array[String] = []
+	# Every scene whose file this turn touched (saved/created). Used after the
+	# node pass to re-persist the edited scene when its file change couldn't be
+	# restored — otherwise a script/resource the revert deleted stays referenced
+	# on disk and the scene fails to load next open.
+	var turn_scene_paths: Array[String] = []
 	for entry in raw_file_changes:
 		if not (entry is Dictionary):
 			errors.append({"error": "fileChanges entry was not a Dictionary"})
@@ -573,6 +581,8 @@ func _main_dispatch_turn_revert(request_id: String, request: Dictionary) -> Dict
 			if file_path.begins_with("/"):
 				file_path = file_path.substr(1)
 			file_path = "res://" + file_path
+		if file_path.get_extension() in ["tscn", "scn"] and not turn_scene_paths.has(file_path):
+			turn_scene_paths.append(file_path)
 		match change_type:
 			"created":
 				# Undo a creation: delete the file. No backup to consult.
@@ -589,6 +599,8 @@ func _main_dispatch_turn_revert(request_id: String, request: Dictionary) -> Dict
 				var res := BackupManager.restore_file(backup_path, file_path)
 				if res.get("success", false):
 					files_restored += 1
+					if file_path.get_extension() in ["tscn", "scn"] and not restored_scene_paths.has(file_path):
+						restored_scene_paths.append(file_path)
 				else:
 					errors.append({"filePath": file_path, "changeType": change_type, "error": res.get("error", "restore failed")})
 			_:
@@ -690,6 +702,40 @@ func _main_dispatch_turn_revert(request_id: String, request: Dictionary) -> Dict
 	# Best-effort: a failed scan doesn't fail the revert. (We already scanned
 	# above after file changes; second scan is cheap and keeps node restores
 	# visible too in case the scene happened to load any new resources.)
+
+	# Reload any open scene whose .tscn was rewound on disk above. restore_file
+	# writes the file directly, leaving the editor's open copy out of sync — on
+	# the next editor refocus Godot would prompt "scene is newer on disk, reload?".
+	# Reloading through the editor reconciles the open scene with the reverted
+	# file (no prompt) and surfaces the rewound state. Done AFTER the node pass so
+	# the reload can't race the in-memory node restores; the reverted .tscn is the
+	# source of truth, so any redundant in-memory restores are simply superseded.
+	if not restored_scene_paths.is_empty():
+		var open_scenes := EditorInterface.get_open_scenes()
+		for scene_path in restored_scene_paths:
+			if scene_path in open_scenes:
+				EditorInterface.reload_scene_from_path(scene_path)
+
+	# Re-persist the edited scene when its tree was rewound by the node pass but
+	# its FILE could not be restored (e.g. save_scene's pre-save snapshot wasn't
+	# captured this turn). Without this the on-disk .tscn keeps referencing a
+	# script/resource the revert just deleted, and the scene fails to load next
+	# open ("missing dependencies"). The reverted in-memory tree is the source of
+	# truth, so we save it back through the editor (which also avoids the reload
+	# prompt). Scoped tightly: only the edited scene, only when this turn saved
+	# that scene's file, and only when its file wasn't already restored above
+	# (a file-level revert + reload reconciles those; re-saving would fight it).
+	if (gameobjects_restored + gameobjects_deleted) > 0:
+		var edited_root := EditorInterface.get_edited_scene_root()
+		if edited_root != null:
+			var edited_path: String = edited_root.scene_file_path
+			var needs_resave := (
+				not edited_path.is_empty()
+				and turn_scene_paths.has(edited_path)
+				and not restored_scene_paths.has(edited_path)
+			)
+			if needs_resave:
+				EditorInterface.save_scene()
 
 	var total_changes: int = files_restored + files_deleted + gameobjects_restored + gameobjects_deleted
 	var message: String

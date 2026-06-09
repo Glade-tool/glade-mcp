@@ -1,8 +1,8 @@
 {
   "name": "com.gladekit.mcp-bridge",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "displayName": "GladeKit MCP Bridge",
-  "description": "Unity Editor bridge for GladeKit MCP — connects Cursor, Claude Code, Windsurf, and other AI clients to your Unity project. Exposes 222+ tools via a local HTTP server on localhost:8765.",
+  "description": "Unity Editor bridge for GladeKit MCP — connects Cursor, Claude Code, Windsurf, and other AI clients to your Unity project. Exposes 235+ tools via a local HTTP server on localhost:8765.",
   "unity": "2021.3",
   "unityRelease": "0f1",
   "documentationUrl": "https://github.com/Glade-tool/glade-mcp",

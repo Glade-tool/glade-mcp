@@ -33,7 +33,7 @@ The Unity bridge starts automatically on `localhost:8765`.
 The Godot bridge starts automatically on `localhost:8766`. You should see a confirmation line in the editor Output panel:
 
 ```
-[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.5.7, 53 tools registered, thread-polled at 200Hz)
+[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.6.4, 60 tools registered, thread-polled at 200Hz)
 ```
 
 **Supported:** Godot 4.3+ GDScript projects, Forward+ and Compatibility renderers, 2D and 3D. **Not yet supported:** Godot Mono / C# projects, web export targets, headless server builds. The bridge is editor-only; it never runs in exported games.

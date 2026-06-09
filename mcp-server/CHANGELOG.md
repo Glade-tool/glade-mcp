@@ -4,6 +4,8 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-06-08
+
 ### Added
 
 - **Godot bridge addon v0.6.4 — context-engineering polish on two heavily-used reads (`get_script_content` pagination + `get_scene_tree` `response_format`).** Two tools with the highest per-call token footprint now expose knobs that let the agent pull only what it actually needs.
@@ -34,11 +36,13 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
   - `get_runtime_events` now mentions ring-buffer overflow in the `message` field when `dropped_due_to_overflow > 0`, so a noisy session can't silently truncate the visible event tail.
   - **New tests**: `test_ui_tools.gd` (14 tests across all 6 UI/Control tools — previously the entire category had zero coverage), `test_uid_tools.gd` (Godot 4.4+ ResourceUID, version-gated to skip cleanly on 4.3), and `test_ws_e2e.gd` (boots a real WS server + sends real JSON frames through `WebSocketPeer` — the first true end-to-end transport-pipeline test).
   - **Code quality**: extracted `parse_color_arg` and `levenshtein` into `ToolUtils`, removing five duplicate `_color_from` implementations and two duplicate `_levenshtein` implementations across `resource/`, `camera/`, and `signal/` tools.
+## [0.7.5] - 2026-06-03
+
+### Added
+
 - **`create_script` overwrite guard.** Sibling hole to the shipped `modify_script` gate — previously a model could clobber any real project script by calling `create_script` with a colliding path. The bridge now refuses `create_script` when the target path already exists on disk and was not created in the current session via `create_script`, unless the caller passes `confirmExistingFileModification=true` (same flag name as `modify_script` so the agent learns one pattern). Schema description updated lockstep on the MCP server so clients see the new arg + the new behavior contract.
 - **Godot bridge addon v0.4.6** with the new `context/gather` endpoint: one round-trip returns project metadata + scene tree (including the model-friendly flat `tree_text`) + recent-error history. Replaces the 2–3 separate `tools/execute` calls a fresh session would otherwise need to orient the agent. MCP clients can call it directly if they want the same aggregation.
 - **Godot bridge addon v0.4.5** with `create_resource` — generic factory for any concrete Resource subclass (BoxMesh, Shape3D variants, Curve, Environment, AudioStream, Gradient, …). Composition partner to the v0.4.4 `set_node_resource`: create the `.tres` here, then assign it there. Refuses Material/Script types with a redirect to the dedicated creators so the three resource creators stay cleanly partitioned.
-
-### Notes
 
 ## [0.7.4] - 2026-06-01
 

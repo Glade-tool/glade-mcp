@@ -4,9 +4,7 @@ Regression and capability test suite for the MCP server and Unity bridge
 integration. Tests the complete dispatch path: MCP tool call → bridge HTTP →
 Unity response, using a mock Unity bridge (no real Unity instance needed).
 
-Scope: this harness covers the MCP server's tool dispatch surface. The
-GladeKit App ships its own separate harness for end-to-end agentic-loop
-testing.
+Scope: this harness covers the MCP server's tool dispatch surface.
 
 ---
 
@@ -78,7 +76,7 @@ pytest tests/test_skill.py -v          # skill level persistence
 - Empty/unrecognized messages return empty set (fail-open)
 - Multi-domain messages match multiple categories
 - Always-included categories (core, scene, scripting) are in filtered results
-- Unrecognized messages get all 222+ tools
+- Unrecognized messages get all 235+ tools
 
 **test_meta_tools.py** — MCP server features
 - Session memory: store, recall, multiple facts, empty fact rejection

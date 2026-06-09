@@ -131,7 +131,7 @@ def test_every_schema_corresponds_to_a_bridge_tool():
 
 
 def test_tool_count_matches_canonical_catalog():
-    """Phase 3 shipped 33 tools; Phase 5 added 3 signal tools → 36;
+    """The catalog started at 33 tools; signal tools added 3 → 36;
     get_project_info added → 37; set_node_resource added → 38; create_resource
     added → 39; list_assets added → 40; v0.5.0 added 6 UI/Control tools → 46;
     v0.5.2 added 3 structured runtime-event observation tools

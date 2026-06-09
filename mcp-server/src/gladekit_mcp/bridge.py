@@ -8,7 +8,7 @@ Bridge clients for the GladeKit editor bridges. Dual-protocol:
              ws://...:8766/ with endpoint envelope {id, endpoint, toolName, arguments}
 
 Unity is the legacy path and stays byte-identical for backward compatibility.
-Godot was added in v0.3.0 of the Godot bridge (Phase 4 of multi-engine work).
+Godot was added in v0.3.0 of the Godot bridge.
 Engine selection happens at the registry layer via a one-shot health probe;
 the bridge module itself exposes parallel `_unity` / `_godot` namespaces and
 a thin dispatcher routes based on the detected bridge kind.

@@ -322,7 +322,7 @@ def test_run_version_update_available_uvx(capsys):
     mock_resp.json.return_value = {"info": {"version": "99.99.99"}}
     mock_resp.raise_for_status = MagicMock()
 
-    uvx_exe = "/Users/danielfang/.local/share/uv/tools/gladekit-mcp/bin/python"
+    uvx_exe = "/Users/x/.local/share/uv/tools/gladekit-mcp/bin/python"
     with (
         patch("gladekit_mcp.cli.httpx.get", return_value=mock_resp),
         patch("gladekit_mcp.cli.sys.executable", uvx_exe),

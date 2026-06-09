@@ -107,7 +107,7 @@ def run_doctor(bridge_url: str = DEFAULT_BRIDGE_URL, output_json: bool = False) 
     checks["gladekit_key"] = _check_env(
         "GLADEKIT_API_KEY",
         "gladekit key",
-        "Get your API key at https://gladekit.dev/pricing (free tier available)",
+        "Get your API key at https://gladekit.com/pricing (free tier available)",
     )
     checks["glade_md"] = _check_glade_md()
 
