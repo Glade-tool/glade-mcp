@@ -4,11 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gladekit-mcp"
-version = "0.7.6"
+version = "0.7.7"
 description = "MCP server for Unity game development — connect Cursor, Claude Code, Windsurf, and other AI clients to your Unity Editor."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+# 3.11+ is required: bridge.py uses asyncio.timeout() (added in 3.11) on the
+# Godot WebSocket path. The CI matrix only exercises 3.11/3.12, so a >=3.10
+# claim would ship a version that breaks every Godot call on 3.10 with a
+# misleading "bridge unreachable" error.
+requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.0",
     "httpx>=0.25.0",

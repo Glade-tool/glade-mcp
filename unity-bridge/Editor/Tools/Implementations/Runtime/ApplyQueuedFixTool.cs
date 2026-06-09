@@ -23,13 +23,13 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
     ///     they share the same DemoAssetsGuard and SessionTracker hooks
     ///     as direct tool calls.
     ///   expectedFileHashes (object, optional): map of asset-path → SHA-256
-    ///     hex digest captured by the cloud at propose time. The bridge
+    ///     hex digest captured by the client at propose time. The bridge
     ///     verifies each entry against the file's current on-disk hash
     ///     before dispatching any change. If ANY mismatch, the apply is
     ///     refused with details so the caller can re-investigate rather
     ///     than silently overwriting user edits. Pass null/omit to skip
     ///     the check (e.g., for non-file-touching proposals or when the
-    ///     cloud couldn't capture a baseline).
+    ///     client couldn't capture a baseline).
     ///
     /// Apply semantics:
     ///   - All changes attempted in order. First-error does NOT short-circuit

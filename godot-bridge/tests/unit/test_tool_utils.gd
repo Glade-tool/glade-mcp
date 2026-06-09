@@ -257,3 +257,15 @@ func test_compare_versions_greater_than() -> void:
 func test_compare_versions_malformed_treated_as_zero() -> void:
 	# Garbage components should fall back to 0, not crash.
 	assert_eq(ToolUtils.compare_versions("4.x", "4.0"), 0)
+
+
+# ── deselect_before_free ──────────────────────────────────────────────────
+
+func test_deselect_before_free_null_is_noop() -> void:
+	# Must not crash on null or freed nodes (headless test context has no
+	# EditorInterface, so this also exercises the no-editor early return).
+	ToolUtils.deselect_before_free(null)
+	var n := Node.new()
+	n.free()
+	ToolUtils.deselect_before_free(n)
+	pass_test("deselect_before_free tolerated null and freed nodes")

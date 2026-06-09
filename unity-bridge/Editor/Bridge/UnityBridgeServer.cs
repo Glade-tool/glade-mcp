@@ -344,6 +344,48 @@ namespace GladeAgenticAI.Bridge
             }
         }
 
+        // Origins permitted to reach the bridge from a browser context. The
+        // desktop UI is a browser-based page, so its fetch() carries an Origin:
+        // in development it loads from a local dev server (port 5173); in a
+        // packaged build it loads from file://, which the browser reports as
+        // the opaque origin "null". Native clients (MCP server, editors) send
+        // no Origin and bypass this list entirely.
+        private static readonly HashSet<string> AllowedOrigins = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "null",
+        };
+
+        /// <summary>
+        /// True if the Host header targets the local loopback interface. Blocks
+        /// DNS-rebinding, where a remote name resolves to 127.0.0.1 and the
+        /// victim's browser sends the attacker's host. Missing Host is rejected
+        /// (every real HTTP/1.1 client sends one).
+        /// </summary>
+        internal static bool IsHostAllowed(string hostHeader)
+        {
+            if (string.IsNullOrEmpty(hostHeader)) return false;
+            // Strip the optional ":port" — IPv6 hosts arrive bracketed ("[::1]:8765")
+            // so split on the last colon only when it isn't inside brackets.
+            string host = hostHeader;
+            int colon = host.LastIndexOf(':');
+            int bracket = host.LastIndexOf(']');
+            if (colon > bracket) host = host.Substring(0, colon);
+            host = host.Trim().ToLowerInvariant();
+            return host == "localhost" || host == "127.0.0.1" || host == "[::1]" || host == "::1";
+        }
+
+        /// <summary>
+        /// True if a browser Origin is permitted. Empty/null input means the
+        /// request carried no Origin (a non-browser client) and is allowed.
+        /// </summary>
+        internal static bool IsOriginAllowed(string origin)
+        {
+            if (string.IsNullOrEmpty(origin)) return true;
+            return AllowedOrigins.Contains(origin);
+        }
+
         /// <summary>
         /// Handle an HTTP request
         /// </summary>
@@ -352,10 +394,42 @@ namespace GladeAgenticAI.Bridge
             var request = context.Request;
             var response = context.Response;
 
-            // Add CORS headers so browser-based and desktop clients can connect
-            response.AddHeader("Access-Control-Allow-Origin", "*");
-            response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            response.AddHeader("Access-Control-Allow-Headers", "Content-Type");
+            // ── Local-only access control ────────────────────────────────────
+            // The bridge binds to localhost, but "bound to localhost" is not the
+            // same as "only reachable by local apps". A web page the user visits
+            // can target http://localhost:8765 directly, and DNS-rebinding can
+            // make a remote origin resolve to 127.0.0.1. Two cheap checks close
+            // both holes without disrupting legitimate clients:
+            //
+            //   1. Host header must be localhost/127.0.0.1 — blocks DNS
+            //      rebinding (the rebinding victim's browser sends Host: evil.com).
+            //   2. Origin, when present, must be on the allowlist — blocks a
+            //      drive-by web page. Native clients (MCP server, editors, curl)
+            //      send no Origin and are unaffected; our own UI is allowlisted.
+            //
+            // For an allowed Origin we reflect it (never "*") so the browser can
+            // still read responses; for a disallowed one the (preflighted) write
+            // request is blocked by the browser before it executes.
+            string hostHeader = request.Headers["Host"];
+            if (!IsHostAllowed(hostHeader))
+            {
+                SendError(response, 403, "Forbidden: host not allowed");
+                return;
+            }
+
+            string origin = request.Headers["Origin"];
+            if (!string.IsNullOrEmpty(origin))
+            {
+                if (!IsOriginAllowed(origin))
+                {
+                    SendError(response, 403, "Forbidden: origin not allowed");
+                    return;
+                }
+                response.AddHeader("Access-Control-Allow-Origin", origin);
+                response.AddHeader("Vary", "Origin");
+                response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                response.AddHeader("Access-Control-Allow-Headers", "Content-Type");
+            }
 
             // Handle preflight OPTIONS request
             if (request.HttpMethod == "OPTIONS")
@@ -1872,15 +1946,21 @@ namespace GladeAgenticAI.Bridge
                 {
                     string json = reader.ReadToEnd();
 
+                    // Only write + log on an ACTUAL change. The client re-POSTs
+                    // the current settings on mount / reconnect, so an unguarded
+                    // write logged on every POST and spammed the console (and
+                    // churned EditorPrefs) with redundant no-op updates.
                     bool? referenceDemoAssets = TryReadBoolField(json, "referenceDemoAssets");
-                    if (referenceDemoAssets.HasValue)
+                    if (referenceDemoAssets.HasValue
+                        && EditorPrefs.GetBool("GladeAI.ReferenceDemoAssets", true) != referenceDemoAssets.Value)
                     {
                         EditorPrefs.SetBool("GladeAI.ReferenceDemoAssets", referenceDemoAssets.Value);
                         Debug.Log($"[UnityBridge] Updated referenceDemoAssets setting: {referenceDemoAssets.Value}");
                     }
 
                     bool? assetPipelineEnabled = TryReadBoolField(json, "assetPipelineEnabled");
-                    if (assetPipelineEnabled.HasValue)
+                    if (assetPipelineEnabled.HasValue
+                        && AssetPipelineGuard.IsEnabled != assetPipelineEnabled.Value)
                     {
                         AssetPipelineGuard.SetEnabled(assetPipelineEnabled.Value);
                         Debug.Log($"[UnityBridge] Updated assetPipelineEnabled setting: {assetPipelineEnabled.Value}");

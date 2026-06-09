@@ -33,9 +33,11 @@ func execute(args: Dictionary) -> Dictionary:
 	var parent_path: String = ToolUtils.node_relative_path(parent) if parent != null else ""
 
 	var deleted_path: String = ToolUtils.node_relative_path(node)
-	# queue_free is deferred — for an editor-side mutation we want the node
-	# gone immediately so subsequent tool calls in the same dispatch tick see
-	# the new state.
+	# free() (not queue_free, which is deferred) — for an editor-side mutation
+	# we want the node gone immediately so subsequent tool calls in the same
+	# dispatch tick see the new state. Deselect first so the scene-tree dock /
+	# inspector never hold a freed node.
+	ToolUtils.deselect_before_free(node)
 	if parent != null:
 		parent.remove_child(node)
 	node.free()

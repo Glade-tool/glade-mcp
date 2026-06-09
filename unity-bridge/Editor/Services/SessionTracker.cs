@@ -48,9 +48,9 @@ namespace GladeAgenticAI.Services
         private static int _successCount;
         private static int _errorCount;
 
-        // Read-only tool names — skip from the mutation log. Source of truth
-        // is Python-side READ_ONLY_TOOLS, duplicated here to keep the bridge
-        // self-contained (no HTTP dependency for classification).
+        // Read-only tool names — skip from the mutation log. Kept in the
+        // bridge so classification needs no round-trip to the client; must
+        // match the client's read-only tool list.
         private static readonly HashSet<string> ReadOnlyTools = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "think", "request_user_input",

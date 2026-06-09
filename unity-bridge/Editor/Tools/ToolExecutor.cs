@@ -43,6 +43,27 @@ namespace GladeAgenticAI.Services
             "avatarMaskPath", "maskPath", "meshPath", "dataPath", "terrainDataPath", "spritePath", "folderPath"
         };
 
+        /// <summary>
+        /// Checks all path-like arguments for directory traversal; returns an
+        /// error JSON string if any would escape the project root. Runs before
+        /// the demo-path check and before any tool executes, so no write tool
+        /// ever sees a "../" path. See ToolUtils.IsAssetPathSafe.
+        /// </summary>
+        private static string RejectIfAnyArgPathEscapesProject(Dictionary<string, object> args)
+        {
+            if (args == null) return null;
+            foreach (string key in AssetPathArgKeys)
+            {
+                if (!args.TryGetValue(key, out var val) || val == null) continue;
+                string path = val.ToString();
+                if (string.IsNullOrWhiteSpace(path)) continue;
+                if (!ToolUtils.IsAssetPathSafe(path))
+                    return ToolUtils.CreateErrorResponse(
+                        $"Invalid path for '{key}': directory traversal ('..') is not allowed.");
+            }
+            return null;
+        }
+
         /// <summary>Checks all path-like arguments in args; returns error JSON if any is a disallowed demo path.</summary>
         private static string RejectIfAnyArgPathIsDemoDisallowed(Dictionary<string, object> args)
         {
@@ -71,6 +92,8 @@ namespace GladeAgenticAI.Services
             {
                 EnsureRegistry();
                 var args = ToolUtils.ParseJsonToDict(argumentsJson);
+                var traversalErr = RejectIfAnyArgPathEscapesProject(args);
+                if (traversalErr != null) return traversalErr;
                 var demoErr = RejectIfAnyArgPathIsDemoDisallowed(args);
                 if (demoErr != null) return demoErr;
 

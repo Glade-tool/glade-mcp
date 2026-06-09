@@ -479,6 +479,7 @@ static func delete_node_at(node_path_in_scene: String) -> Dictionary:
 	if root != null and node == root:
 		return {"success": false, "error": "refusing to delete scene root via revert"}
 	var parent: Node = node.get_parent()
+	ToolUtils.deselect_before_free(node)
 	if parent != null:
 		parent.remove_child(node)
 	node.free()

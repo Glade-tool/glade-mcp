@@ -35,7 +35,7 @@ from . import bridge
 # Bump in lockstep with godot-bridge/addons/com.gladekit.mcp-bridge/plugin.cfg.
 # Sync workflow tags the public repo (eventually) with v{MIN_GODOT_BRIDGE_VERSION}
 # so the upgrade instruction below resolves to a real release.
-MIN_GODOT_BRIDGE_VERSION = "0.6.4"
+MIN_GODOT_BRIDGE_VERSION = "0.6.5"
 
 UPGRADE_INSTRUCTIONS = (
     "Update by re-downloading the addon from the GladeKit Godot bridge releases "
@@ -45,6 +45,10 @@ UPGRADE_INSTRUCTIONS = (
 # Process-scoped one-shot suppression. Independent of the Unity equivalent
 # so a dual-bridge user gets one warning per engine, not one combined.
 _prefix_emitted = False
+# Latch set once the version question is settled (warning emitted OR current
+# bridge confirmed) so a current bridge isn't re-probed on every tool call.
+# Not latched when the bridge is offline, so the check still fires later.
+_check_complete = False
 _startup_check_done = False
 
 
@@ -104,8 +108,8 @@ async def check_on_startup() -> None:
 async def get_warning_prefix() -> str:
     """Return a one-shot warning string to prepend to a tool response, or
     "" if we should stay silent."""
-    global _prefix_emitted
-    if _prefix_emitted:
+    global _prefix_emitted, _check_complete
+    if _check_complete:
         return ""
     if os.environ.get("GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING") == "1":
         return ""
@@ -113,13 +117,17 @@ async def get_warning_prefix() -> str:
     try:
         health = await bridge.godot_check_health()
     except bridge.GodotBridgeError:
+        # Bridge offline — don't latch; re-check on a later tool call.
         return ""
 
     installed = health.get("bridgeVersion")
     if not _is_stale(installed):
+        # Current bridge confirmed — stop probing for the rest of the process.
+        _check_complete = True
         return ""
 
     _prefix_emitted = True
+    _check_complete = True
     label = installed or "<unknown>"
     return (
         f"⚠️ GladeKit Godot bridge {label} is older than recommended v{MIN_GODOT_BRIDGE_VERSION}. "

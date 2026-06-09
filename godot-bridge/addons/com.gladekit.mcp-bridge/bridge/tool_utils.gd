@@ -285,6 +285,26 @@ static func get_edited_scene_root_safe() -> Node:
 	return ei.get_edited_scene_root()
 
 
+# Clear a node (and any selected descendants) from the editor selection
+# before it is freed. Freeing a node while the scene-tree dock / inspector
+# holds it selected leaves them pointing at a dead object until the editor
+# revalidates — the dangling-reference class that delete/revert paths must
+# avoid. Call immediately before remove_child()/free(). No-op outside the
+# editor or when nothing relevant is selected.
+static func deselect_before_free(node: Node) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	var ei: Object = Engine.get_singleton("EditorInterface") if Engine.has_singleton("EditorInterface") else null
+	if ei == null:
+		return
+	var selection: Object = ei.get_selection()
+	if selection == null:
+		return
+	for selected: Node in selection.get_selected_nodes():
+		if selected == node or node.is_ancestor_of(selected):
+			selection.remove_node(selected)
+
+
 # ── Node-path resolution ───────────────────────────────────────────────────
 # Looks up a node within the currently-edited scene by either an explicit
 # NodePath ("Player/Sprite", "/root/Main/Player") or a node name to search

@@ -1134,6 +1134,28 @@ namespace GladeAgenticAI.Core.Tools
         }
 
         /// <summary>
+        /// True if a tool-supplied asset path does not escape the project via
+        /// directory traversal. A bare <c>StartsWith("Assets/")</c> check is
+        /// not enough: "Assets/../../evil.cs" passes the prefix test yet writes
+        /// outside the project root. We reject any path segment that is exactly
+        /// ".." (after normalizing both slash styles), which catches traversal
+        /// while leaving legitimate filenames that merely contain dots
+        /// (e.g. "Assets/My..Folder/file.cs", "Assets/v1.2.3/data.asset") alone.
+        /// Null/empty is treated as safe here — required-ness is enforced by the
+        /// individual tools' own argument validation.
+        /// </summary>
+        public static bool IsAssetPathSafe(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return true;
+            string[] segments = path.Replace('\\', '/').Split('/');
+            foreach (string segment in segments)
+            {
+                if (segment == "..") return false;
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Convenience overload of NormalizeAssetPath that returns just the resolved path
         /// without the actualPath out-param. Use when callers don't need to differentiate
         /// "exact match" from "case-corrected match".
@@ -1622,18 +1644,18 @@ namespace GladeAgenticAI.Core.Tools
 
         /// <summary>
         /// SHA-256 hex digest of an Assets-rooted file's UTF-8 text. Used by
-        /// the Live Loop apply path to detect drift between "what the AI
-        /// read via get_script_content" and "what's on disk at apply time" —
-        /// if the user edited the file in their IDE between the proposal
-        /// arriving and clicking Apply, we want to surface that rather than
-        /// silently overwriting their edits.
+        /// the apply path to detect drift between "what the client read via
+        /// get_script_content" and "what's on disk at apply time" — if the
+        /// user edited the file in their IDE between the proposal arriving and
+        /// clicking Apply, we want to surface that rather than silently
+        /// overwriting their edits.
         ///
-        /// Hashes the text contents (not raw bytes) so the result matches
-        /// a cloud-side hash of the same string returned by GetScriptContent.
-        /// Returns null if the file does not exist or cannot be read —
-        /// callers treat null as "skip the check for this path" (the cloud
-        /// passes an expected hash only when it actually captured one from
-        /// a prior get_script_content).
+        /// Hashes the text contents (not raw bytes) so the result matches a
+        /// hash the client computes over the same string returned by
+        /// GetScriptContent. Returns null if the file does not exist or cannot
+        /// be read — callers treat null as "skip the check for this path" (the
+        /// client passes an expected hash only when it actually captured one
+        /// from a prior get_script_content).
         /// </summary>
         public static string ComputeFileSha256(string assetPath)
         {

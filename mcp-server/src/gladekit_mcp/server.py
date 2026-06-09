@@ -475,7 +475,7 @@ async def read_resource(uri: str) -> str:
                 if project_path:
                     glade_path = os.path.join(project_path, "GLADE.md")
                     if os.path.exists(glade_path):
-                        with open(glade_path, "r") as f:
+                        with open(glade_path, "r", encoding="utf-8") as f:
                             glade_content = f.read()
                             if len(glade_content) <= 2000:
                                 ctx["gladeMarkdown"] = glade_content
@@ -522,7 +522,7 @@ async def read_resource(uri: str) -> str:
             glade_path = os.path.join(project_path, "GLADE.md")
             if not os.path.exists(glade_path):
                 return "No GLADE.md found in project root. Create one to provide game design context."
-            with open(glade_path, "r") as f:
+            with open(glade_path, "r", encoding="utf-8") as f:
                 content = f.read()
             if len(content) > 6000:
                 content = content[:6000] + "\n\n[GLADE.md truncated at ~1500 tokens]"

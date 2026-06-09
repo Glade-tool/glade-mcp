@@ -31,7 +31,7 @@ from . import bridge
 # Bump in lockstep with unity-bridge/package.json. The OSS sync workflow tags
 # the public repo with v{MIN_BRIDGE_VERSION} so the upgrade instruction below
 # resolves to a real release.
-MIN_BRIDGE_VERSION = "0.7.6"
+MIN_BRIDGE_VERSION = "0.7.7"
 
 UPGRADE_INSTRUCTIONS = (
     f"Update via Unity → Window → Package Manager → GladeKit MCP Bridge → Update, "
@@ -44,6 +44,11 @@ UPGRADE_INSTRUCTIONS = (
 # emitted in a tool response, we don't emit it again for the rest of the
 # process — the stderr line still serves as the persistent record.
 _prefix_emitted = False
+# Latch set once the version question is settled either way (warning emitted
+# OR a current bridge confirmed). Without it, a confirmed-current bridge would
+# re-probe /api/health on every single tool call forever. We deliberately do
+# NOT latch on an offline bridge, so the check still fires once Unity comes up.
+_check_complete = False
 # Track whether the startup check has run — prevents repeat stderr spam if
 # the first tool call races the lifespan startup hook.
 _startup_check_done = False
@@ -108,8 +113,8 @@ async def get_warning_prefix() -> str:
     "" if we should stay silent. Called inline from call_tool — does its own
     health probe so it works even if the startup check was skipped (bridge
     offline at launch but online by first tool call)."""
-    global _prefix_emitted
-    if _prefix_emitted:
+    global _prefix_emitted, _check_complete
+    if _check_complete:
         return ""
     if os.environ.get("GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING") == "1":
         return ""
@@ -117,13 +122,17 @@ async def get_warning_prefix() -> str:
     try:
         health = await bridge.check_health()
     except bridge.UnityBridgeError:
+        # Bridge offline — don't latch; re-check on a later tool call.
         return ""
 
     installed = health.get("bridgeVersion")
     if not _is_stale(installed):
+        # Current bridge confirmed — stop probing for the rest of the process.
+        _check_complete = True
         return ""
 
     _prefix_emitted = True
+    _check_complete = True
     label = installed or "<0.4.0"
     return (
         f"⚠️ GladeKit MCP bridge {label} is older than recommended v{MIN_BRIDGE_VERSION}. "

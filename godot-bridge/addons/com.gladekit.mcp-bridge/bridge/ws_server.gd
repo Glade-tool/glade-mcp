@@ -50,6 +50,17 @@ const DEFAULT_PORT := 8766
 const BIND_ADDRESS := "127.0.0.1"
 const THREAD_POLL_SLEEP_MSEC := 5  # ~200Hz worker loop (never throttled)
 
+# WebSocketPeer defaults to 64KB in/out buffers. Tool payloads routinely
+# exceed that: get_script_content allows max_lines=5000 (~200KB+),
+# get_scene_tree response_format="both" on a large scene, and context/gather
+# aggregates several of those. An oversized outbound frame makes send_text
+# fail (client hangs to timeout); an oversized inbound frame (e.g.
+# create_script with a large content arg) never arrives. Sized for the
+# largest realistic payloads; allocated per peer, and peer count is
+# effectively 1-2, so the memory cost is bounded.
+const WS_INBOUND_BUFFER_SIZE := 4 * 1024 * 1024   # 4 MiB
+const WS_OUTBOUND_BUFFER_SIZE := 8 * 1024 * 1024  # 8 MiB
+
 # Unknown-tool typo recovery — when tools/execute fails to resolve a name,
 # surface up to MAX nearest tool names within DISTANCE_THRESHOLD edits so the
 # agent can self-correct on the next turn instead of flailing. Threshold of 4
@@ -131,9 +142,7 @@ func start() -> void:
 				killed_count += 1
 		print_rich(
 			"[color=yellow][GladeKit MCP Bridge][/color] "
-			+ "reaped %d orphan play session(s) from a previous plugin instance "
-			+ "(%d still running and killed). This is expected after a plugin hot-reload."
-			% [reaped.size(), killed_count]
+			+ _format_reap_message(reaped.size(), killed_count)
 		)
 	_thread_should_exit = false
 	_thread = Thread.new()
@@ -687,6 +696,7 @@ func _main_dispatch_turn_revert(request_id: String, request: Dictionary) -> Dict
 						continue
 					var sibling_index: int = parent_node3.get_children().find(current_node)
 					var node_name: String = current_node.name
+					ToolUtils.deselect_before_free(current_node)
 					parent_node3.remove_child(current_node)
 					current_node.free()
 					var restore3 := BackupManager.restore_node(state_backup, parent_node3, node_name, sibling_index)
@@ -794,6 +804,18 @@ func _main_dispatch_turn_accept(request_id: String, request: Dictionary) -> Dict
 	}
 
 
+# Builds the orphan-reap startup notice. Kept as a separate helper because
+# GDScript's % operator binds tighter than +, so formatting a multi-line
+# string concatenation in place silently applies the args to only the last
+# literal (a 0.6.4 regression caught in review). Static so unit tests can
+# exercise it without spinning up the server.
+static func _format_reap_message(reaped_count: int, killed_count: int) -> String:
+	return (
+		"reaped %d orphan play session(s) from a previous plugin instance "
+		+ "(%d still running and killed). This is expected after a plugin hot-reload."
+	) % [reaped_count, killed_count]
+
+
 # ── Worker thread: accept, poll, send ────────────────────────────────────
 # Owns _tcp_server, _peers, and the I/O loop. Touches main-thread state
 # only via mutex-protected queues. Never calls EditorInterface or scene-tree
@@ -815,6 +837,10 @@ func _thread_accept() -> void:
 		if stream == null:
 			break
 		var ws := WebSocketPeer.new()
+		# Must be set before accept_stream — buffers are allocated when the
+		# connection is established.
+		ws.inbound_buffer_size = WS_INBOUND_BUFFER_SIZE
+		ws.outbound_buffer_size = WS_OUTBOUND_BUFFER_SIZE
 		var err := ws.accept_stream(stream)
 		if err != OK:
 			push_warning("[GladeKit MCP Bridge] accept_stream failed (error %d)" % err)
