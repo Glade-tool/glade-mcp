@@ -4,6 +4,8 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-06-11
+
 ### Added
 
 - **Godot bridge addon v0.6.6 — editor main-thread stall watchdog.** Tool execution waits on the Godot editor's main thread; when that thread wedges (an open modal dialog, a long synchronous import/scan), every queued and subsequent `tools/execute` call previously rode out the client's full 30s timeout with an opaque "timed out" error, making the bridge look dead even though it was reachable. Two-layer fix:

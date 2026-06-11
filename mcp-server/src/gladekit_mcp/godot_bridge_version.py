@@ -35,7 +35,7 @@ from . import bridge
 # Bump in lockstep with godot-bridge/addons/com.gladekit.mcp-bridge/plugin.cfg.
 # Sync workflow tags the public repo (eventually) with v{MIN_GODOT_BRIDGE_VERSION}
 # so the upgrade instruction below resolves to a real release.
-MIN_GODOT_BRIDGE_VERSION = "0.6.5"
+MIN_GODOT_BRIDGE_VERSION = "0.6.6"
 
 UPGRADE_INSTRUCTIONS = (
     "Update by re-downloading the addon from the GladeKit Godot bridge releases "
