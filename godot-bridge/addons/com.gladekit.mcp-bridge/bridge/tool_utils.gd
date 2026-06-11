@@ -263,23 +263,39 @@ static func levenshtein(a: String, b: String) -> int:
 	return prev[n]
 
 
-# Safely resolve the currently-edited scene root. Returns null in non-editor
-# contexts (e.g. GUT runs tests via play_custom_scene where EditorInterface
-# isn't available).
+# Safely resolve the EditorInterface singleton. Returns null in non-editor
+# contexts (e.g. GUT runs tests via play_custom_scene or gut_cmdln where
+# EditorInterface isn't available).
 #
-# The trick: GDScript parses the bare identifier `EditorInterface` at
-# compile time as a class reference. In non-editor contexts that class has
-# no `get_edited_scene_root` static method, so `EditorInterface.<anything>`
-# raises "Nonexistent function in base 'EditorInterface'" — even when the
-# call is gated by Engine.has_singleton(), because the parse-time
-# resolution doesn't depend on runtime singleton state.
+# Two engine quirks make this helper necessary:
 #
-# Workaround: fetch the singleton via Engine.get_singleton(name) and call
-# through the returned variable. The variable's type is inferred at
-# runtime, so the method lookup happens against the actual singleton
-# instance (in editor mode) instead of the bare class symbol (in test mode).
+# 1. GDScript parses the bare identifier `EditorInterface` at compile time
+#    as a class reference. In non-editor contexts that class has no
+#    instance methods, so `EditorInterface.<anything>` raises "Nonexistent
+#    function in base 'EditorInterface'" — even when the call is gated by
+#    Engine.has_singleton(), because the parse-time resolution doesn't
+#    depend on runtime singleton state. Fetching via Engine.get_singleton()
+#    and calling through the returned variable defers method lookup to
+#    runtime, against the actual instance.
+#
+# 2. On Godot 4.6+, Engine.has_singleton("EditorInterface") returns true
+#    even in game-runtime/headless contexts, but Engine.get_singleton()
+#    then raises a C++ "Can't retrieve singleton 'EditorInterface' outside
+#    of editor" error (engine.cpp get_singleton_object). The
+#    Engine.is_editor_hint() gate short-circuits before that call so test
+#    runs stay error-free.
+static func get_editor_interface_safe() -> Object:
+	if not Engine.is_editor_hint():
+		return null
+	if not Engine.has_singleton("EditorInterface"):
+		return null
+	return Engine.get_singleton("EditorInterface")
+
+
+# Safely resolve the currently-edited scene root. Returns null in
+# non-editor contexts. See get_editor_interface_safe for the rationale.
 static func get_edited_scene_root_safe() -> Node:
-	var ei: Object = Engine.get_singleton("EditorInterface") if Engine.has_singleton("EditorInterface") else null
+	var ei: Object = get_editor_interface_safe()
 	if ei == null:
 		return null
 	return ei.get_edited_scene_root()
@@ -291,10 +307,16 @@ static func get_edited_scene_root_safe() -> Node:
 # revalidates — the dangling-reference class that delete/revert paths must
 # avoid. Call immediately before remove_child()/free(). No-op outside the
 # editor or when nothing relevant is selected.
-static func deselect_before_free(node: Node) -> void:
-	if node == null or not is_instance_valid(node):
+#
+# The parameter is deliberately untyped: the contract includes tolerating
+# an already-freed node (delete/revert paths may double-handle), and on
+# Godot 4.6+ passing a freed instance to a `Node`-typed parameter raises
+# "Invalid type ... previously freed" at the call boundary, before the
+# body's is_instance_valid check could run.
+static func deselect_before_free(node) -> void:
+	if node == null or not is_instance_valid(node) or not (node is Node):
 		return
-	var ei: Object = Engine.get_singleton("EditorInterface") if Engine.has_singleton("EditorInterface") else null
+	var ei: Object = get_editor_interface_safe()
 	if ei == null:
 		return
 	var selection: Object = ei.get_selection()

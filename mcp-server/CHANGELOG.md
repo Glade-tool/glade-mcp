@@ -4,6 +4,16 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- **Godot bridge addon v0.6.6 — editor main-thread stall watchdog.** Tool execution waits on the Godot editor's main thread; when that thread wedges (an open modal dialog, a long synchronous import/scan), every queued and subsequent `tools/execute` call previously rode out the client's full 30s timeout with an opaque "timed out" error, making the bridge look dead even though it was reachable. Two-layer fix:
+  - **Bridge:** the worker thread now expires `tools/execute` dispatches that sit undispatched for 25s and answers them with a structured error naming the stall ("editor's main thread has not processed bridge work for Xs") plus `possible_solutions[]` (dismiss the dialog / wait out the import / restart the editor). The `health` endpoint reports `mainThreadStalledMsec` — how long since the main thread last made progress — which stays readable during a stall because health answers from the worker thread. Dispatches are drained one at a time (previously bulk) so queued work stays visible to the watchdog while an earlier tool executes, and a long multi-tool batch refreshes the heartbeat between tools so "busy" isn't misreported as "wedged".
+  - **MCP server:** a `tools/execute` timeout now triggers a follow-up health probe and appends a diagnosis to the error — editor wedged (with stall duration and the modal-dialog hint), editor healthy but tool slow (suggest retry/smaller steps), or bridge gone (editor crashed/closed). Works against older bridges too, with a less precise "busy or blocked" message when `mainThreadStalledMsec` is absent. New `GodotBridgeTimeoutError` (subclass of `GodotBridgeError`) distinguishes deadline expiry from transport failure.
+
+### Fixed
+
+- **Godot 4.6 compatibility in the bridge's editor-singleton probes.** On 4.6, `Engine.has_singleton("EditorInterface")` returns `true` even outside the editor (game-runtime / headless test context), but `Engine.get_singleton()` then raises a C++ "Can't retrieve singleton outside of editor" error. All EditorInterface lookups now route through a new `ToolUtils.get_editor_interface_safe()` gated on `Engine.is_editor_hint()`, so headless/GUT runs stay error-free. Also on 4.6, passing an already-freed node to a `Node`-typed parameter raises at the call boundary before any validity check can run — `ToolUtils.deselect_before_free` now takes an untyped parameter and validates inside, preserving its tolerate-freed-nodes contract.
+
 ## [0.7.6] - 2026-06-08
 
 ### Added

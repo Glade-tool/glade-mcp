@@ -61,17 +61,20 @@ static func _count_nodes(node: Node) -> int:
 
 
 static func _selection_paths() -> Array:
-	# Same singleton-via-Engine pattern as ToolUtils.get_edited_scene_root_safe.
 	# Bare `EditorInterface.<method>` parses as a static call on the class,
-	# which doesn't have the method outside editor context. Fetching the
-	# singleton via Engine routes the call through the actual instance.
-	var ei: Object = Engine.get_singleton("EditorInterface") if Engine.has_singleton("EditorInterface") else null
+	# which doesn't have the method outside editor context — see
+	# ToolUtils.get_editor_interface_safe for the full rationale (including
+	# the Godot 4.6 has_singleton/get_singleton mismatch).
+	var ei: Object = ToolUtils.get_editor_interface_safe()
 	if ei == null:
 		return []
-	var selection := ei.get_selection()
+	# Explicit types: these are unsafe calls through an Object-typed
+	# variable, so the analyzer can't infer the result type — `:=` here is
+	# a parse error that takes the whole script down at load.
+	var selection: Object = ei.get_selection()
 	if selection == null:
 		return []
-	var nodes := selection.get_selected_nodes()
+	var nodes: Array = selection.get_selected_nodes()
 	var paths: Array = []
 	for n in nodes:
 		var rel := ToolUtils.node_relative_path(n)

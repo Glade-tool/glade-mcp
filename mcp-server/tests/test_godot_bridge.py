@@ -285,6 +285,7 @@ def test_module_exposes_expected_symbols():
     callers (registry.py, server.py)."""
     expected = [
         "GodotBridgeError",
+        "GodotBridgeTimeoutError",
         "godot_check_health",
         "godot_is_available",
         "godot_execute_tool",
@@ -315,9 +316,114 @@ async def test_godot_call_timeout_raises():
     server = await websockets.serve(slow_handler, "127.0.0.1", 0)
     port = server.sockets[0].getsockname()[1]
     try:
-        with pytest.raises(bridge.GodotBridgeError) as exc:
+        with pytest.raises(bridge.GodotBridgeTimeoutError) as exc:
             await bridge._godot_call(f"ws://127.0.0.1:{port}/", {"endpoint": "health"}, timeout=0.1)
         assert "timed out" in str(exc.value)
     finally:
         server.close()
         await server.wait_closed()
+
+
+# ── Timeout diagnosis ────────────────────────────────────────────────────────
+# After a tools/execute timeout the client probes health (served from the
+# bridge's worker thread, alive even when the editor's main thread is
+# blocked) and appends an actionable explanation to the error. These mock
+# servers hold the tools/execute connection open until the client gives up,
+# then answer the diagnosis probe per scenario.
+
+
+def _hanging_bridge(health_payload: dict | None):
+    """Mock bridge whose tools/execute never answers.
+
+    health_payload of None makes health hang too (bridge fully gone);
+    otherwise health answers with the given payload.
+    """
+
+    async def handler(websocket):
+        raw = await websocket.recv()
+        payload = json.loads(raw)
+        if payload.get("endpoint") == "health" and health_payload is not None:
+            reply = {"id": payload["id"], "success": True, "status": "ok", **health_payload}
+            await websocket.send(json.dumps(reply))
+            return
+        # Hold the connection open; the client's timeout closes it.
+        await websocket.wait_closed()
+
+    return handler
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="asyncio.timeout requires Python 3.11+")
+@pytest.mark.asyncio
+async def test_execute_timeout_reports_stalled_main_thread():
+    """Bridge alive + stale main-thread heartbeat → the error names the
+    stall and tells the agent to dismiss the editor's modal dialog,
+    instead of the bare 'timed out after Xs'."""
+    handler = _hanging_bridge({"mainThreadStalledMsec": 12_000})
+    server = await websockets.serve(handler, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        result_str = await bridge.godot_execute_tool("get_project_info", {}, f"ws://127.0.0.1:{port}/", timeout=0.2)
+    finally:
+        server.close()
+        await server.wait_closed()
+    result = json.loads(result_str)
+    assert result["success"] is False
+    assert "timed out" in result["message"]
+    assert "stalled for ~12s" in result["message"]
+    assert "modal dialog" in result["message"]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="asyncio.timeout requires Python 3.11+")
+@pytest.mark.asyncio
+async def test_execute_timeout_reports_slow_tool_when_editor_healthy():
+    """Bridge alive + fresh heartbeat → the editor is fine, the tool just
+    needs longer; the error suggests retrying / splitting the request."""
+    handler = _hanging_bridge({"mainThreadStalledMsec": 40})
+    server = await websockets.serve(handler, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        result_str = await bridge.godot_execute_tool("update_project_uids", {}, f"ws://127.0.0.1:{port}/", timeout=0.2)
+    finally:
+        server.close()
+        await server.wait_closed()
+    result = json.loads(result_str)
+    assert result["success"] is False
+    assert "likely needs longer" in result["message"]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="asyncio.timeout requires Python 3.11+")
+@pytest.mark.asyncio
+async def test_execute_timeout_with_legacy_health_reports_busy_or_blocked():
+    """Bridges without the mainThreadStalledMsec field still get a useful
+    (if less precise) diagnosis: reachable but busy/blocked."""
+    handler = _hanging_bridge({})  # health ok, no heartbeat field
+    server = await websockets.serve(handler, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        result_str = await bridge.godot_execute_tool("get_scene_tree", {}, f"ws://127.0.0.1:{port}/", timeout=0.2)
+    finally:
+        server.close()
+        await server.wait_closed()
+    result = json.loads(result_str)
+    assert result["success"] is False
+    assert "busy" in result["message"]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="asyncio.timeout requires Python 3.11+")
+@pytest.mark.asyncio
+async def test_execute_timeout_with_dead_health_reports_editor_gone(monkeypatch):
+    """When the diagnosis probe also hangs, report the bridge as gone
+    rather than guessing at editor state."""
+    # Shrink the probe timeout so the test doesn't wait the real 5s.
+    monkeypatch.setattr(bridge, "GODOT_HEALTH_TIMEOUT", 0.2)
+    handler = _hanging_bridge(None)  # everything hangs
+    server = await websockets.serve(handler, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    try:
+        result_str = await bridge.godot_execute_tool("get_project_info", {}, f"ws://127.0.0.1:{port}/", timeout=0.2)
+    finally:
+        server.close()
+        await server.wait_closed()
+    result = json.loads(result_str)
+    assert result["success"] is False
+    assert "stopped answering" in result["message"]

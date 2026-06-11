@@ -43,6 +43,14 @@ COMPILATION_POLL_INTERVAL = 1.5
 GODOT_HEALTH_TIMEOUT = 5.0
 GODOT_TOOL_EXECUTE_TIMEOUT = 30.0
 
+# Editor main-thread stall reporting. The Godot bridge's health endpoint
+# answers from its worker thread even while the editor's main thread (where
+# tools execute) is blocked, and bridges >= 0.6.6 report how long the main
+# thread has been silent via `mainThreadStalledMsec`. After a tool timeout
+# we probe health and treat a stall at or above this threshold as "the
+# editor is wedged" rather than "the tool is slow".
+GODOT_STALL_REPORT_THRESHOLD_MSEC = 5_000
+
 
 class UnityBridgeError(Exception):
     """Raised when the Unity bridge is unreachable or returns an unexpected error."""
@@ -50,6 +58,15 @@ class UnityBridgeError(Exception):
 
 class GodotBridgeError(Exception):
     """Raised when the Godot bridge is unreachable or returns an unexpected error."""
+
+
+class GodotBridgeTimeoutError(GodotBridgeError):
+    """Raised when a Godot bridge call exceeds its deadline.
+
+    Distinct from the base error so callers can run extra diagnosis on
+    timeouts (the bridge being reachable-but-stalled needs different user
+    guidance than the bridge being gone).
+    """
 
 
 # Shared HTTP client — keepalive connections avoid the TCP-connect tax on every
@@ -338,6 +355,20 @@ async def godot_execute_tool(
             },
             timeout=timeout,
         )
+    except GodotBridgeTimeoutError as exc:
+        # A bare timeout is ambiguous (slow tool? wedged editor? dead
+        # bridge?) and ambiguity makes agents flail — e.g. concluding the
+        # bridge is broken and abandoning it after one stuck modal dialog.
+        # Health answers from the bridge's worker thread even while the
+        # editor's main thread is blocked, so a follow-up probe can say
+        # which of the three it is.
+        diagnosis = await _diagnose_godot_timeout(bridge_url, timeout)
+        return json.dumps(
+            {
+                "success": False,
+                "message": f"Godot bridge error for {tool_name}: {exc}. {diagnosis}",
+            }
+        )
     except GodotBridgeError as exc:
         return json.dumps({"success": False, "message": f"Godot bridge error for {tool_name}: {exc}"})
     # The bridge already returns {success, message, ...payload}; just stringify.
@@ -365,6 +396,50 @@ async def godot_recent_errors(
     if not response.get("success"):
         raise GodotBridgeError(f"recent_errors failed: {response.get('error', 'unknown')}")
     return list(response.get("errors", []))
+
+
+async def _diagnose_godot_timeout(bridge_url: str, tool_timeout: float) -> str:
+    """Explain a tools/execute timeout via a follow-up health probe.
+
+    The bridge serves health from its worker thread, which stays responsive
+    even when the editor's main thread (where tools execute) is blocked by a
+    modal dialog or a long synchronous operation. Probing health after a
+    tool timeout therefore distinguishes three states a bare timeout can't:
+
+      1. health unreachable      → editor crashed / closed / hard-frozen
+      2. health ok, stale tick   → main thread wedged (modal dialog etc.)
+      3. health ok, fresh tick   → editor fine; the tool just ran long
+
+    Returns one actionable sentence to append to the timeout error. Never
+    raises — diagnosis is best-effort decoration of an error we already have.
+    """
+    try:
+        health = await _godot_call(bridge_url, {"endpoint": "health"}, timeout=GODOT_HEALTH_TIMEOUT)
+    except GodotBridgeError:
+        return (
+            "The bridge has stopped answering entirely — the Godot editor may have "
+            "crashed, been closed, or hard-frozen. Verify the editor is running, then retry."
+        )
+
+    stalled_msec = health.get("mainThreadStalledMsec")
+    if isinstance(stalled_msec, (int, float)) and stalled_msec >= GODOT_STALL_REPORT_THRESHOLD_MSEC:
+        return (
+            f"The bridge is reachable, but the editor's main thread has been stalled for "
+            f"~{stalled_msec / 1000:.0f}s — usually an open modal dialog or a long synchronous "
+            "operation. Ask the user to switch to the Godot editor and dismiss any open "
+            "dialog, then retry."
+        )
+    if isinstance(stalled_msec, (int, float)):
+        return (
+            f"The bridge and editor are responsive, so the tool likely needs longer than "
+            f"the {tool_timeout:.0f}s limit. Retry, or break the request into smaller steps."
+        )
+    # Pre-0.6.6 bridge: health works but doesn't report the main-thread
+    # heartbeat, so we can't tell "wedged" from "busy".
+    return (
+        "The bridge is reachable, so the editor is likely busy with a long operation or "
+        "blocked by a modal dialog. Check the Godot editor window, then retry."
+    )
 
 
 async def _godot_call(bridge_url: str, payload: dict, *, timeout: float) -> dict:
@@ -396,7 +471,7 @@ async def _godot_call(bridge_url: str, payload: dict, *, timeout: float) -> dict
                 # the next frame IS our response.
                 raw = await ws.recv()
     except asyncio.TimeoutError as exc:
-        raise GodotBridgeError(f"Godot bridge call timed out after {timeout}s") from exc
+        raise GodotBridgeTimeoutError(f"Godot bridge call timed out after {timeout}s") from exc
     except Exception as exc:
         # websockets raises ConnectionClosed, InvalidURI, OSError, etc. —
         # collapse them all into one bridge error so callers handle

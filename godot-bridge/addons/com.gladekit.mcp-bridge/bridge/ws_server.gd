@@ -50,6 +50,18 @@ const DEFAULT_PORT := 8766
 const BIND_ADDRESS := "127.0.0.1"
 const THREAD_POLL_SLEEP_MSEC := 5  # ~200Hz worker loop (never throttled)
 
+# Main-thread stall watchdog. tools/execute (and the other main-thread
+# endpoints) wait on the editor's main thread; if a modal dialog or a long
+# synchronous operation blocks the editor, queued dispatches would otherwise
+# sit until every client rides out its own timeout with an opaque error —
+# and every FOLLOW-UP call piles up behind them, so the whole bridge looks
+# dead. The worker thread expires dispatches older than this and answers
+# with a structured "editor main thread stalled" error that names the cause
+# and how to clear it. Keep this below typical client per-call timeouts
+# (the gladekit-mcp server uses 30s) so clients receive the diagnostic
+# instead of their own generic timeout.
+const MAIN_DISPATCH_STALL_TIMEOUT_MSEC := 25_000
+
 # WebSocketPeer defaults to 64KB in/out buffers. Tool payloads routinely
 # exceed that: get_script_content allows max_lines=5000 (~200KB+),
 # get_scene_tree response_format="both" on a large scene, and context/gather
@@ -105,6 +117,13 @@ var _pending_sends_mutex: Mutex = null
 var _cached_engine_mode: String = "edit"
 var _cached_mutex: Mutex = null
 
+# Main-thread heartbeat: last Time.get_ticks_msec() at which the main thread
+# made progress (each _process tick, and after each dispatched tool inside a
+# batch). Written by the main thread, read by the worker thread, guarded by
+# _cached_mutex. Drives the stall watchdog's diagnostics and the health
+# endpoint's mainThreadStalledMsec field.
+var _last_main_tick_msec: int = 0
+
 # ── Diagnostics ──────────────────────────────────────────────────────────
 var _accept_log_count: int = 0
 
@@ -130,6 +149,7 @@ func start() -> void:
 	_pending_sends_mutex = Mutex.new()
 	_cached_mutex = Mutex.new()
 	_refresh_cached_engine_mode()  # seed before thread starts reading it
+	_touch_main_heartbeat()  # seed so the watchdog doesn't see a phantom stall at boot
 	# Reap any orphaned play-session PIDs from a previous plugin instance
 	# (hot-reload survival — see PlaySessionManager.reap_orphans comment).
 	# Runs synchronously on the main thread before we start accepting tool
@@ -184,6 +204,7 @@ func stop() -> void:
 func _process(_delta: float) -> void:
 	if not _running:
 		return
+	_touch_main_heartbeat()
 	_refresh_cached_engine_mode()
 	_drain_pending_dispatches()
 
@@ -195,12 +216,25 @@ func _refresh_cached_engine_mode() -> void:
 	_cached_mutex.unlock()
 
 
+func _touch_main_heartbeat() -> void:
+	_cached_mutex.lock()
+	_last_main_tick_msec = Time.get_ticks_msec()
+	_cached_mutex.unlock()
+
+
 func _drain_pending_dispatches() -> void:
-	_pending_main_dispatches_mutex.lock()
-	var dispatches: Array = _pending_main_dispatches.duplicate()
-	_pending_main_dispatches.clear()
-	_pending_main_dispatches_mutex.unlock()
-	for entry: Dictionary in dispatches:
+	# Pop one entry at a time instead of bulk-draining the whole queue:
+	# entries still waiting stay visible to the worker thread's stall
+	# watchdog while an earlier tool executes, and the heartbeat refresh
+	# after each entry tells the watchdog "busy, not wedged" during a long
+	# multi-tool batch.
+	while true:
+		_pending_main_dispatches_mutex.lock()
+		if _pending_main_dispatches.is_empty():
+			_pending_main_dispatches_mutex.unlock()
+			return
+		var entry: Dictionary = _pending_main_dispatches.pop_front()
+		_pending_main_dispatches_mutex.unlock()
 		var peer: WebSocketPeer = entry["peer"]
 		var request: Dictionary = entry["request"]
 		var request_id: String = entry["request_id"]
@@ -221,6 +255,7 @@ func _drain_pending_dispatches() -> void:
 		else:
 			response = _main_dispatch_tool(request_id, request)
 		_enqueue_send(peer, response)
+		_touch_main_heartbeat()
 
 
 func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
@@ -249,10 +284,12 @@ func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
 		if (raw_args as String).is_empty():
 			args = {}
 		else:
-			var parsed = JSON.parse_string(raw_args)
-			if not (parsed is Dictionary):
+			# Instance parse — silent on malformed input (see
+			# _thread_handle_packet for why the static helper isn't used).
+			var args_json := JSON.new()
+			if args_json.parse(raw_args) != OK or not (args_json.data is Dictionary):
 				return _make_error(request_id, "'arguments' string is not a valid JSON object")
-			args = parsed
+			args = args_json.data
 	else:
 		return _make_error(request_id, "'arguments' must be a JSON object or JSON-encoded string")
 
@@ -825,6 +862,7 @@ func _thread_main() -> void:
 	while not _thread_should_exit:
 		_thread_accept()
 		_thread_poll()
+		_thread_expire_stalled_dispatches()
 		_thread_send()
 		OS.delay_msec(THREAD_POLL_SLEEP_MSEC)
 
@@ -869,11 +907,22 @@ func _thread_poll() -> void:
 
 
 func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
-	var parsed = JSON.parse_string(packet_text)
-	if parsed == null or not (parsed is Dictionary):
+	# Instance-based JSON.parse instead of the static JSON.parse_string:
+	# the static helper push_errors to the editor Output panel on malformed
+	# input, so a misbehaving client could spam red engine errors at the
+	# user. The instance method is silent and exposes the parse diagnostics,
+	# which belong in the structured response to the client instead.
+	var json := JSON.new()
+	if json.parse(packet_text) != OK:
+		_enqueue_send(peer, _make_error(
+			"",
+			"Request body is not valid JSON: %s (line %d)" % [json.get_error_message(), json.get_error_line()]
+		))
+		return
+	if not (json.data is Dictionary):
 		_enqueue_send(peer, _make_error("", "Request body is not a valid JSON object"))
 		return
-	var request: Dictionary = parsed
+	var request: Dictionary = json.data
 	var request_id := str(request.get("id", ""))
 	var endpoint := str(request.get("endpoint", ""))
 	if endpoint.is_empty():
@@ -894,6 +943,12 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 				"godotVersion": Engine.get_version_info().get("string", ""),
 				"engineMode": mode,
 				"toolCount": _registry.get_tool_count(),
+				# How long since the editor's main thread last made progress.
+				# Health answers from the worker thread, so this stays readable
+				# even while the main thread is blocked — clients use it to
+				# tell "editor wedged behind a modal dialog" apart from
+				# "bridge gone" after a tool timeout.
+				"mainThreadStalledMsec": _msec_since_main_tick(Time.get_ticks_msec()),
 			})
 		"tools/list":
 			_enqueue_send(peer, {
@@ -915,26 +970,14 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 			})
 		"tools/execute":
 			# Marshal to main thread — tools touch the scene tree.
-			_pending_main_dispatches_mutex.lock()
-			_pending_main_dispatches.append({
-				"peer": peer,
-				"request": request,
-				"request_id": request_id,
-			})
-			_pending_main_dispatches_mutex.unlock()
+			_enqueue_main_dispatch(peer, request, request_id)
 		"context/gather":
 			# One-shot project orientation snapshot for clients that want a
 			# pre-prompt context bundle. Aggregates get_project_info +
 			# get_scene_tree + recent_errors so the agent doesn't burn
 			# 2-3 round-trips on every Godot session's first turn.
 			# Scene-tree access requires the main thread.
-			_pending_main_dispatches_mutex.lock()
-			_pending_main_dispatches.append({
-				"peer": peer,
-				"request": request,
-				"request_id": request_id,
-			})
-			_pending_main_dispatches_mutex.unlock()
+			_enqueue_main_dispatch(peer, request, request_id)
 		"backup/file", "backup/node", "backup/check_exists", "turn/revert", "turn/accept":
 			# File-level revert/backup endpoints. Routed through the main
 			# thread for two reasons: (a) FileAccess + DirAccess operations
@@ -943,13 +986,7 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 			# restore so the editor immediately reflects the rewound state —
 			# that call is main-thread-only. These endpoints don't touch
 			# the scene tree, so latency is dominated by disk I/O.
-			_pending_main_dispatches_mutex.lock()
-			_pending_main_dispatches.append({
-				"peer": peer,
-				"request": request,
-				"request_id": request_id,
-			})
-			_pending_main_dispatches_mutex.unlock()
+			_enqueue_main_dispatch(peer, request, request_id)
 		_:
 			_enqueue_send(peer, _make_error(request_id, "Unknown endpoint '%s'" % endpoint))
 
@@ -969,7 +1006,86 @@ func _thread_send() -> void:
 			push_warning("[GladeKit MCP Bridge] send_text failed (error %d)" % err)
 
 
+# ── Main-thread stall watchdog (worker thread) ───────────────────────────
+# The editor's main thread can wedge: a modal dialog pumping its own event
+# loop, a long synchronous import/scan, or a tool that blocks. When that
+# happens the dispatch queue stops draining, and without intervention every
+# queued request rides out the client's full timeout with a generic error —
+# making the bridge look dead while health still answers. The worker thread
+# (which owns no editor state and never blocks) expires queued entries past
+# MAIN_DISPATCH_STALL_TIMEOUT_MSEC and answers them with a structured error
+# naming the stall and how to clear it. Expired entries are removed under
+# the queue mutex before the main thread can pop them, so a request can
+# never receive both the stall error and a late tool response.
+
+func _thread_expire_stalled_dispatches() -> void:
+	var now := Time.get_ticks_msec()
+	var expired: Array = []
+	_pending_main_dispatches_mutex.lock()
+	if not _pending_main_dispatches.is_empty():
+		var split := _split_expired_dispatches(_pending_main_dispatches, now, MAIN_DISPATCH_STALL_TIMEOUT_MSEC)
+		expired = split["expired"]
+		_pending_main_dispatches = split["remaining"]
+	_pending_main_dispatches_mutex.unlock()
+	if expired.is_empty():
+		return
+	var stalled_msec := _msec_since_main_tick(now)
+	for entry: Dictionary in expired:
+		var request: Dictionary = entry["request"]
+		var label := str(request.get("toolName", "")) if request.has("toolName") else str(request.get("endpoint", "request"))
+		var waited_msec: int = now - int(entry.get("queued_at_msec", now))
+		var response := _make_error(
+			str(entry["request_id"]),
+			(
+				"'%s' was never dispatched: the Godot editor's main thread has not "
+				+ "processed bridge work for %.1fs (request queued %.1fs ago). The "
+				+ "editor is likely blocked by a modal dialog or a long synchronous "
+				+ "operation."
+			) % [label, stalled_msec / 1000.0, waited_msec / 1000.0]
+		)
+		response["mainThreadStalledMsec"] = stalled_msec
+		response["possible_solutions"] = [
+			"Switch to the Godot editor window and dismiss any open modal dialog",
+			"If the editor is busy importing or scanning, wait for it to finish, then retry",
+			"If the editor is permanently unresponsive, restart it — the bridge comes back automatically",
+		]
+		push_warning("[GladeKit MCP Bridge] " + str(response["message"]))
+		_enqueue_send(entry["peer"], response)
+
+
+# Pure splitter so the expiry policy is unit-testable without threads or an
+# editor. Entries missing a queued_at_msec stamp are treated as fresh.
+static func _split_expired_dispatches(dispatches: Array, now_msec: int, threshold_msec: int) -> Dictionary:
+	var expired: Array = []
+	var remaining: Array = []
+	for entry: Dictionary in dispatches:
+		var queued_at: int = int(entry.get("queued_at_msec", now_msec))
+		if now_msec - queued_at >= threshold_msec:
+			expired.append(entry)
+		else:
+			remaining.append(entry)
+	return {"expired": expired, "remaining": remaining}
+
+
+func _msec_since_main_tick(now_msec: int) -> int:
+	_cached_mutex.lock()
+	var last := _last_main_tick_msec
+	_cached_mutex.unlock()
+	return maxi(0, now_msec - last)
+
+
 # ── Cross-thread helpers ─────────────────────────────────────────────────
+
+func _enqueue_main_dispatch(peer: WebSocketPeer, request: Dictionary, request_id: String) -> void:
+	_pending_main_dispatches_mutex.lock()
+	_pending_main_dispatches.append({
+		"peer": peer,
+		"request": request,
+		"request_id": request_id,
+		"queued_at_msec": Time.get_ticks_msec(),
+	})
+	_pending_main_dispatches_mutex.unlock()
+
 
 func _enqueue_send(peer: WebSocketPeer, response: Dictionary) -> void:
 	_pending_sends_mutex.lock()
