@@ -123,8 +123,17 @@ Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 
 ## Install
 
-1. Copy `addons/com.gladekit.mcp-bridge/` into your Godot project's
-   `addons/` directory. The final path should be:
+**Easiest: release zip.** Download `com.gladekit.mcp-bridge.zip` from the latest
+[Godot bridge release](https://github.com/Glade-tool/glade-mcp/releases?q=godot&expanded=true)
+(the zip asset under **Assets**, not "Source code") and extract it — you get a
+single `com.gladekit.mcp-bridge/` folder ready to drop into `addons/`.
+
+**From source:** copy `addons/com.gladekit.mcp-bridge/` out of this directory.
+
+Either way:
+
+1. Place the folder in your Godot project's `addons/` directory. The final
+   path should be:
    ```
    <your-project>/addons/com.gladekit.mcp-bridge/plugin.cfg
    ```

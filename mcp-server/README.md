@@ -16,7 +16,12 @@ The MCP server auto-detects which editor is running (Unity on `:8765`, Godot on 
 
 ### 1. Install the editor bridge
 
-**Unity:** In Unity, open **Window > Package Manager > + > Add package from git URL...**
+GladeKit MCP supports both Unity and Godot. Install the bridge for your engine by following the instructions below.
+
+<details>
+<summary><strong>Unity</strong></summary>
+
+In Unity, open **Window > Package Manager > + > Add package from git URL...**
 
 ```
 https://github.com/Glade-tool/glade-mcp.git?path=/unity-bridge
@@ -24,10 +29,13 @@ https://github.com/Glade-tool/glade-mcp.git?path=/unity-bridge
 
 The Unity bridge starts automatically on `localhost:8765`.
 
-**Godot (4.3+):** copy the addon into your project's `addons/` directory:
+</details>
 
-1. Download the latest `com.gladekit.mcp-bridge` addon zip from [GladeKit MCP releases](https://github.com/Glade-tool/glade-mcp/releases) (the asset is named `com.gladekit.mcp-bridge-<version>.zip`).
-2. Extract into `<your-godot-project>/addons/com.gladekit.mcp-bridge/`.
+<details>
+<summary><strong>Godot (4.3+)</strong></summary>
+
+1. Download `com.gladekit.mcp-bridge.zip` from the latest [Godot bridge release](https://github.com/Glade-tool/glade-mcp/releases?q=godot&expanded=true). (Grab the zip asset under **Assets** - not "Source code".)
+2. Extract it and you get a single `com.gladekit.mcp-bridge/` folder. Move it into your project's `addons/` directory, so the final path is `<your-godot-project>/addons/com.gladekit.mcp-bridge/plugin.cfg`.
 3. In Godot: **Project → Project Settings → Plugins** → enable **GladeKit MCP Bridge**.
 
 The Godot bridge starts automatically on `localhost:8766`. You should see a confirmation line in the editor Output panel:
@@ -37,6 +45,8 @@ The Godot bridge starts automatically on `localhost:8766`. You should see a conf
 ```
 
 **Supported:** Godot 4.3+ GDScript projects, Forward+ and Compatibility renderers, 2D and 3D. **Not yet supported:** Godot Mono / C# projects, web export targets, headless server builds. The bridge is editor-only; it never runs in exported games.
+
+</details>
 
 Engine auto-detection: the MCP server probes both ports on startup and exposes the matching tool set. Running both editors at once? Set `GLADEKIT_MCP_FORCE_ENGINE=unity` or `=godot` to pin a specific engine.
 
