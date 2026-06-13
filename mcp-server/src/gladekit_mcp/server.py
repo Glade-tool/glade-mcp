@@ -207,7 +207,7 @@ async def list_tools() -> list[types.Tool]:
     accordingly. Meta-tools are Unity-specific today — get_relevant_tools,
     remember_for_session, batch_execute, search_project_scripts all
     assume the Unity bridge's tool surface and context-gather endpoint.
-    On Godot we expose just the 60 native tools.
+    On Godot we expose just the 63 native tools.
     """
     engine_tools = await get_mcp_tools_async()
     if get_active_engine() == "godot":

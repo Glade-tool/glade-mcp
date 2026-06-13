@@ -31,8 +31,9 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# v0.6.0 animation (5 — add_animation_to_player + add_animation_track +
 	# add_animation_keyframe + set_animation_properties +
 	# get_animation_player_info) = 58; add_input_action (1) = 59;
-	# set_node_property (1) = 60 total.
-	assert_eq(registry.get_tool_count(), 60, "Catalog should register exactly 60 tools")
+	# set_node_property (1) = 60; v0.7.0 asset pipeline import_asset +
+	# list_imported_assets (2) = 62 total.
+	assert_eq(registry.get_tool_count(), 62, "Catalog should register exactly 62 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -74,6 +75,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"add_animation_to_player", "add_animation_track",
 		"add_animation_keyframe", "set_animation_properties",
 		"get_animation_player_info",
+		# v0.7.0 — Asset pipeline (async download + install; license audit)
+		"import_asset", "list_imported_assets",
 	]
 	for expected in expected_names:
 		assert_true(registry.has_tool(expected), "Missing registration for tool '%s'" % expected)

@@ -57,6 +57,8 @@ const READ_ONLY_TOOLS: Array[String] = [
 	"get_world_environment",
 	# Animation reads (v0.6.0)
 	"get_animation_player_info",
+	# Asset pipeline audit (v0.7.0) — reads .gladekit-asset.json sidecars only
+	"list_imported_assets",
 ]
 
 const SETTING_KEY := "gladekit/read_only_mode"

@@ -25,17 +25,22 @@ Categories follow the Godot bridge's own directory layout under
     project   — Introspection + asset listing + input actions   ( 3 tools)
     ui        — Control-tree creation + anchor / text helpers   ( 6 tools)
     animation — AnimationPlayer + Animation .tres scaffolding   ( 5 tools)
+    asset_pipeline — find / import / audit external CC0 assets   ( 3 tools)
                                                                 ───────
-                                                                60 tools
+                                                                63 tools
 
 Unlike the Unity side (~235 tools across 17 categories) we expose the
-full Godot catalog directly — 60 tools is well within Claude Code's
+full Godot catalog directly — 63 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
+
+Note: find_asset (in asset_pipeline) is answered by the server itself rather
+than dispatched to the bridge, so it appears here but has no bridge tool.
 """
 
 from typing import Dict, List
 
 from .animation import TOOLS as ANIMATION_TOOLS
+from .asset_pipeline import TOOLS as ASSET_PIPELINE_TOOLS
 from .camera import TOOLS as CAMERA_TOOLS
 from .physics import TOOLS as PHYSICS_TOOLS
 from .project import TOOLS as PROJECT_TOOLS
@@ -61,6 +66,7 @@ ALL_CATEGORIES = [
     ("project", PROJECT_TOOLS),
     ("ui", UI_TOOLS),
     ("animation", ANIMATION_TOOLS),
+    ("asset_pipeline", ASSET_PIPELINE_TOOLS),
 ]
 
 
@@ -110,12 +116,14 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
         "get_world_environment",
         # Animation reads (v0.6.0)
         "get_animation_player_info",
+        # Asset pipeline audit (v0.7.0) — reads .gladekit-asset.json sidecars only
+        "list_imported_assets",
     }
 )
 
 
 def get_godot_tool_schemas() -> List[Dict]:
-    """Return all 60 Godot tool schemas as a flat list (OpenAI function format)."""
+    """Return all 63 Godot tool schemas as a flat list (OpenAI function format)."""
     all_tools: List[Dict] = []
     for _, tools in ALL_CATEGORIES:
         all_tools.extend(tools)

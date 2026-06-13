@@ -101,6 +101,12 @@ const AddAnimationKeyframeTool   = preload("res://addons/com.gladekit.mcp-bridge
 const SetAnimationPropertiesTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/set_animation_properties.gd")
 const GetAnimationPlayerInfoTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/get_animation_player_info.gd")
 
+# ── Asset pipeline tools (v0.7.0) ──────────────────────────────────────────
+# Download + install external CC0 assets. import_asset is async (downloads on a
+# worker thread); see i_tool.gd's async protocol + ws_server._drain_async_dispatches.
+const ImportAssetTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/asset_pipeline/import_asset.gd")
+const ListImportedAssetsTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/asset_pipeline/list_imported_assets.gd")
+
 var _tools: Dictionary = {}
 
 
@@ -182,6 +188,10 @@ func _register_all() -> void:
 	register_tool(AddAnimationKeyframeTool.new())
 	register_tool(SetAnimationPropertiesTool.new())
 	register_tool(GetAnimationPlayerInfoTool.new())
+	# Asset pipeline (2, v0.7.0) — async external-asset download + install,
+	# plus a read-only license audit of what's been imported.
+	register_tool(ImportAssetTool.new())
+	register_tool(ListImportedAssetsTool.new())
 
 
 func register_tool(tool_instance) -> void:

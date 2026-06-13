@@ -62,6 +62,18 @@ const THREAD_POLL_SLEEP_MSEC := 5  # ~200Hz worker loop (never throttled)
 # instead of their own generic timeout.
 const MAIN_DISPATCH_STALL_TIMEOUT_MSEC := 25_000
 
+# Hard ceiling for an async tool (e.g. import_asset) from the moment its
+# execute() returns an "async_pending" marker to the moment poll() yields a
+# final result. Unlike the stall watchdog above — which guards work still
+# QUEUED on the main thread — this guards work already IN FLIGHT on a worker
+# thread (a download that hangs). Set above the downloader's own 60s timeout so
+# the tool's own error surfaces first; this is the backstop if the tool itself
+# wedges. NOTE: pure-MCP clients typically use a ~30s per-call timeout, so an
+# async job that runs longer than that is answered to a client that has already
+# given up — fine for small CC0 packs (sub-second to a few seconds), but the
+# reason large/slow downloads are out of scope for v1.
+const ASYNC_DISPATCH_TIMEOUT_MSEC := 90_000
+
 # WebSocketPeer defaults to 64KB in/out buffers. Tool payloads routinely
 # exceed that: get_script_content allows max_lines=5000 (~200KB+),
 # get_scene_tree response_format="both" on a large scene, and context/gather
@@ -112,6 +124,12 @@ var _pending_main_dispatches_mutex: Mutex = null
 # Main → Thread (or Thread → Thread): JSON responses ready to send.
 var _pending_sends: Array = []
 var _pending_sends_mutex: Mutex = null
+
+# Async tool dispatches awaiting completion. Main-thread-only — appended when a
+# tool's execute() returns an "async_pending" marker, drained each _process
+# tick by polling the tool. No mutex: only the main thread touches it.
+# Entry shape: { peer, request_id, tool, tool_name, started_msec }.
+var _pending_async: Array = []
 
 # Cached engine mode, refreshed by main thread, read by worker thread.
 var _cached_engine_mode: String = "edit"
@@ -196,6 +214,7 @@ func stop() -> void:
 		_tcp_server = null
 	_pending_main_dispatches.clear()
 	_pending_sends.clear()
+	_pending_async.clear()
 	print_rich("[color=cyan][GladeKit MCP Bridge][/color] stopped")
 
 
@@ -207,6 +226,7 @@ func _process(_delta: float) -> void:
 	_touch_main_heartbeat()
 	_refresh_cached_engine_mode()
 	_drain_pending_dispatches()
+	_drain_async_dispatches()
 
 
 func _refresh_cached_engine_mode() -> void:
@@ -253,12 +273,55 @@ func _drain_pending_dispatches() -> void:
 		elif endpoint == "turn/accept":
 			response = _main_dispatch_turn_accept(request_id, request)
 		else:
-			response = _main_dispatch_tool(request_id, request)
-		_enqueue_send(peer, response)
+			response = _main_dispatch_tool(request_id, request, peer)
+		# An empty response is the sentinel for "deferred": the tool started
+		# async work and registered itself in _pending_async; its real response
+		# is sent later by _drain_async_dispatches. Don't send anything now.
+		if not response.is_empty():
+			_enqueue_send(peer, response)
 		_touch_main_heartbeat()
 
 
-func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
+# Poll in-flight async tool dispatches once per tick. Each tool's poll()
+# returns {} while still running, or its final result Dictionary when done.
+# Finished tools have their response sent and are removed; a tool that exceeds
+# ASYNC_DISPATCH_TIMEOUT_MSEC is answered with a structured timeout error so the
+# client never hangs on a wedged worker.
+func _drain_async_dispatches() -> void:
+	if _pending_async.is_empty():
+		return
+	var now := Time.get_ticks_msec()
+	var still_pending: Array = []
+	for entry: Dictionary in _pending_async:
+		var tool = entry["tool"]
+		var tool_name: String = str(entry["tool_name"])
+		var result = tool.poll()
+		if result == null or not (result is Dictionary) or (result as Dictionary).is_empty():
+			# Still running — unless it has blown the hard ceiling.
+			if now - int(entry["started_msec"]) > ASYNC_DISPATCH_TIMEOUT_MSEC:
+				var to_msg := (
+					"Async tool '%s' did not finish within %ds and was abandoned. "
+					+ "The download may have stalled; retry, and check your network."
+				) % [tool_name, ASYNC_DISPATCH_TIMEOUT_MSEC / 1000]
+				ErrorTracker.record(tool_name, to_msg, {})
+				_enqueue_send(entry["peer"], _make_error(str(entry["request_id"]), to_msg))
+			else:
+				still_pending.append(entry)
+			continue
+		# Finished — forward the final result.
+		var final: Dictionary = result
+		if not final.has("success"):
+			final = _make_error(str(entry["request_id"]), "Async tool '%s' returned a result missing 'success'" % tool_name)
+		if not bool(final.get("success", false)):
+			ErrorTracker.record(tool_name, str(final.get("error", final.get("message", "async tool failed"))), {})
+		var response: Dictionary = {"id": entry["request_id"]}
+		for key in final:
+			response[key] = final[key]
+		_enqueue_send(entry["peer"], response)
+	_pending_async = still_pending
+
+
+func _main_dispatch_tool(request_id: String, request: Dictionary, peer: WebSocketPeer) -> Dictionary:
 	var tool_name := str(request.get("toolName", ""))
 	if tool_name.is_empty():
 		return _make_error(request_id, "Missing 'toolName' field")
@@ -350,6 +413,22 @@ func _main_dispatch_tool(request_id: String, request: Dictionary) -> Dictionary:
 		push_error("[GladeKit MCP Bridge] " + shape_msg)
 		ErrorTracker.record(tool_name, shape_msg, args)
 		return _make_error(request_id, shape_msg)
+
+	# Async tools: execute() kicked off a worker thread and returned an
+	# "async_pending" marker rather than the final answer. Register the tool to
+	# be polled each tick (see _drain_async_dispatches) and return the empty
+	# sentinel so the caller sends nothing now. The single real response is sent
+	# when poll() yields a final result.
+	if bool((result as Dictionary).get("async_pending", false)):
+		_pending_async.append({
+			"peer": peer,
+			"request_id": request_id,
+			"tool": tool_instance,
+			"tool_name": tool_name,
+			"started_msec": Time.get_ticks_msec(),
+		})
+		return {}
+
 	# Tool result already carries success/message/error — inject id and forward.
 	# Also feed failures into the per-session ErrorTracker so callers can read
 	# the recent failure pattern via the bridge's recent_errors endpoint and

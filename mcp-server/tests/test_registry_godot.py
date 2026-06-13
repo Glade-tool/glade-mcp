@@ -31,6 +31,13 @@ from gladekit_mcp.schemas.godot import (
 )
 from gladekit_mcp.tools.registry import _build_tool_list
 
+# Some tools live in the schema catalog (the agent must see them) but are
+# answered by the server itself rather than dispatched to the engine bridge, so
+# they have no bridge tool. They are legitimate "orphan schemas" and exempt from
+# the parity orphan check. find_asset searches the bundled asset catalog;
+# meshy_generate_3d generates a model.
+_LOCALLY_HANDLED_TOOLS = {"find_asset", "meshy_generate_3d"}
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
@@ -122,11 +129,12 @@ def test_every_schema_corresponds_to_a_bridge_tool():
     bridge_names = _bridge_tool_names()
     schema_names = set(get_godot_tool_names())
 
-    orphan_schemas = schema_names - bridge_names
+    orphan_schemas = schema_names - bridge_names - _LOCALLY_HANDLED_TOOLS
     assert not orphan_schemas, (
         f"schemas/godot/ describes tools that the bridge does not register: "
-        f"{sorted(orphan_schemas)}. Either remove the schema or add the tool to "
-        f"godot-bridge/.../bridge/tool_registry.gd."
+        f"{sorted(orphan_schemas)}. Either remove the schema, add the tool to "
+        f"godot-bridge/.../bridge/tool_registry.gd, or (if handled by the server "
+        f"itself) add it to _LOCALLY_HANDLED_TOOLS."
     )
 
 
@@ -141,11 +149,14 @@ def test_tool_count_matches_canonical_catalog():
     v0.6.0 added 5 animation tools (add_animation_to_player +
     add_animation_track + add_animation_keyframe + set_animation_properties
     + get_animation_player_info) → 58; add_input_action (InputMap action
-    setup) → 59; set_node_property (generic non-Resource property setter) → 60.
+    setup) → 59; set_node_property (generic non-Resource property setter) → 60;
+    v0.7.0 asset pipeline added 2 bridge tools (import_asset +
+    list_imported_assets) → 62. (find_asset is answered by the server itself —
+    it has a schema but no bridge tool, so it is not counted here.)
     A change here is a real change —
     update this test and the schema package together."""
     bridge_names = _bridge_tool_names()
-    expected = 60
+    expected = 62
     assert len(bridge_names) == expected, (
         f"Expected {expected} Godot bridge tools, got {len(bridge_names)}. "
         f"If the catalog grew or shrank, update this test and the schema package."
