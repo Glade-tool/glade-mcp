@@ -27,6 +27,10 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #               format dropped it.
 #   scene_path: String  ("" for ad-hoc / unsaved scenes)
 #   node_count: int  — also echoed in the success message.
+#   root_space: "2d"|"3d"|"ui"|"other"|"unknown" — the workspace the scene
+#               root lives in (Node2D→2d, Node3D→3d, Control/CanvasLayer→ui),
+#               so the agent picks 2D vs 3D node types correctly. "unknown"
+#               when no scene is open.
 #
 # Each node in `tree`:
 #   { "name": String, "type": String, "path": String,
@@ -65,6 +69,7 @@ func execute(args: Dictionary) -> Dictionary:
 		var empty: Dictionary = {
 			"scene_path": "",
 			"node_count": 0,
+			"root_space": "unknown",
 		}
 		if format != FORMAT_TREE_TEXT_ONLY:
 			empty["tree"] = null
@@ -80,6 +85,7 @@ func execute(args: Dictionary) -> Dictionary:
 	var payload: Dictionary = {
 		"scene_path": root.scene_file_path,
 		"node_count": count,
+		"root_space": ToolUtils.classify_node_space(root),
 	}
 	if format != FORMAT_TREE_TEXT_ONLY:
 		payload["tree"] = _serialize(root, 0, max_depth)

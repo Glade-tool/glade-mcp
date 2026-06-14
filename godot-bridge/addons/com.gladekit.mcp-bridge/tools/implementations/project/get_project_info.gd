@@ -23,6 +23,11 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #   project: {
 #     name, description, godot_version, renderer,
 #     main_scene, current_scene,
+#     workspace: "2d"|"3d"|"ui"|"other"|"unknown" — the project's primary
+#                dimension, inferred from the main (run) scene's root node
+#                type, falling back to the open scene. Tells the agent to
+#                reach for Camera2D/PointLight2D/Sprite2D in a 2D project vs
+#                Camera3D/OmniLight3D/MeshInstance3D in a 3D one.
 #     scene_count, script_count, resource_count,
 #     enabled_addons: [String], supports_uid: bool,
 #   }
@@ -60,6 +65,7 @@ func execute(args: Dictionary) -> Dictionary:
 
 	var info: Dictionary = _read_project_settings()
 	info["supports_uid"] = ToolUtils.compare_versions(info["godot_version"], "4.4") >= 0
+	info["workspace"] = _detect_workspace(str(info.get("main_scene", "")))
 
 	var counts: Dictionary = {"scene": 0, "script": 0, "resource": 0}
 	var listings: Dictionary = {}
@@ -99,6 +105,26 @@ func _read_project_settings() -> Dictionary:
 		"enabled_addons": _enabled_addon_list(),
 	}
 	return info
+
+
+# Infer the project's primary workspace ("2d" | "3d" | "ui" | "other" |
+# "unknown"). The main (run) scene's root node type is the strongest signal —
+# it's the game's entry point. When that's ambiguous (a UI menu or a bare Node
+# wrapper), fall back to whatever scene is open in the editor. We read the main
+# scene's root type from its serialized state (no instantiation) to stay cheap.
+func _detect_workspace(main_scene: String) -> String:
+	var main_space := ToolUtils.classify_class_space(ToolUtils.scene_file_root_type(main_scene)) if not main_scene.is_empty() else "unknown"
+	if main_space == "2d" or main_space == "3d":
+		return main_space
+	var edited: Node = EditorInterface.get_edited_scene_root()
+	var edited_space := ToolUtils.classify_node_space(edited) if edited != null else "unknown"
+	if edited_space == "2d" or edited_space == "3d":
+		return edited_space
+	# Neither yielded a spatial answer — surface the best non-spatial hint
+	# (e.g. "ui" for a menu-only project) rather than masking it as unknown.
+	if main_space != "unknown":
+		return main_space
+	return edited_space
 
 
 func _current_scene_path() -> String:

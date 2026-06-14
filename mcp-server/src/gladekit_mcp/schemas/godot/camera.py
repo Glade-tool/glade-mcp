@@ -1,11 +1,14 @@
 """
 Godot camera, lighting, and environment tools (6 tools).
 
-`create_light` covers DirectionalLight3D, OmniLight3D, and SpotLight3D
-behind a single `type` arg — the original three-tool plan was deduped
-to one tool with a type parameter, matching the way Godot users actually
-reason about lights. `set_light_properties` / `get_light_info` are the
-mutate/read pair for an existing Light3D.
+`create_camera` and `create_light` are dimension-aware: a `space` arg
+(`"2d"` | `"3d"`) picks the node family, the same convention
+`create_physics_body` uses. `create_camera` makes a Camera3D or Camera2D;
+`create_light` covers the 3D Light3D subclasses (DirectionalLight3D /
+OmniLight3D / SpotLight3D) and the 2D family (PointLight2D /
+DirectionalLight2D / CanvasModulate) behind a single `type` arg.
+`set_light_properties` / `get_light_info` are the mutate/read pair for an
+existing Light3D.
 
 `set_world_environment` / `get_world_environment` cover scene-wide
 rendering: sky, ambient light, fog, tonemap, glow, SSAO. Godot's
@@ -21,16 +24,28 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
-            "name": "create_camera_3d",
+            "name": "create_camera",
             "description": (
-                "Create a Camera3D node and add it to the edited scene. Optionally "
-                "orient toward a target via look_at, and/or make it the active camera "
-                "via current=true. For 2D scenes use create_node with type='Camera2D'."
+                "Create a camera node. The `space` arg picks the family: 'space=3d' "
+                "(default) makes a Camera3D (perspective, fov, look_at); 'space=2d' "
+                "makes a Camera2D (zoom, viewport follow) for platformers / top-down "
+                "games. Check the project's workspace from get_project_info first — use "
+                "space='2d' in a 2D project. Optionally make it the active camera with "
+                "current=true."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Node name. Default 'Camera3D'."},
+                    "space": {
+                        "type": "string",
+                        "description": (
+                            "Dimension: '3d' (Camera3D) or '2d' (Camera2D). Inferred from "
+                            "the open scene's root when omitted, so you usually don't need "
+                            "to pass it — set it only to override."
+                        ),
+                        "enum": ["3d", "2d"],
+                    },
+                    "name": {"type": "string", "description": "Node name. Default 'Camera3D'/'Camera2D'."},
                     "parent_path": {
                         "type": "string",
                         "description": "Scene-relative parent. Default scene root.",
@@ -41,16 +56,23 @@ TOOLS: List[Dict] = [
                     },
                     "fov": {
                         "type": "number",
-                        "description": "Field of view in degrees. Default 75.",
+                        "description": "Field of view in degrees (3D only). Default 75.",
                     },
                     "position": {
                         "type": "string",
-                        "description": "Initial position as 'x,y,z'. Default '0,0,5'.",
+                        "description": "Initial position: 'x,y,z' (3D, default '0,0,5') or 'x,y' (2D, default '0,0').",
                     },
                     "look_at": {
                         "type": "string",
                         "description": (
-                            "Optional point to orient toward, as 'x,y,z'. The camera will be rotated automatically."
+                            "Optional point to orient toward, as 'x,y,z' (3D only). The camera is rotated automatically."
+                        ),
+                    },
+                    "zoom": {
+                        "type": "string",
+                        "description": (
+                            "Camera2D zoom (2D only). A single number for uniform zoom or 'x,y'. "
+                            ">1 zooms IN. Default 1."
                         ),
                     },
                 },
@@ -62,18 +84,32 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "create_light",
             "description": (
-                "Create a Light3D node (DirectionalLight3D / OmniLight3D / SpotLight3D). "
-                "The `type` arg picks the subclass — 'directional' for sun-style lighting, "
-                "'omni' for point lights, 'spot' for cone lights. Directional lights get "
-                "a sensible 45° default rotation if no rotation is passed."
+                "Create a light node in 3D or 2D, picked by `space`. space='3d' (default): "
+                "DirectionalLight3D ('directional'), OmniLight3D ('omni'), SpotLight3D "
+                "('spot'). space='2d': PointLight2D ('point'), DirectionalLight2D "
+                "('directional'), or a scene-wide CanvasModulate tint ('ambient', the 2D "
+                "analogue of ambient/environment color). In a 2D project use space='2d' — "
+                "a 2D point light auto-gets a soft radial texture so it actually emits. "
+                "3D directional lights get a 45° default rotation."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "space": {
+                        "type": "string",
+                        "description": (
+                            "Dimension: '3d' (Light3D) or '2d' (Light2D / CanvasModulate). "
+                            "Inferred from the open scene's root when omitted."
+                        ),
+                        "enum": ["3d", "2d"],
+                    },
                     "type": {
                         "type": "string",
-                        "description": "Light kind.",
-                        "enum": ["directional", "omni", "spot"],
+                        "description": (
+                            "Light kind. 3D: directional | omni | spot. "
+                            "2D: point | directional | ambient (CanvasModulate)."
+                        ),
+                        "enum": ["directional", "omni", "spot", "point", "ambient"],
                     },
                     "name": {
                         "type": "string",
@@ -85,7 +121,7 @@ TOOLS: List[Dict] = [
                     },
                     "energy": {
                         "type": "number",
-                        "description": "Light energy multiplier. Default 1.0.",
+                        "description": "Light energy multiplier (3D + 2D Light2D). Default 1.0.",
                     },
                     "color": {
                         "type": "string",
@@ -93,11 +129,18 @@ TOOLS: List[Dict] = [
                     },
                     "position": {
                         "type": "string",
-                        "description": "Initial position as 'x,y,z'. Default '0,3,0'.",
+                        "description": "Initial position: 'x,y,z' (3D) or 'x,y' (2D). Ignored for 'ambient'.",
                     },
                     "shadow": {
                         "type": "boolean",
-                        "description": "Enable shadow casting. Default true.",
+                        "description": "Enable shadow casting. Default true (3D), false (2D).",
+                    },
+                    "texture": {
+                        "type": "string",
+                        "description": (
+                            "res:// texture for a 2D point light (overrides the generated "
+                            "radial gradient). 2D 'point' only."
+                        ),
                     },
                 },
                 "required": ["type"],

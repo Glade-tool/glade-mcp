@@ -1,21 +1,31 @@
 extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 
-# Creates a new StandardMaterial3D (default) or ShaderMaterial resource
-# and saves it as a .tres file.
+# Creates a new material resource and saves it as a .tres file. The `space`
+# arg picks the material family — StandardMaterial3D for 3D meshes (default) or
+# CanvasItemMaterial for 2D sprites/canvas items — so one tool covers both,
+# matching the create_physics_body / create_light convention. A ShaderMaterial
+# (material_type="shader") is dimension-agnostic and works for either.
 #
 # Args:
 #   path:        String (required) — res:// path for the .tres file. Auto-
 #                                    appends .tres if no extension.
-#   material_type: String — "standard" (StandardMaterial3D, default) or
-#                          "shader" (ShaderMaterial, requires shader_path)
+#   space:       "2d" | "3d" — StandardMaterial3D vs CanvasItemMaterial. When
+#                omitted, inferred from the open scene's root (falls back "3d").
+#   material_type: String — "standard" (default; StandardMaterial3D in 3D,
+#                          CanvasItemMaterial in 2D) or "shader" (ShaderMaterial,
+#                          requires shader_path; ignores `space`).
 #   shader_path: String — required when material_type=shader.
-#   albedo:      "r,g,b" | "#rrggbb" — initial albedo color (standard only).
-#   metallic:    float (0-1) — metallic property (standard only).
-#   roughness:   float (0-1) — roughness property (standard only).
-#   emission:    "r,g,b" | "#rrggbb" — emission color (standard only).
+#   albedo:      "r,g,b" | "#rrggbb" — initial albedo color (3D standard only).
+#   metallic:    float (0-1) — metallic property (3D standard only).
+#   roughness:   float (0-1) — roughness property (3D standard only).
+#   emission:    "r,g,b" | "#rrggbb" — emission color (3D standard only).
+#   blend_mode:  String — CanvasItemMaterial blend (2D standard only):
+#                "mix" (default) | "add" | "sub" | "mul" | "premul_alpha".
+#   light_mode:  String — CanvasItemMaterial light interaction (2D standard only):
+#                "normal" (default) | "unshaded" | "light_only".
 #
 # Response payload:
-#   path, type ("StandardMaterial3D" or "ShaderMaterial")
+#   path, type ("StandardMaterial3D" | "CanvasItemMaterial" | "ShaderMaterial")
 
 const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 const DemoAssetsGuard = preload("res://addons/com.gladekit.mcp-bridge/services/demo_assets_guard.gd")
@@ -43,6 +53,17 @@ func execute(args: Dictionary) -> Dictionary:
 			["Call set_material_property to modify the existing material", "Or pick a different path"]
 		)
 
+	# Inferred from the open scene's root when not passed: a material created
+	# while editing a 2D scene defaults to CanvasItemMaterial. material_type=
+	# "shader" ignores space entirely (ShaderMaterial is dimension-agnostic).
+	var space: String = ToolUtils.resolve_space(args)
+	if space != "2d" and space != "3d":
+		return ToolUtils.error_with_solutions(
+			"Unknown space '%s'" % space,
+			["Use space='3d' for a StandardMaterial3D", "Use space='2d' for a CanvasItemMaterial (sprites / canvas items)"]
+		)
+	var is_2d: bool = space == "2d"
+
 	var mat_type: String = ToolUtils.parse_string_arg(args, "material_type", "standard").to_lower()
 	var material: Material
 	if mat_type == "shader":
@@ -55,6 +76,12 @@ func execute(args: Dictionary) -> Dictionary:
 		var sm := ShaderMaterial.new()
 		sm.shader = shader
 		material = sm
+	elif is_2d:
+		var cim := CanvasItemMaterial.new()
+		var blend_err := _apply_canvas_item_properties(cim, args)
+		if not blend_err.is_empty():
+			return ToolUtils.error(blend_err)
+		material = cim
 	else:
 		var std := StandardMaterial3D.new()
 		_apply_standard_properties(std, args)
@@ -99,3 +126,35 @@ func _apply_standard_properties(m: StandardMaterial3D, args: Dictionary) -> void
 		m.metallic = clamp(ToolUtils.parse_float_arg(args, "metallic", 0.0), 0.0, 1.0)
 	if args.has("roughness"):
 		m.roughness = clamp(ToolUtils.parse_float_arg(args, "roughness", 1.0), 0.0, 1.0)
+
+
+# Apply 2D CanvasItemMaterial properties. Returns "" on success or an error
+# message for an unknown blend/light mode.
+func _apply_canvas_item_properties(m: CanvasItemMaterial, args: Dictionary) -> String:
+	if args.has("blend_mode"):
+		var bm: String = ToolUtils.parse_string_arg(args, "blend_mode", "mix").to_lower()
+		match bm:
+			"mix", "normal":
+				m.blend_mode = CanvasItemMaterial.BLEND_MODE_MIX
+			"add", "additive":
+				m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			"sub", "subtract":
+				m.blend_mode = CanvasItemMaterial.BLEND_MODE_SUB
+			"mul", "multiply":
+				m.blend_mode = CanvasItemMaterial.BLEND_MODE_MUL
+			"premul_alpha", "premultiplied":
+				m.blend_mode = CanvasItemMaterial.BLEND_MODE_PREMULT_ALPHA
+			_:
+				return "Unknown blend_mode '%s' (use mix | add | sub | mul | premul_alpha)" % bm
+	if args.has("light_mode"):
+		var lm: String = ToolUtils.parse_string_arg(args, "light_mode", "normal").to_lower()
+		match lm:
+			"normal":
+				m.light_mode = CanvasItemMaterial.LIGHT_MODE_NORMAL
+			"unshaded":
+				m.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+			"light_only":
+				m.light_mode = CanvasItemMaterial.LIGHT_MODE_LIGHT_ONLY
+			_:
+				return "Unknown light_mode '%s' (use normal | unshaded | light_only)" % lm
+	return ""

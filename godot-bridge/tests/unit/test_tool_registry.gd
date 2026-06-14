@@ -32,21 +32,28 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# add_animation_keyframe + set_animation_properties +
 	# get_animation_player_info) = 58; add_input_action (1) = 59;
 	# set_node_property (1) = 60; v0.7.0 asset pipeline import_asset +
-	# list_imported_assets (2) = 62 total.
-	assert_eq(registry.get_tool_count(), 62, "Catalog should register exactly 62 tools")
+	# list_imported_assets (2) = 62; 2D foundation create_sprite_2d +
+	# create_animated_sprite_2d (2) = 64; 2D batch 2 create_tilemap_layer +
+	# set_tilemap_cells + create_parallax_2d (3) = 67 total. (create_camera_3d →
+	# create_camera was a rename, not an add; it stays callable via a registry
+	# alias which does NOT count toward get_tool_count.)
+	assert_eq(registry.get_tool_count(), 67, "Catalog should register exactly 67 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
 	var expected_names := [
 		# Phase 2 — Scene / Node
 		"get_scene_tree", "get_node_info", "find_nodes", "create_node",
-		"create_primitive_3d", "delete_node", "rename_node", "duplicate_node",
+		"create_primitive_3d", "create_sprite_2d", "create_animated_sprite_2d",
+		"create_tilemap_layer", "set_tilemap_cells", "create_parallax_2d",
+		"delete_node", "rename_node", "duplicate_node",
 		"set_node_parent", "set_node_transform", "set_node_resource",
 		# Phase 2 — Script
 		"create_script", "modify_script", "get_script_content", "find_scripts",
 		"attach_script_to_node",
-		# Phase 3 — Camera / Light
-		"create_camera_3d", "create_light",
+		# Camera / Light (create_camera is dimension-aware; create_camera_3d
+		# remains a registry alias, asserted separately below)
+		"create_camera", "create_light",
 		# Phase 3 — Resource
 		"create_material", "set_material_property", "create_resource",
 		# Phase 3 — Physics
@@ -92,6 +99,28 @@ func test_get_tool_returns_instance() -> void:
 func test_get_tool_unknown_returns_null() -> void:
 	var registry = ToolRegistry.new()
 	assert_null(registry.get_tool("not_a_real_tool"))
+
+
+# ── Backward-compat aliases ───────────────────────────────────────────────
+
+func test_alias_resolves_to_canonical_tool() -> void:
+	var registry = ToolRegistry.new()
+	# create_camera_3d is the legacy name; it must still dispatch to the
+	# dimension-aware create_camera tool (same instance).
+	assert_true(registry.has_tool("create_camera_3d"), "Legacy alias must resolve")
+	var aliased = registry.get_tool("create_camera_3d")
+	var canonical = registry.get_tool("create_camera")
+	assert_not_null(aliased)
+	assert_eq(aliased, canonical, "Alias must return the same instance as the canonical tool")
+	assert_eq(aliased.tool_name, "create_camera", "Alias instance keeps its canonical tool_name")
+
+
+func test_alias_excluded_from_count_and_names() -> void:
+	var registry = ToolRegistry.new()
+	# Aliases are invisible to the catalog: the agent is steered to the
+	# canonical name, and the parity/catalog tests count canonical tools only.
+	assert_false(registry.get_tool_names().has("create_camera_3d"),
+		"Alias must not appear in get_tool_names()")
 
 
 func test_get_tool_names_sorted() -> void:

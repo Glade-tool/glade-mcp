@@ -55,6 +55,11 @@ func test_concise_default_returns_metadata_and_counts() -> void:
 	assert_true(p.has("supports_uid"))
 	assert_true(p.supports_uid is bool)
 
+	# workspace tells the agent whether to reach for 2D or 3D node families.
+	assert_true(p.has("workspace"))
+	assert_true(["2d", "3d", "ui", "other", "unknown"].has(p.workspace),
+		"workspace must be a known classification, got '%s'" % p.workspace)
+
 	# Counts are non-negative integers.
 	assert_true(p.scene_count is int and p.scene_count >= 0, "scene_count: %s" % p.scene_count)
 	assert_true(p.script_count is int and p.script_count >= 0, "script_count: %s" % p.script_count)

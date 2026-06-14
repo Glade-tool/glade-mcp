@@ -543,6 +543,109 @@ static func _split_version(v: String) -> Array:
 	return parts
 
 
+# ── 2D / 3D workspace classification ───────────────────────────────────────
+# Godot has no project-level "this is a 2D game" flag — the dimension is
+# implied by the node types in use (Node3D vs Node2D). These helpers let a
+# tool report which workspace a node / scene / class belongs to so an agent
+# can pick the right family (Camera2D vs Camera3D, PointLight2D vs OmniLight3D,
+# Sprite2D vs MeshInstance3D) instead of defaulting to 3D in a 2D project.
+# Shared vocabulary returned everywhere:
+#   "3d"      — Node3D and descendants (spatial)
+#   "2d"      — Node2D and descendants (canvas)
+#   "ui"      — Control / CanvasLayer (UI-only, dimension-agnostic)
+#   "other"   — plain Node or anything else (ambiguous; may hold a mix)
+#   "unknown" — null / unreadable / unresolvable class
+
+static func classify_node_space(node: Node) -> String:
+	if node == null:
+		return "unknown"
+	if node is Node3D:
+		return "3d"
+	if node is Node2D:
+		return "2d"
+	if node is Control or node is CanvasLayer:
+		return "ui"
+	return "other"
+
+
+# Classify a built-in class name (string) WITHOUT instantiating. Same
+# vocabulary as classify_node_space; unknown/empty/non-existent → "unknown".
+static func classify_class_space(type_name: String) -> String:
+	if type_name.is_empty() or not ClassDB.class_exists(type_name):
+		return "unknown"
+	if ClassDB.is_parent_class(type_name, "Node3D"):
+		return "3d"
+	if ClassDB.is_parent_class(type_name, "Node2D"):
+		return "2d"
+	if ClassDB.is_parent_class(type_name, "Control") or ClassDB.is_parent_class(type_name, "CanvasLayer"):
+		return "ui"
+	return "other"
+
+
+# Resolve the effective "2d"/"3d" dimension for a dimension-aware tool. An
+# explicit `space` arg always wins; otherwise the dimension is INFERRED from
+# the open scene's root node, so a tool called in a 2D scene produces 2D nodes
+# even when the agent forgets to pass `space`. This is the smoothness win — the
+# agent rarely has to think about dimension, and the few times it does it just
+# passes `space` explicitly to override. Ambiguous roots (plain Node / Control /
+# no scene) fall back to `fallback` (default "3d").
+#
+# Returns "2d" | "3d" for valid input, or the raw lower-cased string for an
+# invalid explicit value (e.g. "2.5d") so the caller can surface a precise error.
+static func resolve_space(args: Dictionary, fallback: String = "3d") -> String:
+	if args.has("space") and args["space"] != null and not str(args["space"]).strip_edges().is_empty():
+		var s: String = parse_string_arg(args, "space", fallback).strip_edges().to_lower()
+		if s == "2d" or s == "2":
+			return "2d"
+		if s == "3d" or s == "3":
+			return "3d"
+		return s  # invalid explicit value — caller validates / errors
+	var cls := classify_node_space(get_edited_scene_root_safe())
+	if cls == "2d" or cls == "3d":
+		return cls
+	return fallback
+
+
+# Whether `space` was explicitly supplied by the caller (vs inferred from the
+# scene). Lets a tool tell the agent "I picked 2D because the scene is 2D" in
+# its response so an unexpected Camera2D isn't mystifying.
+static func space_was_explicit(args: Dictionary) -> bool:
+	return args.has("space") and args["space"] != null and not str(args["space"]).strip_edges().is_empty()
+
+
+# When a single-dimension tool runs in a scene of the OTHER dimension, return a
+# short hint steering the agent to the right tool; "" when the scene matches the
+# tool, is ambiguous (plain Node / Control), or no scene is open. The call still
+# succeeds — this keeps wrong-tool usage self-correcting without failing work.
+static func dimension_mismatch_note(tool_space: String, suggestion: String) -> String:
+	var scene_space := classify_node_space(get_edited_scene_root_safe())
+	if scene_space != "2d" and scene_space != "3d":
+		return ""
+	if scene_space == tool_space:
+		return ""
+	return "Heads up: this scene's root is %s but this tool creates a %s node. For a %s scene, %s is usually the right call." % [
+		scene_space.to_upper(), tool_space.to_upper(), scene_space.to_upper(), suggestion
+	]
+
+
+# Read a saved scene's root node class WITHOUT instantiating it. Loading +
+# instancing a scene triggers imports and runs every node's _init — far too
+# expensive merely to learn the root type. PackedScene.get_state() exposes the
+# serialized node table; index 0 is always the root. Returns "" when the path
+# is empty/missing, isn't a PackedScene, or the root type can't be read (e.g.
+# an inherited scene whose root is itself an instance).
+static func scene_file_root_type(scene_path: String) -> String:
+	if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
+		return ""
+	var ps = load(scene_path)
+	if not (ps is PackedScene):
+		return ""
+	var st: SceneState = (ps as PackedScene).get_state()
+	if st == null or st.get_node_count() == 0:
+		return ""
+	return String(st.get_node_type(0))
+
+
 # Build a scene-relative path string for a node ("Player/Sprite"). Returns ""
 # if the node is the scene root, or null/not in the edited scene.
 static func node_relative_path(node: Node) -> String:

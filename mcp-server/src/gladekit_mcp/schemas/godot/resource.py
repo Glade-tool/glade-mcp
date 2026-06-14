@@ -24,10 +24,15 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "create_material",
             "description": (
-                "Create a new StandardMaterial3D (default) or ShaderMaterial and save "
-                "as a .tres file. Refuses to overwrite — use set_material_property to "
-                "modify an existing material. Standard property args (albedo / metallic / "
-                "roughness / emission) apply to StandardMaterial3D only."
+                "Create a material and save as a .tres file. The `space` arg picks the "
+                "family: space='3d' (default) makes a StandardMaterial3D (PBR: albedo / "
+                "metallic / roughness / emission); space='2d' makes a CanvasItemMaterial "
+                "for sprites / canvas items (blend_mode / light_mode). material_type='shader' "
+                "makes a ShaderMaterial (dimension-agnostic) and ignores `space`. Refuses to "
+                "overwrite — use set_material_property to modify an existing material. Note: "
+                "most 2D tinting is done via a node's `modulate`, not a material — only reach "
+                "for a CanvasItemMaterial when you need additive/multiply blending or 2D "
+                "light interaction."
             ),
             "parameters": {
                 "type": "object",
@@ -36,9 +41,17 @@ TOOLS: List[Dict] = [
                         "type": "string",
                         "description": "res:// path for the .tres file. Auto-appends .tres.",
                     },
+                    "space": {
+                        "type": "string",
+                        "description": (
+                            "Dimension: '3d' (StandardMaterial3D) or '2d' (CanvasItemMaterial). "
+                            "Inferred from the open scene's root when omitted."
+                        ),
+                        "enum": ["3d", "2d"],
+                    },
                     "material_type": {
                         "type": "string",
-                        "description": "Material class.",
+                        "description": "Material class. 'standard' respects `space`; 'shader' ignores it.",
                         "enum": ["standard", "shader"],
                     },
                     "shader_path": {
@@ -47,19 +60,29 @@ TOOLS: List[Dict] = [
                     },
                     "albedo": {
                         "type": "string",
-                        "description": "Albedo color, hex '#rrggbb' or 'r,g,b' (0-1). StandardMaterial3D only.",
+                        "description": "Albedo color, hex '#rrggbb' or 'r,g,b' (0-1). StandardMaterial3D (3D) only.",
                     },
                     "metallic": {
                         "type": "number",
-                        "description": "Metallic 0-1. StandardMaterial3D only.",
+                        "description": "Metallic 0-1. StandardMaterial3D (3D) only.",
                     },
                     "roughness": {
                         "type": "number",
-                        "description": "Roughness 0-1. StandardMaterial3D only.",
+                        "description": "Roughness 0-1. StandardMaterial3D (3D) only.",
                     },
                     "emission": {
                         "type": "string",
-                        "description": "Emission color. Enables emission automatically. StandardMaterial3D only.",
+                        "description": "Emission color. Enables emission automatically. StandardMaterial3D (3D) only.",
+                    },
+                    "blend_mode": {
+                        "type": "string",
+                        "description": "CanvasItemMaterial blend (2D only). Default 'mix'.",
+                        "enum": ["mix", "add", "sub", "mul", "premul_alpha"],
+                    },
+                    "light_mode": {
+                        "type": "string",
+                        "description": "CanvasItemMaterial light interaction (2D only). Default 'normal'.",
+                        "enum": ["normal", "unshaded", "light_only"],
                     },
                 },
                 "required": ["path"],

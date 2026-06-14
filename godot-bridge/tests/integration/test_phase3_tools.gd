@@ -97,8 +97,54 @@ func test_create_light_happy_omni() -> void:
 func test_create_light_unknown_type() -> void:
 	var r := _run("create_light", {"type": "rainbow_disco", "parent_path": SANDBOX_NAME})
 	assert_false(r.success)
-	assert_string_contains(r.error, "Unknown light type")
+	assert_string_contains(r.error, "light type")
 	assert_true(r.has("possible_solutions"))
+
+
+# ── 2D camera / light / material (space arg) ──────────────────────────────
+
+func test_create_camera_2d_happy() -> void:
+	var r := _run("create_camera", {"space": "2d", "parent_path": SANDBOX_NAME, "name": "Cam2D", "zoom": 2.0, "current": true})
+	assert_true(r.success)
+	assert_eq(r.type, "Camera2D")
+	assert_eq(r.space, "2d")
+	var cam := _sandbox.find_child("Cam2D", false, false)
+	assert_not_null(cam)
+	assert_true((cam as Camera2D).enabled, "current=true should enable the Camera2D")
+	assert_eq((cam as Camera2D).zoom, Vector2(2, 2))
+
+
+func test_create_camera_alias_defaults_to_3d() -> void:
+	# Legacy create_camera_3d alias → Camera3D (space defaults to 3d).
+	var r := _run("create_camera_3d", {"parent_path": SANDBOX_NAME, "name": "AliasCam"})
+	assert_true(r.success)
+	assert_eq(r.type, "Camera3D")
+
+
+func test_create_light_2d_point_gets_texture() -> void:
+	var r := _run("create_light", {"space": "2d", "type": "point", "parent_path": SANDBOX_NAME, "name": "P2D"})
+	assert_true(r.success)
+	assert_eq(r.type, "PointLight2D")
+	var light := _sandbox.find_child("P2D", false, false)
+	assert_not_null(light)
+	# A PointLight2D with no texture is a silent no-op — the tool must supply one.
+	assert_not_null((light as PointLight2D).texture, "PointLight2D must get a default texture")
+
+
+func test_create_light_2d_ambient_is_canvas_modulate() -> void:
+	var r := _run("create_light", {"space": "2d", "type": "ambient", "parent_path": SANDBOX_NAME, "color": "#202040"})
+	assert_true(r.success)
+	assert_eq(r.type, "CanvasModulate")
+
+
+func test_create_material_2d_canvas_item() -> void:
+	var path := SCRATCH_DIR + "/canvas_mat.tres"
+	var r := _run("create_material", {"path": path, "space": "2d", "blend_mode": "add"})
+	assert_true(r.success)
+	assert_eq(r.type, "CanvasItemMaterial")
+	var mat = load(path)
+	assert_true(mat is CanvasItemMaterial)
+	assert_eq((mat as CanvasItemMaterial).blend_mode, CanvasItemMaterial.BLEND_MODE_ADD)
 
 
 # ── Resource ──────────────────────────────────────────────────────────────
@@ -324,6 +370,39 @@ func test_create_physics_body_2d_character() -> void:
 	assert_eq(r.type, "CharacterBody2D")
 	assert_eq(r.space, "2d")
 	assert_false(String(r.collision_shape_path).is_empty())
+
+
+func test_create_physics_body_2d_area_trigger() -> void:
+	var r := _run("create_physics_body", {
+		"space": "2d",
+		"body_type": "area",
+		"parent_path": SANDBOX_NAME,
+		"name": "Pickup",
+	})
+	assert_true(r.success, str(r))
+	assert_eq(r.type, "Area2D")
+	assert_eq(r.space, "2d")
+	# Area still gets a collision shape via the shared auto_shape path.
+	assert_false(String(r.collision_shape_path).is_empty())
+
+
+func test_create_physics_body_3d_area_trigger() -> void:
+	var r := _run("create_physics_body", {
+		"space": "3d",
+		"body_type": "area",
+		"parent_path": SANDBOX_NAME,
+		"name": "Zone",
+	})
+	assert_true(r.success, str(r))
+	assert_eq(r.type, "Area3D")
+
+
+func test_create_physics_body_infers_3d_from_scene() -> void:
+	# No space arg: the dev scene root is a Node3D, so it must infer "3d".
+	var r := _run("create_physics_body", {"body_type": "static", "parent_path": SANDBOX_NAME, "name": "Inferred"})
+	assert_true(r.success, str(r))
+	assert_eq(r.space, "3d", "space should be inferred from the 3D scene root")
+	assert_eq(r.type, "StaticBody3D")
 
 
 func test_create_physics_body_2d_static_default_shape_is_rectangle() -> void:

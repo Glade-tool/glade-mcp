@@ -48,11 +48,17 @@ func execute(args: Dictionary) -> Dictionary:
 	parent.add_child(mesh_instance)
 	mesh_instance.owner = root
 
-	return ToolUtils.success("Created %s primitive '%s'" % [primitive, mesh_instance.name], {
+	var extras := {
 		"node_path": ToolUtils.node_relative_path(mesh_instance),
 		"type": "MeshInstance3D",
 		"mesh_type": mesh.get_class(),
-	})
+	}
+	# Self-correcting hint if a 3D mesh was dropped into a 2D scene.
+	var hint := ToolUtils.dimension_mismatch_note("3d", "create_sprite_2d (Sprite2D) or create_primitive_3d only in a 3D scene")
+	if not hint.is_empty():
+		extras["hint"] = hint
+
+	return ToolUtils.success("Created %s primitive '%s'" % [primitive, mesh_instance.name], extras)
 
 
 func _make_mesh(primitive: String) -> PrimitiveMesh:

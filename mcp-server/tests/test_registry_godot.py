@@ -153,10 +153,19 @@ def test_tool_count_matches_canonical_catalog():
     v0.7.0 asset pipeline added 2 bridge tools (import_asset +
     list_imported_assets) → 62. (find_asset is answered by the server itself —
     it has a schema but no bridge tool, so it is not counted here.)
+    The 2D foundation added 2 bridge tools (create_sprite_2d +
+    create_animated_sprite_2d) → 64. (create_camera_3d was generalized to the
+    dimension-aware create_camera and kept as a registry ALIAS; aliases have no
+    tool_name line of their own, so they are not counted here. create_light /
+    create_material gained a space arg without changing their count.)
+    2D batch 2 added 3 bridge tools (create_tilemap_layer + set_tilemap_cells +
+    create_parallax_2d) → 67. (create_physics_body gained a body_type='area'
+    option and create_animated_sprite_2d gained spritesheet slicing — both are
+    arg extensions, not new tools.)
     A change here is a real change —
     update this test and the schema package together."""
     bridge_names = _bridge_tool_names()
-    expected = 62
+    expected = 67
     assert len(bridge_names) == expected, (
         f"Expected {expected} Godot bridge tools, got {len(bridge_names)}. "
         f"If the catalog grew or shrank, update this test and the schema package."
@@ -216,7 +225,7 @@ def test_all_categories_have_at_least_one_tool():
 def test_get_category_for_tool_resolves_known_tool():
     assert get_category_for_tool("get_scene_tree") == "scene"
     assert get_category_for_tool("create_script") == "script"
-    assert get_category_for_tool("create_camera_3d") == "camera"
+    assert get_category_for_tool("create_camera") == "camera"
     assert get_category_for_tool("create_material") == "resource"
     assert get_category_for_tool("create_physics_body") == "physics"
     assert get_category_for_tool("create_scene") == "scene_io"

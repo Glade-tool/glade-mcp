@@ -31,6 +31,14 @@ TOOLS: List[Dict] = [
                 "first when working with an unfamiliar project — it answers "
                 'most "what kind of project is this and what\'s in it" '
                 "questions without needing 4-5 separate exploratory calls.\n\n"
+                "CRITICAL for tool choice: the response includes "
+                "`workspace` ('2d' | '3d' | 'ui' | 'other' | 'unknown'), the "
+                "project's primary dimension inferred from the main scene's "
+                "root node. In a '2d' project reach for the 2D node families "
+                "(create_camera/create_light/create_material with space='2d', "
+                "create_sprite_2d, create_animated_sprite_2d, Sprite2D / "
+                "Camera2D / CharacterBody2D); in a '3d' project use the 3D "
+                "families. Do NOT drop a Camera3D into a 2D game.\n\n"
                 'Use `response_format="detailed"` when planning broader '
                 "changes — it adds bounded file listings (top 50 scenes / "
                 "50 scripts / 30 resources, each as `{path, name}` for "

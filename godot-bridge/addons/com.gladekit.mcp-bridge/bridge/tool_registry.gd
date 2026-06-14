@@ -14,6 +14,11 @@ const GetNodeInfoTool       = preload("res://addons/com.gladekit.mcp-bridge/tool
 const FindNodesTool         = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/find_nodes.gd")
 const CreateNodeTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_node.gd")
 const CreatePrimitive3DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_primitive_3d.gd")
+const CreateSprite2DTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_sprite_2d.gd")
+const CreateAnimatedSprite2DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_animated_sprite_2d.gd")
+const CreateTilemapLayerTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_tilemap_layer.gd")
+const SetTilemapCellsTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_tilemap_cells.gd")
+const CreateParallax2DTool  = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_parallax_2d.gd")
 const DeleteNodeTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/delete_node.gd")
 const RenameNodeTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/rename_node.gd")
 const DuplicateNodeTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/duplicate_node.gd")
@@ -30,7 +35,9 @@ const FindScriptsTool        = preload("res://addons/com.gladekit.mcp-bridge/too
 const AttachScriptToNodeTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/attach_script_to_node.gd")
 
 # ── Camera / Lighting / Environment tools (Phase 3 + v0.5.3) ───────────────
-const CreateCamera3DTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_camera_3d.gd")
+# create_camera is dimension-aware (space="2d"|"3d"); the legacy create_camera_3d
+# name is kept as a registry alias (see _register_aliases).
+const CreateCameraTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_camera.gd")
 const CreateLightTool         = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/create_light.gd")
 const SetLightPropertiesTool  = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/set_light_properties.gd")
 const GetLightInfoTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/get_light_info.gd")
@@ -109,18 +116,49 @@ const ListImportedAssetsTool = preload("res://addons/com.gladekit.mcp-bridge/too
 
 var _tools: Dictionary = {}
 
+# Backward-compat name → tool instance. Aliases keep an OLD tool name dispatching
+# after a tool is renamed/generalized (e.g. create_camera_3d → create_camera), so
+# existing transcripts, external MCP callers, and saved sessions don't break.
+# Aliases are deliberately INVISIBLE to get_tool_count() / get_tool_names() and
+# to the schema catalog: the agent is steered to the canonical name, and the
+# parity/catalog tests count canonical tools only. Resolution still finds them.
+var _aliases: Dictionary = {}
+
 
 func _init() -> void:
 	_register_all()
+	_register_aliases()
+
+
+# Register legacy tool-name aliases AFTER _register_all so the canonical tools
+# exist to point at. Each alias resolves to the same instance as its canonical
+# tool.
+func _register_aliases() -> void:
+	register_alias("create_camera_3d", "create_camera")
+
+
+func register_alias(alias_name: String, canonical_name: String) -> void:
+	if not _tools.has(canonical_name):
+		push_error("[GladeKit MCP Bridge] Alias '%s' targets unknown tool '%s'" % [alias_name, canonical_name])
+		return
+	if _tools.has(alias_name):
+		push_error("[GladeKit MCP Bridge] Alias '%s' collides with a real tool name" % alias_name)
+		return
+	_aliases[alias_name] = _tools[canonical_name]
 
 
 func _register_all() -> void:
-	# Scene / Node (12)
+	# Scene / Node (17)
 	register_tool(GetSceneTreeTool.new())
 	register_tool(GetNodeInfoTool.new())
 	register_tool(FindNodesTool.new())
 	register_tool(CreateNodeTool.new())
 	register_tool(CreatePrimitive3DTool.new())
+	register_tool(CreateSprite2DTool.new())
+	register_tool(CreateAnimatedSprite2DTool.new())
+	register_tool(CreateTilemapLayerTool.new())
+	register_tool(SetTilemapCellsTool.new())
+	register_tool(CreateParallax2DTool.new())
 	register_tool(DeleteNodeTool.new())
 	register_tool(RenameNodeTool.new())
 	register_tool(DuplicateNodeTool.new())
@@ -135,7 +173,7 @@ func _register_all() -> void:
 	register_tool(FindScriptsTool.new())
 	register_tool(AttachScriptToNodeTool.new())
 	# Camera / Lighting / Environment (6) — 2 Phase 3 + 4 (v0.5.3)
-	register_tool(CreateCamera3DTool.new())
+	register_tool(CreateCameraTool.new())
 	register_tool(CreateLightTool.new())
 	register_tool(SetLightPropertiesTool.new())
 	register_tool(GetLightInfoTool.new())
@@ -215,11 +253,13 @@ func register_tool(tool_instance) -> void:
 
 
 func get_tool(tool_name: String):
-	return _tools.get(tool_name, null)
+	if _tools.has(tool_name):
+		return _tools[tool_name]
+	return _aliases.get(tool_name, null)
 
 
 func has_tool(tool_name: String) -> bool:
-	return _tools.has(tool_name)
+	return _tools.has(tool_name) or _aliases.has(tool_name)
 
 
 func get_tool_names() -> Array:

@@ -259,6 +259,55 @@ func test_compare_versions_malformed_treated_as_zero() -> void:
 	assert_eq(ToolUtils.compare_versions("4.x", "4.0"), 0)
 
 
+# ── 2D / 3D classification + space resolution ─────────────────────────────
+
+func test_classify_class_space_3d() -> void:
+	assert_eq(ToolUtils.classify_class_space("Node3D"), "3d")
+	assert_eq(ToolUtils.classify_class_space("Camera3D"), "3d")
+	assert_eq(ToolUtils.classify_class_space("CharacterBody3D"), "3d")
+
+
+func test_classify_class_space_2d() -> void:
+	assert_eq(ToolUtils.classify_class_space("Node2D"), "2d")
+	assert_eq(ToolUtils.classify_class_space("Sprite2D"), "2d")
+	assert_eq(ToolUtils.classify_class_space("TileMapLayer"), "2d")
+
+
+func test_classify_class_space_ui() -> void:
+	assert_eq(ToolUtils.classify_class_space("Control"), "ui")
+	assert_eq(ToolUtils.classify_class_space("Button"), "ui")
+	assert_eq(ToolUtils.classify_class_space("CanvasLayer"), "ui")
+
+
+func test_classify_class_space_unknown() -> void:
+	assert_eq(ToolUtils.classify_class_space(""), "unknown")
+	assert_eq(ToolUtils.classify_class_space("NotARealClass_xyz"), "unknown")
+	# A plain Node is neither 2D nor 3D nor UI.
+	assert_eq(ToolUtils.classify_class_space("Node"), "other")
+
+
+func test_resolve_space_explicit_wins() -> void:
+	# An explicit arg is honored regardless of scene context (none here).
+	assert_eq(ToolUtils.resolve_space({"space": "2d"}), "2d")
+	assert_eq(ToolUtils.resolve_space({"space": "3d"}), "3d")
+	# Normalizes "2"/"3".
+	assert_eq(ToolUtils.resolve_space({"space": "2"}), "2d")
+	assert_eq(ToolUtils.resolve_space({"space": "3"}), "3d")
+
+
+func test_resolve_space_invalid_explicit_passthrough() -> void:
+	# An invalid explicit value returns lowercased for the caller to error on.
+	assert_eq(ToolUtils.resolve_space({"space": "2.5d"}), "2.5d")
+
+
+func test_resolve_space_falls_back_without_scene() -> void:
+	# No editor scene in the headless test context, so empty/missing space
+	# falls back to the provided default rather than crashing.
+	assert_eq(ToolUtils.resolve_space({}), "3d")
+	assert_eq(ToolUtils.resolve_space({}, "2d"), "2d")
+	assert_eq(ToolUtils.resolve_space({"space": ""}), "3d")
+
+
 # ── deselect_before_free ──────────────────────────────────────────────────
 
 func test_deselect_before_free_null_is_noop() -> void:

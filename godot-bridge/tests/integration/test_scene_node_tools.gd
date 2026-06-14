@@ -78,6 +78,98 @@ func test_get_scene_tree_happy() -> void:
 	assert_string_contains(r.tree_text, SANDBOX_NAME)
 
 
+func test_get_scene_tree_reports_root_space() -> void:
+	var r := _run("get_scene_tree", {})
+	assert_true(r.success)
+	assert_has(r, "root_space")
+	# The dev scene root is a real node, so root_space must be a concrete
+	# workspace classification, never "unknown".
+	assert_true(["2d", "3d", "ui", "other"].has(r.root_space),
+		"root_space must classify the open scene root, got '%s'" % r.root_space)
+
+
+# ── 2D sprite tools ───────────────────────────────────────────────────────
+
+func test_create_sprite_2d_no_texture_is_valid() -> void:
+	var r := _run("create_sprite_2d", {"parent_path": SANDBOX_NAME, "name": "Hero"})
+	assert_true(r.success)
+	assert_eq(r.type, "Sprite2D")
+	assert_eq(r.texture, "", "no texture arg → empty texture echo")
+	assert_not_null(_sandbox.find_child("Hero", false, false))
+
+
+func test_create_sprite_2d_missing_texture_errors() -> void:
+	var r := _run("create_sprite_2d", {"parent_path": SANDBOX_NAME, "texture": "res://_does_not_exist_xyz.png"})
+	assert_false(r.success)
+	assert_true(r.has("possible_solutions"))
+	# A failed texture load must NOT leave an orphaned Sprite2D in the scene.
+	assert_null(_sandbox.find_child("_does_not_exist_xyz", false, false))
+
+
+func test_create_animated_sprite_2d_empty_frames() -> void:
+	var r := _run("create_animated_sprite_2d", {"parent_path": SANDBOX_NAME, "name": "Anim", "animation": "run", "fps": 12.0})
+	assert_true(r.success)
+	assert_eq(r.type, "AnimatedSprite2D")
+	assert_eq(r.animation, "run")
+	assert_eq(r.frame_count, 0)
+	var node := _sandbox.find_child("Anim", false, false)
+	assert_not_null(node)
+	var sf := (node as AnimatedSprite2D).sprite_frames
+	assert_not_null(sf, "SpriteFrames must be embedded even with no frames")
+	assert_true(sf.has_animation("run"))
+	assert_false(sf.has_animation("default"), "custom animation name should replace 'default'")
+
+
+# ── TileMapLayer + Parallax2D ─────────────────────────────────────────────
+
+func test_create_tilemap_layer_no_texture() -> void:
+	var r := _run("create_tilemap_layer", {"parent_path": SANDBOX_NAME, "name": "Tiles", "tile_size": "32,32"})
+	assert_true(r.success, str(r))
+	assert_eq(r.type, "TileMapLayer")
+	assert_eq(r.tile_size, "32,32")
+	assert_eq(r.source_id, -1, "no texture → no atlas source")
+	assert_eq(r.tiles_created, 0)
+	var layer := _sandbox.find_child("Tiles", false, false)
+	assert_not_null(layer)
+	assert_not_null((layer as TileMapLayer).tile_set, "TileSet must be scaffolded")
+	assert_eq((layer as TileMapLayer).tile_set.tile_size, Vector2i(32, 32))
+
+
+func test_set_tilemap_cells_errors_without_source() -> void:
+	var made := _run("create_tilemap_layer", {"parent_path": SANDBOX_NAME, "name": "Tiles2"})
+	assert_true(made.success)
+	# No atlas source (no texture) → painting must fail with guidance.
+	var r := _run("set_tilemap_cells", {"node_path": String(made.node_path), "cells": [[0, 0], [1, 0]]})
+	assert_false(r.success)
+	assert_true(r.has("possible_solutions"))
+
+
+func test_set_tilemap_cells_erase_path() -> void:
+	var made := _run("create_tilemap_layer", {"parent_path": SANDBOX_NAME, "name": "Tiles3"})
+	assert_true(made.success)
+	# Erase doesn't need a source — it clears cells (set_cell with -1).
+	var r := _run("set_tilemap_cells", {"node_path": String(made.node_path), "fill_rect": "0,0,2,2", "erase": true})
+	assert_true(r.success, str(r))
+	assert_eq(r.cells_set, 4)
+	assert_true(r.erased)
+
+
+func test_set_tilemap_cells_wrong_node_type() -> void:
+	var r := _run("set_tilemap_cells", {"node_path": SANDBOX_NAME, "cells": [[0, 0]]})
+	assert_false(r.success)
+	assert_string_contains(r.error, "not a TileMapLayer")
+
+
+func test_create_parallax_2d_no_texture() -> void:
+	var r := _run("create_parallax_2d", {"parent_path": SANDBOX_NAME, "name": "BG", "scroll_scale": 0.3})
+	assert_true(r.success, str(r))
+	assert_eq(r.type, "Parallax2D")
+	assert_eq(r.sprite_path, "", "no texture → no sprite child")
+	var node := _sandbox.find_child("BG", false, false)
+	assert_not_null(node)
+	assert_eq((node as Parallax2D).scroll_scale, Vector2(0.3, 0.3))
+
+
 func test_get_scene_tree_wrong_type_max_depth_falls_back() -> void:
 	# parse_int_arg returns its default on a garbage type, so this is still
 	# a successful call — just with a sensible cap.

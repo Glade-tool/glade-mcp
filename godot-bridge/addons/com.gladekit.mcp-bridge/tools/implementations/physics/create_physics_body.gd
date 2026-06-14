@@ -1,15 +1,19 @@
 extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 
-# Creates a physics body (StaticBody | RigidBody | CharacterBody) in either 3D
-# or 2D and optionally attaches a matching CollisionShape child. Folds the
-# original `add_collision_shape` tool into this one per the Phase 3 catalog
+# Creates a collision object (StaticBody | RigidBody | CharacterBody | Area) in
+# either 3D or 2D and optionally attaches a matching CollisionShape child. Folds
+# the original `add_collision_shape` tool into this one per the Phase 3 catalog
 # dedupe (devs almost always want a body with a shape; making the user call two
-# tools is friction). The `space` arg picks the dimension — one tool covers both
-# 3D level geometry/props and 2D platformer/top-down bodies.
+# tools is friction). One tool covers 3D level geometry/props, 2D platformer/
+# top-down bodies, AND trigger/sensor zones (Area2D / Area3D).
 #
 # Args:
-#   space:           "3d" (default) | "2d" — picks Node3D vs Node2D node family.
-#   body_type:       "static" | "rigid" | "character". Default: "static".
+#   space:           "2d" | "3d" — Node2D vs Node3D family. When omitted,
+#                    inferred from the open scene's root (falls back "3d").
+#   body_type:       "static" | "rigid" | "character" | "area". Default: "static".
+#                    "area" makes an Area2D/Area3D trigger (overlap detection,
+#                    no collision response) — use it for pickups, hurtboxes,
+#                    checkpoints, region triggers.
 #   name:            String — node name. Default: derived from body_type + space.
 #   parent_path:     String — scene-relative parent. Default: scene root.
 #   position:        "x,y,z" (3D) / "x,y" (2D) — initial position. Default: 0.
@@ -45,20 +49,21 @@ func execute(args: Dictionary) -> Dictionary:
 	if root == null:
 		return ToolUtils.error("No scene currently open")
 
-	var space: String = ToolUtils.parse_string_arg(args, "space", "3d").to_lower()
-	var is_2d: bool = space == "2d" or space == "2"
-	if not is_2d and space != "3d" and space != "3" and not space.is_empty():
+	# Inferred from the scene root when not passed (2D scene → Node2D bodies).
+	var space: String = ToolUtils.resolve_space(args)
+	if space != "2d" and space != "3d":
 		return ToolUtils.error_with_solutions(
 			"Unknown space '%s'" % space,
-			["Use space='3d' (default) for Node3D bodies", "Use space='2d' for Node2D bodies (platformers, top-down)"]
+			["Use space='3d' for Node3D bodies", "Use space='2d' for Node2D bodies (platformers, top-down)"]
 		)
+	var is_2d: bool = space == "2d"
 
 	var body_type: String = ToolUtils.parse_string_arg(args, "body_type", "static").to_lower()
 	var body: Node = _make_body_2d(body_type) if is_2d else _make_body_3d(body_type)
 	if body == null:
 		return ToolUtils.error_with_solutions(
 			"Unknown body_type '%s'" % body_type,
-			["Use body_type='static' for unmoving level geometry", "Use body_type='rigid' for physics-simulated objects", "Use body_type='character' for player-controlled bodies"]
+			["Use body_type='static' for unmoving level geometry", "Use body_type='rigid' for physics-simulated objects", "Use body_type='character' for player-controlled bodies", "Use body_type='area' for trigger/sensor zones"]
 		)
 
 	body.name = ToolUtils.parse_string_arg(args, "name", _default_name(body_type, is_2d))
@@ -110,6 +115,8 @@ func _make_body_3d(t: String) -> Node3D:
 			return RigidBody3D.new()
 		"character", "characterbody":
 			return CharacterBody3D.new()
+		"area", "trigger", "sensor":
+			return Area3D.new()
 		_:
 			return null
 
@@ -122,6 +129,8 @@ func _make_body_2d(t: String) -> Node2D:
 			return RigidBody2D.new()
 		"character", "characterbody":
 			return CharacterBody2D.new()
+		"area", "trigger", "sensor":
+			return Area2D.new()
 		_:
 			return null
 
@@ -135,6 +144,8 @@ func _default_name(t: String, is_2d: bool) -> String:
 			return "RigidBody" + suffix
 		"character", "characterbody":
 			return "CharacterBody" + suffix
+		"area", "trigger", "sensor":
+			return "Area" + suffix
 		_:
 			return "PhysicsBody" + suffix
 

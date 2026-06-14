@@ -1,5 +1,5 @@
 """
-Godot scene/hierarchy tools — Node creation, lookup, transforms (11 tools).
+Godot scene/hierarchy tools — Node creation, lookup, transforms (17 tools).
 
 Godot's scene model differs from Unity's GameObject+Component model:
 each scene is a tree of Nodes (Node3D, CharacterBody3D, Sprite2D, ...);
@@ -25,7 +25,10 @@ TOOLS: List[Dict] = [
                 "scene), and a nested `tree` of {name, type, path, children[], "
                 "script_path?} for programmatic use. Safe to call any time (read-only, "
                 "works in both edit and play mode). Call this first to understand what's "
-                "in the scene before mutating it. To save context on large scenes, pass "
+                "in the scene before mutating it. Also returns `root_space` ('2d' | '3d' "
+                "| 'ui' | 'other'), the workspace the scene root lives in — use it to pick "
+                "2D vs 3D node types (a Node2D root means add Sprite2D / Camera2D, not "
+                "MeshInstance3D / Camera3D). To save context on large scenes, pass "
                 "response_format='tree_text_only' — the ASCII view is enough for almost "
                 "all reasoning, and dropping the nested JSON halves the response size."
             ),
@@ -188,6 +191,267 @@ TOOLS: List[Dict] = [
                     "parent_path": {
                         "type": "string",
                         "description": "Scene-relative parent path. Defaults to scene root.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_sprite_2d",
+            "description": (
+                "Convenience: create a Sprite2D and assign its texture in one call — the "
+                "2D analogue of create_primitive_3d. Use for static 2D images (player, "
+                "props, backgrounds). Pass a res:// `texture` path (a sprite with no "
+                "texture is invisible). For frame-based animation use "
+                "create_animated_sprite_2d instead. Spritesheets: set hframes/vframes and "
+                "pick a `frame`."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "texture": {
+                        "type": "string",
+                        "description": "res:// path to the image (png/webp/svg/…). Strongly recommended.",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Defaults to the texture filename, else 'Sprite2D'.",
+                    },
+                    "parent_path": {
+                        "type": "string",
+                        "description": "Scene-relative parent path. Defaults to scene root.",
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Initial position in pixels, 'x,y'. Default '0,0'.",
+                    },
+                    "centered": {
+                        "type": "boolean",
+                        "description": "Centre the texture on the node origin. Default true.",
+                    },
+                    "modulate": {
+                        "type": "string",
+                        "description": "Tint color, '#rrggbb[aa]' or 'r,g,b[,a]'. Default white.",
+                    },
+                    "hframes": {
+                        "type": "integer",
+                        "description": "Horizontal frames for a spritesheet. Default 1.",
+                    },
+                    "vframes": {
+                        "type": "integer",
+                        "description": "Vertical frames for a spritesheet. Default 1.",
+                    },
+                    "frame": {
+                        "type": "integer",
+                        "description": "Which frame to show (0-based) when h/vframes > 1.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_animated_sprite_2d",
+            "description": (
+                "Create an AnimatedSprite2D with a ready-to-play SpriteFrames — the "
+                "frame-based 2D animation workflow (run cycles, coin spins, explosions). "
+                "Bundles node + SpriteFrames + frames in one call (an AnimatedSprite2D "
+                "with no SpriteFrames shows nothing); the SpriteFrames is embedded in the "
+                "scene. Supply frames EITHER as `frames` (a list of individual res:// "
+                "texture paths) OR as `spritesheet` (one image sliced into a grid by "
+                "hframes/vframes) — use the spritesheet form when you have a single strip/"
+                "grid image like run.png. If both are given, the spritesheet wins."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "frames": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "res:// texture paths, one per animation frame, in order.",
+                    },
+                    "spritesheet": {
+                        "type": "string",
+                        "description": (
+                            "res:// path to a grid spritesheet, sliced into frames via hframes/vframes (row-major)."
+                        ),
+                    },
+                    "hframes": {
+                        "type": "integer",
+                        "description": "Spritesheet columns (with `spritesheet`). Default 1.",
+                    },
+                    "vframes": {
+                        "type": "integer",
+                        "description": "Spritesheet rows (with `spritesheet`). Default 1.",
+                    },
+                    "frame_start": {
+                        "type": "integer",
+                        "description": "First grid cell (0-based, row-major) to include. Default 0.",
+                    },
+                    "frame_end": {
+                        "type": "integer",
+                        "description": "Last grid cell to include. Default: last cell.",
+                    },
+                    "animation": {
+                        "type": "string",
+                        "description": "Animation name. Default 'default'.",
+                    },
+                    "fps": {
+                        "type": "number",
+                        "description": "Playback speed in frames/sec. Default 10.",
+                    },
+                    "loop": {
+                        "type": "boolean",
+                        "description": "Loop the animation. Default true.",
+                    },
+                    "autoplay": {
+                        "type": "boolean",
+                        "description": "Start this animation automatically at runtime. Default false.",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Default 'AnimatedSprite2D'.",
+                    },
+                    "parent_path": {
+                        "type": "string",
+                        "description": "Scene-relative parent path. Defaults to scene root.",
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Initial position in pixels, 'x,y'. Default '0,0'.",
+                    },
+                    "centered": {
+                        "type": "boolean",
+                        "description": "Centre frames on the node origin. Default true.",
+                    },
+                    "modulate": {
+                        "type": "string",
+                        "description": "Tint color, '#rrggbb[aa]' or 'r,g,b[,a]'. Default white.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_tilemap_layer",
+            "description": (
+                "Create a TileMapLayer (Godot 4.3+; replaced TileMap) with a ready-to-paint "
+                "TileSet scaffolded from a tile atlas image — the foundation for tile-based "
+                "2D levels (platformers, top-down RPGs). Pass `texture` (a tile atlas) and "
+                "`tile_size`; the tool slices the atlas into tiles so the very next "
+                "set_tilemap_cells call can paint them. Without a texture you get an empty, "
+                "unpaintable layer."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "texture": {
+                        "type": "string",
+                        "description": "res:// tile atlas image. Strongly recommended (no texture = no tiles).",
+                    },
+                    "tile_size": {
+                        "type": "string",
+                        "description": "Tile size in pixels, 'x,y'. Default '16,16'. Also the atlas slice size.",
+                    },
+                    "name": {"type": "string", "description": "Node name. Default 'TileMapLayer'."},
+                    "parent_path": {
+                        "type": "string",
+                        "description": "Scene-relative parent path. Defaults to scene root.",
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Initial position in pixels, 'x,y'. Default '0,0'.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_tilemap_cells",
+            "description": (
+                "Paint or erase cells on an existing TileMapLayer (pairs with "
+                "create_tilemap_layer). Specify cells individually via `cells` and/or fill "
+                "a rectangular region via `fill_rect`. Each cell coordinate is in tile "
+                "units, not pixels. `atlas` picks which tile from the atlas to stamp "
+                "(default '0,0'). Set erase=true to clear cells instead of painting."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_path": {
+                        "type": "string",
+                        "description": "Scene-relative path to the TileMapLayer.",
+                    },
+                    "source_id": {
+                        "type": "integer",
+                        "description": "TileSet atlas source id. Default: the layer's first source.",
+                    },
+                    "atlas": {
+                        "type": "string",
+                        "description": "Default atlas tile coords 'ax,ay' for cells that don't specify. Default '0,0'.",
+                    },
+                    "cells": {
+                        "type": "array",
+                        "description": (
+                            "Cells to set. Each entry is [x,y] (uses default atlas), "
+                            "[x,y,atlas_x,atlas_y], or {x,y,atlas_x?,atlas_y?}. Coords are tile units."
+                        ),
+                        "items": {},
+                    },
+                    "fill_rect": {
+                        "type": "string",
+                        "description": "Fill a w×h block of cells with the default atlas tile, as 'x,y,w,h' (tile units).",
+                    },
+                    "erase": {
+                        "type": "boolean",
+                        "description": "Clear the listed cells / rect instead of painting. Default false.",
+                    },
+                },
+                "required": ["node_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_parallax_2d",
+            "description": (
+                "Create a Parallax2D (Godot 4.3+; replaced ParallaxBackground/ParallaxLayer) "
+                "for depth-scrolling 2D backgrounds. scroll_scale below 1 makes the layer "
+                "move slower than the camera (distant-background effect). Pass `texture` to "
+                "drop in a Sprite2D child; repeat_size defaults to the texture size so it "
+                "tiles seamlessly as the camera moves."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "scroll_scale": {
+                        "type": "string",
+                        "description": "Scroll speed vs camera. A number (uniform) or 'x,y'. <1 = slower/further. Default 0.5.",
+                    },
+                    "texture": {
+                        "type": "string",
+                        "description": "res:// background image. Optional; adds a Sprite2D child when given.",
+                    },
+                    "repeat_size": {
+                        "type": "string",
+                        "description": "Tiling period in pixels 'x,y'. Default: the texture size (seamless tiling).",
+                    },
+                    "name": {"type": "string", "description": "Node name. Default 'Parallax2D'."},
+                    "parent_path": {
+                        "type": "string",
+                        "description": "Scene-relative parent path. Defaults to scene root.",
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Initial position in pixels, 'x,y'. Default '0,0'.",
                     },
                 },
             },

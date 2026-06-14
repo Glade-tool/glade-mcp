@@ -19,14 +19,15 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "create_physics_body",
             "description": (
-                "Create a physics body (StaticBody / RigidBody / CharacterBody) in 3D "
-                "or 2D with an optional CollisionShape child. Set space='2d' for "
-                "platformer/top-down bodies (CharacterBody2D etc.), or omit for 3D "
-                "(default). Default auto_shape=true bundles the body + shape; pass "
-                "auto_shape=false to skip and add shapes manually. For player "
-                "controllers use body_type='character'; for level geometry use 'static'; "
-                "for dynamic physics-simulated objects use 'rigid'. This is the Godot "
-                "idiom — Unity's CharacterController equivalent."
+                "Create a collision object (StaticBody / RigidBody / CharacterBody / Area) "
+                "in 3D or 2D with an optional CollisionShape child. `space` is inferred "
+                "from the open scene's root when omitted (2D scene → Node2D bodies), or "
+                "pass it explicitly. Default auto_shape=true bundles the body + shape; pass "
+                "auto_shape=false to skip. body_type: 'character' for player controllers, "
+                "'static' for level geometry, 'rigid' for dynamic physics objects, 'area' "
+                "for trigger/sensor zones (Area2D/Area3D — pickups, hurtboxes, checkpoints, "
+                "no collision response). This is the Godot idiom — Unity's "
+                "CharacterController equivalent."
             ),
             "parameters": {
                 "type": "object",
@@ -34,15 +35,16 @@ TOOLS: List[Dict] = [
                     "space": {
                         "type": "string",
                         "description": (
-                            "Dimension: '3d' (default, Node3D bodies) or '2d' "
-                            "(Node2D bodies for platformers/top-down games)."
+                            "Dimension: '2d' (Node2D bodies for platformers/top-down) or "
+                            "'3d' (Node3D bodies). Inferred from the open scene's root "
+                            "when omitted (falls back to 3d)."
                         ),
                         "enum": ["3d", "2d"],
                     },
                     "body_type": {
                         "type": "string",
-                        "description": "Physics body kind.",
-                        "enum": ["static", "rigid", "character"],
+                        "description": "Collision-object kind ('area' = trigger/sensor zone).",
+                        "enum": ["static", "rigid", "character", "area"],
                     },
                     "name": {
                         "type": "string",
