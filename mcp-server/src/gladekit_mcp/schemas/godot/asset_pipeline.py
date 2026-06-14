@@ -122,8 +122,11 @@ TOOLS: List[Dict] = [
                     "importOptions": {
                         "type": "object",
                         "description": (
-                            "Optional asset-type-specific overrides. Accepted for forward "
-                            "compatibility; Godot's import defaults are used when omitted."
+                            "Optional asset-type-specific overrides. Supported key: "
+                            "filter ('nearest' | 'linear') for sprite_2d / ui_sprite imports. "
+                            "Pass 'nearest' for PIXEL ART (keeps sprites crisp); omit or use "
+                            "'linear' for smooth/vector/HD art. Sets the project's default 2D "
+                            "texture filter (reported back). Other import defaults are sensible."
                         ),
                     },
                 },
