@@ -139,36 +139,24 @@ def test_every_schema_corresponds_to_a_bridge_tool():
 
 
 def test_tool_count_matches_canonical_catalog():
-    """The catalog started at 33 tools; signal tools added 3 → 36;
-    get_project_info added → 37; set_node_resource added → 38; create_resource
-    added → 39; list_assets added → 40; v0.5.0 added 6 UI/Control tools → 46;
-    v0.5.2 added 3 structured runtime-event observation tools
-    (start/stop_runtime_observation + get_runtime_events) → 49;
-    v0.5.3 added 4 lighting/environment tools (set_light_properties +
-    get_light_info + set_world_environment + get_world_environment) → 53;
-    v0.6.0 added 5 animation tools (add_animation_to_player +
-    add_animation_track + add_animation_keyframe + set_animation_properties
-    + get_animation_player_info) → 58; add_input_action (InputMap action
-    setup) → 59; set_node_property (generic non-Resource property setter) → 60;
-    v0.7.0 asset pipeline added 2 bridge tools (import_asset +
-    list_imported_assets) → 62. (find_asset is answered by the server itself —
-    it has a schema but no bridge tool, so it is not counted here.)
-    The 2D foundation added 2 bridge tools (create_sprite_2d +
-    create_animated_sprite_2d) → 64. (create_camera_3d was generalized to the
-    dimension-aware create_camera and kept as a registry ALIAS; aliases have no
-    tool_name line of their own, so they are not counted here. create_light /
-    create_material gained a space arg without changing their count.)
-    2D batch 2 added 3 bridge tools (create_tilemap_layer + set_tilemap_cells +
-    create_parallax_2d) → 67. (create_physics_body gained a body_type='area'
-    option and create_animated_sprite_2d gained spritesheet slicing — both are
-    arg extensions, not new tools.)
-    A change here is a real change —
-    update this test and the schema package together."""
+    """Catalog size is DERIVED from the bridge, never a hardcoded literal.
+
+    A magic `== <N>` count used to live here and broke on every tool add —
+    pure maintenance friction, since the parity tests above already pin the
+    exact NAME set (strictly stronger than a count). The invariant we keep:
+    every schema is either a real bridge tool or a known locally-handled tool,
+    so the schema count equals the bridge count plus the locally-handled
+    schemas present. Adding a tool to both halves keeps this green with no
+    number to bump; a one-sided change fails here and in the by-name parity
+    tests with the offending tool named.
+    """
     bridge_names = _bridge_tool_names()
-    expected = 67
-    assert len(bridge_names) == expected, (
-        f"Expected {expected} Godot bridge tools, got {len(bridge_names)}. "
-        f"If the catalog grew or shrank, update this test and the schema package."
+    schema_names = set(get_godot_tool_names())
+    locally_handled_in_schema = schema_names & _LOCALLY_HANDLED_TOOLS
+    assert len(schema_names) == len(bridge_names) + len(locally_handled_in_schema), (
+        f"Schema/bridge size mismatch: {len(schema_names)} schemas, "
+        f"{len(bridge_names)} bridge tools, {sorted(locally_handled_in_schema)} locally handled. "
+        f"The by-name parity tests above name the specific offender."
     )
 
 

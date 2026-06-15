@@ -26,11 +26,12 @@ Categories follow the Godot bridge's own directory layout under
     ui        — Control-tree creation + anchor / text helpers   ( 6 tools)
     animation — AnimationPlayer + Animation .tres scaffolding   ( 5 tools)
     asset_pipeline — find / import / audit external CC0 assets   ( 3 tools)
+    audio     — AudioStreamPlayer (2D/3D) create + mutate        ( 2 tools)
                                                                 ───────
-                                                                68 tools
+                                                                70 tools
 
 Unlike the Unity side (~235 tools across 17 categories) we expose the
-full Godot catalog directly — 68 tools is well within Claude Code's
+full Godot catalog directly — 70 tools is well within Claude Code's
 ~128-tool budget so there's no need for a CORE_TOOLS filter.
 
 Note: find_asset (in asset_pipeline) is answered by the server itself rather
@@ -41,6 +42,7 @@ from typing import Dict, List
 
 from .animation import TOOLS as ANIMATION_TOOLS
 from .asset_pipeline import TOOLS as ASSET_PIPELINE_TOOLS
+from .audio import TOOLS as AUDIO_TOOLS
 from .camera import TOOLS as CAMERA_TOOLS
 from .physics import TOOLS as PHYSICS_TOOLS
 from .project import TOOLS as PROJECT_TOOLS
@@ -67,6 +69,7 @@ ALL_CATEGORIES = [
     ("ui", UI_TOOLS),
     ("animation", ANIMATION_TOOLS),
     ("asset_pipeline", ASSET_PIPELINE_TOOLS),
+    ("audio", AUDIO_TOOLS),
 ]
 
 
@@ -123,7 +126,7 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
 
 
 def get_godot_tool_schemas() -> List[Dict]:
-    """Return all 68 Godot tool schemas as a flat list (OpenAI function format)."""
+    """Return every Godot tool schema as a flat list (OpenAI function format)."""
     all_tools: List[Dict] = []
     for _, tools in ALL_CATEGORIES:
         all_tools.extend(tools)

@@ -114,6 +114,14 @@ const GetAnimationPlayerInfoTool = preload("res://addons/com.gladekit.mcp-bridge
 const ImportAssetTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/asset_pipeline/import_asset.gd")
 const ListImportedAssetsTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/asset_pipeline/list_imported_assets.gd")
 
+# ── Audio tools (v0.6.7) ───────────────────────────────────────────────────
+# Place an audio player in the scene and wire an imported stream to it — the
+# step between import_asset (downloads/imports audio) and a sound that plays.
+# create_audio_player picks AudioStreamPlayer (non-positional, music/UI) or a
+# positional AudioStreamPlayer2D/3D; set_audio_player_properties mutates one.
+const CreateAudioPlayerTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/audio/create_audio_player.gd")
+const SetAudioPlayerPropertiesTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/audio/set_audio_player_properties.gd")
+
 var _tools: Dictionary = {}
 
 # Backward-compat name → tool instance. Aliases keep an OLD tool name dispatching
@@ -230,6 +238,10 @@ func _register_all() -> void:
 	# plus a read-only license audit of what's been imported.
 	register_tool(ImportAssetTool.new())
 	register_tool(ListImportedAssetsTool.new())
+	# Audio (2, v0.6.7) — place a player in the scene + wire an imported
+	# stream so audio actually plays. create + mutate pair.
+	register_tool(CreateAudioPlayerTool.new())
+	register_tool(SetAudioPlayerPropertiesTool.new())
 
 
 func register_tool(tool_instance) -> void:

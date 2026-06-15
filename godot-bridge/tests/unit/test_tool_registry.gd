@@ -34,10 +34,12 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# set_node_property (1) = 60; v0.7.0 asset pipeline import_asset +
 	# list_imported_assets (2) = 62; 2D foundation create_sprite_2d +
 	# create_animated_sprite_2d (2) = 64; 2D batch 2 create_tilemap_layer +
-	# set_tilemap_cells + create_parallax_2d (3) = 67 total. (create_camera_3d →
-	# create_camera was a rename, not an add; it stays callable via a registry
-	# alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 67, "Catalog should register exactly 67 tools")
+	# set_tilemap_cells + create_parallax_2d (3) = 67;
+	# v0.6.7 audio create_audio_player + set_audio_player_properties (2) = 69
+	# total. (create_camera_3d → create_camera was a rename, not an add; it
+	# stays callable via a registry alias which does NOT count toward
+	# get_tool_count.)
+	assert_eq(registry.get_tool_count(), 69, "Catalog should register exactly 69 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -84,6 +86,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"get_animation_player_info",
 		# v0.7.0 — Asset pipeline (async download + install; license audit)
 		"import_asset", "list_imported_assets",
+		# v0.6.7 — Audio (place a player + wire a stream)
+		"create_audio_player", "set_audio_player_properties",
 	]
 	for expected in expected_names:
 		assert_true(registry.has_tool(expected), "Missing registration for tool '%s'" % expected)
