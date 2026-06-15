@@ -108,6 +108,18 @@ const AddAnimationKeyframeTool   = preload("res://addons/com.gladekit.mcp-bridge
 const SetAnimationPropertiesTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/set_animation_properties.gd")
 const GetAnimationPlayerInfoTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/get_animation_player_info.gd")
 
+# ── AnimationTree state-machine tools (v0.6.8) ─────────────────────────────
+# Godot's state-machine animation controller — the analog of Unity's Animator
+# Controller. Where the AnimationPlayer tools above scaffold individual clips,
+# these wrap those clips into an AnimationNodeStateMachine of states +
+# transitions so a character blends idle/walk/run/jump driven by travel() or
+# advance conditions. create builds (optionally seeding states from the bound
+# player); add_state/add_transition extend; get_*_info inspects.
+const CreateAnimationTreeTool         = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/create_animation_tree.gd")
+const AddStateMachineStateTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/add_state_machine_state.gd")
+const AddStateMachineTransitionTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/add_state_machine_transition.gd")
+const GetAnimationTreeInfoTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/get_animation_tree_info.gd")
+
 # ── Asset pipeline tools (v0.7.0) ──────────────────────────────────────────
 # Download + install external CC0 assets. import_asset is async (downloads on a
 # worker thread); see i_tool.gd's async protocol + ws_server._drain_async_dispatches.
@@ -234,6 +246,12 @@ func _register_all() -> void:
 	register_tool(AddAnimationKeyframeTool.new())
 	register_tool(SetAnimationPropertiesTool.new())
 	register_tool(GetAnimationPlayerInfoTool.new())
+	# AnimationTree state machine (4, v0.6.8) — states + transitions over the
+	# player's clips; the Animator-Controller analog.
+	register_tool(CreateAnimationTreeTool.new())
+	register_tool(AddStateMachineStateTool.new())
+	register_tool(AddStateMachineTransitionTool.new())
+	register_tool(GetAnimationTreeInfoTool.new())
 	# Asset pipeline (2, v0.7.0) — async external-asset download + install,
 	# plus a read-only license audit of what's been imported.
 	register_tool(ImportAssetTool.new())

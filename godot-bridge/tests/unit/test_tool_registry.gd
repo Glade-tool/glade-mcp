@@ -35,11 +35,13 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# list_imported_assets (2) = 62; 2D foundation create_sprite_2d +
 	# create_animated_sprite_2d (2) = 64; 2D batch 2 create_tilemap_layer +
 	# set_tilemap_cells + create_parallax_2d (3) = 67;
-	# v0.6.7 audio create_audio_player + set_audio_player_properties (2) = 69
-	# total. (create_camera_3d → create_camera was a rename, not an add; it
-	# stays callable via a registry alias which does NOT count toward
-	# get_tool_count.)
-	assert_eq(registry.get_tool_count(), 69, "Catalog should register exactly 69 tools")
+	# v0.6.7 audio create_audio_player + set_audio_player_properties (2) = 69;
+	# v0.6.8 AnimationTree state machine create_animation_tree +
+	# add_state_machine_state + add_state_machine_transition +
+	# get_animation_tree_info (4) = 73 total. (create_camera_3d → create_camera
+	# was a rename, not an add; it stays callable via a registry alias which
+	# does NOT count toward get_tool_count.)
+	assert_eq(registry.get_tool_count(), 73, "Catalog should register exactly 73 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -88,6 +90,9 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"import_asset", "list_imported_assets",
 		# v0.6.7 — Audio (place a player + wire a stream)
 		"create_audio_player", "set_audio_player_properties",
+		# v0.6.8 — AnimationTree state machine (Animator-Controller analog)
+		"create_animation_tree", "add_state_machine_state",
+		"add_state_machine_transition", "get_animation_tree_info",
 	]
 	for expected in expected_names:
 		assert_true(registry.has_tool(expected), "Missing registration for tool '%s'" % expected)

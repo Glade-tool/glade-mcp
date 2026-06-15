@@ -119,6 +119,8 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
         "get_world_environment",
         # Animation reads (v0.6.0)
         "get_animation_player_info",
+        # AnimationTree state-machine read (v0.6.8)
+        "get_animation_tree_info",
         # Asset pipeline audit (v0.7.0) — reads .gladekit-asset.json sidecars only
         "list_imported_assets",
     }
