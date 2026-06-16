@@ -18,6 +18,7 @@ const CreateSprite2DTool    = preload("res://addons/com.gladekit.mcp-bridge/tool
 const CreateAnimatedSprite2DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_animated_sprite_2d.gd")
 const CreateTilemapLayerTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_tilemap_layer.gd")
 const SetTilemapCellsTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_tilemap_cells.gd")
+const SetTilemapCollisionTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_tilemap_collision.gd")
 const CreateParallax2DTool  = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/create_parallax_2d.gd")
 const DeleteNodeTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/delete_node.gd")
 const RenameNodeTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/rename_node.gd")
@@ -38,6 +39,16 @@ const AttachScriptToNodeTool = preload("res://addons/com.gladekit.mcp-bridge/too
 # self-referential-camera bug. Lives in the script category (it's script-centric).
 const CreateThirdPersonControllerTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_third_person_controller.gd")
 
+# 2D analog of the above: a vetted CharacterBody2D platformer/top-down controller
+# (style arg) that ships the game-feel details — coyote time, jump buffering,
+# variable jump height — a model re-deriving movement from scratch tends to drop.
+const Create2DControllerTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_2d_controller.gd")
+
+# Vetted trauma-based Camera2D screen-shake scaffolder — the "juice" companion to
+# create_particles_2d. Writes a known-good shake script (decaying, noise-driven,
+# applied via offset so it composes with a following camera) and attaches it.
+const CreateScreenShakeTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_screen_shake.gd")
+
 # ── Camera / Lighting / Environment tools (Phase 3 + v0.5.3) ───────────────
 # create_camera is dimension-aware (space="2d"|"3d"); the legacy create_camera_3d
 # name is kept as a registry alias (see _register_aliases).
@@ -55,6 +66,11 @@ const CreateResourceTool      = preload("res://addons/com.gladekit.mcp-bridge/to
 
 # ── Physics tools (Phase 3) ────────────────────────────────────────────────
 const CreatePhysicsBodyTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/create_physics_body.gd")
+
+# ── Particles / juice ──────────────────────────────────────────────────────
+# Preset-driven GPUParticles2D + ParticleProcessMaterial scaffolder (explosion /
+# sparkle / smoke / fire / trail) — the highest-impact "juice" lever.
+const CreateParticles2DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/particles/create_particles_2d.gd")
 
 # ── Scene I/O tools (Phase 3) ──────────────────────────────────────────────
 const CreateSceneTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene_io/create_scene.gd")
@@ -172,7 +188,7 @@ func register_alias(alias_name: String, canonical_name: String) -> void:
 
 
 func _register_all() -> void:
-	# Scene / Node (17)
+	# Scene / Node (18)
 	register_tool(GetSceneTreeTool.new())
 	register_tool(GetNodeInfoTool.new())
 	register_tool(FindNodesTool.new())
@@ -182,6 +198,7 @@ func _register_all() -> void:
 	register_tool(CreateAnimatedSprite2DTool.new())
 	register_tool(CreateTilemapLayerTool.new())
 	register_tool(SetTilemapCellsTool.new())
+	register_tool(SetTilemapCollisionTool.new())
 	register_tool(CreateParallax2DTool.new())
 	register_tool(DeleteNodeTool.new())
 	register_tool(RenameNodeTool.new())
@@ -190,13 +207,15 @@ func _register_all() -> void:
 	register_tool(SetNodeTransformTool.new())
 	register_tool(SetNodeResourceTool.new())
 	register_tool(SetNodePropertyTool.new())
-	# Script (6)
+	# Script (8)
 	register_tool(CreateScriptTool.new())
 	register_tool(ModifyScriptTool.new())
 	register_tool(GetScriptContentTool.new())
 	register_tool(FindScriptsTool.new())
 	register_tool(AttachScriptToNodeTool.new())
 	register_tool(CreateThirdPersonControllerTool.new())
+	register_tool(Create2DControllerTool.new())
+	register_tool(CreateScreenShakeTool.new())
 	# Camera / Lighting / Environment (6) — 2 Phase 3 + 4 (v0.5.3)
 	register_tool(CreateCameraTool.new())
 	register_tool(CreateLightTool.new())
@@ -211,6 +230,8 @@ func _register_all() -> void:
 	register_tool(CreateResourceTool.new())
 	# Physics (1)
 	register_tool(CreatePhysicsBodyTool.new())
+	# Particles / juice (1)
+	register_tool(CreateParticles2DTool.new())
 	# Scene I/O (4)
 	register_tool(CreateSceneTool.new())
 	register_tool(OpenSceneTool.new())

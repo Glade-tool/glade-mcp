@@ -10,13 +10,15 @@ asserts every registered bridge tool has a schema and vice versa.
 Categories follow the Godot bridge's own directory layout under
 `addons/com.gladekit.mcp-bridge/tools/implementations/`:
 
-    scene     — Node creation (incl. 2D sprites), queries,
-                transforms, resource assignment                  (17 tools)
-    script    — GDScript file CRUD + node attachment           ( 5 tools)
+    scene     — Node creation (incl. 2D sprites / tilemaps +
+                collision), queries, transforms, resource assign (18 tools)
+    script    — GDScript file CRUD + node attachment + vetted
+                scaffolders (3D/2D controllers, screen shake)    ( 8 tools)
     camera    — Camera (2D/3D) + Light (2D/3D) + WorldEnv       ( 6 tools)
     resource  — Material creation, generic Resource creation,
                 property updates                                ( 3 tools)
-    physics   — PhysicsBody3D + auto-collision-shape            ( 1 tool)
+    physics   — PhysicsBody (2D/3D) + auto-collision-shape      ( 1 tool)
+    particles — preset-driven GPUParticles2D ("juice")          ( 1 tool)
     scene_io  — .tscn create/open/save/instantiate              ( 4 tools)
     runtime   — Play-mode + selection + console + play session
                 + structured runtime-event observation          (10 tools)
@@ -24,15 +26,19 @@ Categories follow the Godot bridge's own directory layout under
     signal    — Persistent (scene-saved) signal wiring          ( 3 tools)
     project   — Introspection + asset listing + input actions   ( 3 tools)
     ui        — Control-tree creation + anchor / text helpers   ( 6 tools)
-    animation — AnimationPlayer + Animation .tres scaffolding   ( 5 tools)
+    animation — AnimationPlayer + AnimationTree state machines  ( 9 tools)
     asset_pipeline — find / import / audit external CC0 assets   ( 3 tools)
     audio     — AudioStreamPlayer (2D/3D) create + mutate        ( 2 tools)
                                                                 ───────
-                                                                70 tools
+                                                                78 tools
+
+(Per-category counts are indicative; the authoritative catalog size is
+asserted against the bridge registry by the parity test in
+tests/test_registry_godot.py.)
 
 Unlike the Unity side (~235 tools across 17 categories) we expose the
-full Godot catalog directly — 70 tools is well within Claude Code's
-~128-tool budget so there's no need for a CORE_TOOLS filter.
+full Godot catalog directly — it is well within Claude Code's ~128-tool
+budget so there's no need for a CORE_TOOLS filter.
 
 Note: find_asset (in asset_pipeline) is answered by the server itself rather
 than dispatched to the bridge, so it appears here but has no bridge tool.
@@ -44,6 +50,7 @@ from .animation import TOOLS as ANIMATION_TOOLS
 from .asset_pipeline import TOOLS as ASSET_PIPELINE_TOOLS
 from .audio import TOOLS as AUDIO_TOOLS
 from .camera import TOOLS as CAMERA_TOOLS
+from .particles import TOOLS as PARTICLES_TOOLS
 from .physics import TOOLS as PHYSICS_TOOLS
 from .project import TOOLS as PROJECT_TOOLS
 from .resource import TOOLS as RESOURCE_TOOLS
@@ -61,6 +68,7 @@ ALL_CATEGORIES = [
     ("camera", CAMERA_TOOLS),
     ("resource", RESOURCE_TOOLS),
     ("physics", PHYSICS_TOOLS),
+    ("particles", PARTICLES_TOOLS),
     ("scene_io", SCENE_IO_TOOLS),
     ("runtime", RUNTIME_TOOLS),
     ("uid", UID_TOOLS),

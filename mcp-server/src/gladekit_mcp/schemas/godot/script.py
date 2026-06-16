@@ -1,5 +1,5 @@
 """
-Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (6 tools).
+Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (8 tools).
 
 GDScript files are .gd resources living anywhere under res://. Each
 Godot node can have at most one attached script (vs Unity's many
@@ -226,6 +226,119 @@ TOOLS: List[Dict] = [
                         "description": (
                             "Overwrite the generated script files if they already exist. Default "
                             "false (the tool refuses rather than clobber existing files)."
+                        ),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_2d_controller",
+            "description": (
+                "Scaffold a complete, playable 2D player in ONE atomic call. ALWAYS PREFER "
+                "THIS over hand-writing scripts for ANY request that wants a 2D player that "
+                "moves and (for platformers) jumps — a side-scroller/platformer (Mario-like) "
+                "OR a top-down character (Zelda-like). It writes a VETTED, known-good "
+                "CharacterBody2D GDScript VERBATIM, then assembles the scene: a Player "
+                "(CharacterBody2D with a RectangleShape2D collision + a colored Polygon2D "
+                "placeholder so something is visible on Play), a follow Camera2D, optionally a "
+                "ground (platformer), the movement/jump input actions, and adds the Player to "
+                "the 'player' group. Do NOT follow this with create_script / "
+                "attach_script_to_node / add_input_action for the controller — it already did "
+                "all of that. Why prefer it: the platformer template ships the game-feel "
+                "details a hand-written controller almost always omits — COYOTE TIME, JUMP "
+                "BUFFERING, and VARIABLE JUMP HEIGHT — so the jump feels good instead of floaty "
+                "or stiff; the top-down template normalizes diagonals so they aren't faster. "
+                "Replace the placeholder Polygon2D with a Sprite2D/AnimatedSprite2D for real "
+                "art. After it runs, your only remaining step is save_scene. (For a 3D player "
+                "use create_third_person_controller instead.)"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "style": {
+                        "type": "string",
+                        "enum": ["platformer", "top_down"],
+                        "description": (
+                            "Movement style. 'platformer' (default) = side-view with gravity + "
+                            "jump (coyote time, jump buffer, variable jump height). 'top_down' = "
+                            "8-direction movement with no gravity, normalized diagonals."
+                        ),
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "player_name": {
+                        "type": "string",
+                        "description": (
+                            "Name of the player node to create or reuse. Default 'Player'. If a "
+                            "node with this name already exists it must be a CharacterBody2D."
+                        ),
+                    },
+                    "create_ground": {
+                        "type": "boolean",
+                        "description": (
+                            "Create a wide ground if the scene has none. Default true. Only "
+                            "applies to style='platformer' (top-down has no gravity to fall onto)."
+                        ),
+                    },
+                    "create_camera": {
+                        "type": "boolean",
+                        "description": (
+                            "Add a follow Camera2D as a child of the Player if the scene has no Camera2D. Default true."
+                        ),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Overwrite the generated script file if it already exists. Default "
+                            "false (the tool refuses rather than clobber an existing file)."
+                        ),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_screen_shake",
+            "description": (
+                "Add trauma-based screen shake to a 2D camera in ONE atomic call — the "
+                "'juice' companion to create_particles_2d. PREFER THIS over hand-writing "
+                "shake: it writes a VETTED Camera2D script VERBATIM and attaches it to a "
+                "Camera2D (the first one in the scene, or a new one if none exists). The "
+                "script is trauma-based (intensity = trauma squared, so small hits barely "
+                "shake and big hits really kick), noise-driven (not cheap per-frame random), "
+                "decays to zero on its own, and shakes via offset/rotation so it composes "
+                "with a camera that follows the player. The script joins the 'screen_shake' "
+                "group; trigger it from gameplay code wherever an impact happens (a hit, "
+                "death, hard landing, or right where you emit explosion particles) with ONE "
+                'line: get_tree().get_first_node_in_group("screen_shake").shake(0.5) — '
+                "bigger amount (0..1) is a bigger kick. After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "camera_path": {
+                        "type": "string",
+                        "description": (
+                            "Scene-relative path to the Camera2D to shake. Default: the first "
+                            "Camera2D in the scene, or a new one is created if none exists."
+                        ),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Overwrite the generated script if it already exists. Default false "
+                            "(the tool refuses rather than clobber an existing file)."
                         ),
                     },
                 },

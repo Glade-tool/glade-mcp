@@ -38,10 +38,12 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# v0.6.7 audio create_audio_player + set_audio_player_properties (2) = 69;
 	# v0.6.8 AnimationTree state machine create_animation_tree +
 	# add_state_machine_state + add_state_machine_transition +
-	# get_animation_tree_info (4) = 73; create_third_person_controller (1) = 74
-	# total. (create_camera_3d → create_camera was a rename, not an add; it stays
-	# callable via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 74, "Catalog should register exactly 74 tools")
+	# get_animation_tree_info (4) = 73; create_third_person_controller (1) = 74;
+	# create_2d_controller (1) = 75; create_particles_2d (1) = 76;
+	# create_screen_shake (1) = 77; set_tilemap_collision (1) = 78 total.
+	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
+	# via a registry alias which does NOT count toward get_tool_count.)
+	assert_eq(registry.get_tool_count(), 78, "Catalog should register exactly 78 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -49,12 +51,14 @@ func test_registry_contains_all_mvp_tools() -> void:
 		# Phase 2 — Scene / Node
 		"get_scene_tree", "get_node_info", "find_nodes", "create_node",
 		"create_primitive_3d", "create_sprite_2d", "create_animated_sprite_2d",
-		"create_tilemap_layer", "set_tilemap_cells", "create_parallax_2d",
+		"create_tilemap_layer", "set_tilemap_cells", "set_tilemap_collision",
+		"create_parallax_2d",
 		"delete_node", "rename_node", "duplicate_node",
 		"set_node_parent", "set_node_transform", "set_node_resource",
 		# Phase 2 — Script
 		"create_script", "modify_script", "get_script_content", "find_scripts",
 		"attach_script_to_node", "create_third_person_controller",
+		"create_2d_controller", "create_screen_shake",
 		# Camera / Light (create_camera is dimension-aware; create_camera_3d
 		# remains a registry alias, asserted separately below)
 		"create_camera", "create_light",
@@ -62,6 +66,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"create_material", "set_material_property", "create_resource",
 		# Phase 3 — Physics
 		"create_physics_body",
+		# Particles / juice
+		"create_particles_2d",
 		# Phase 3 — Scene I/O
 		"create_scene", "open_scene", "save_scene", "instantiate_scene",
 		# Phase 3 — Runtime / process

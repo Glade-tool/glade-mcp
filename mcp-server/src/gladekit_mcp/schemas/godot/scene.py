@@ -1,5 +1,5 @@
 """
-Godot scene/hierarchy tools — Node creation, lookup, transforms (17 tools).
+Godot scene/hierarchy tools — Node creation, lookup, transforms (18 tools).
 
 Godot's scene model differs from Unity's GameObject+Component model:
 each scene is a tree of Nodes (Node3D, CharacterBody3D, Sprite2D, ...);
@@ -415,6 +415,49 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["node_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_tilemap_collision",
+            "description": (
+                "Make a TileMapLayer's tiles SOLID so a CharacterBody2D can stand on them. "
+                "A painted TileMapLayer is purely visual until this runs — without it a "
+                "player (e.g. from create_2d_controller) falls straight through the floor. "
+                "Adds a physics layer to the TileSet and a full-tile rectangle collision "
+                "polygon to every atlas tile. Call this once after building a tile level "
+                "(create_tilemap_layer + set_tilemap_cells), then save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tilemap_path": {
+                        "type": "string",
+                        "description": "Scene-relative path to the TileMapLayer to make solid.",
+                    },
+                    "collision_layer": {
+                        "type": "integer",
+                        "description": "Physics layer bitmask the tiles occupy. Default 1.",
+                    },
+                    "collision_mask": {
+                        "type": "integer",
+                        "description": "Physics layers the tiles scan. Default 1.",
+                    },
+                    "physics_layer": {
+                        "type": "integer",
+                        "description": ("TileSet physics-layer index to author (created if absent). Default 0."),
+                    },
+                    "clear_existing": {
+                        "type": "boolean",
+                        "description": (
+                            "Remove existing collision polygons on each tile first so re-running "
+                            "doesn't stack duplicates. Default true."
+                        ),
+                    },
+                },
+                "required": ["tilemap_path"],
             },
         },
     },
