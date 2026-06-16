@@ -1,5 +1,5 @@
 """
-Godot GDScript tools — file CRUD + node attachment (5 tools).
+Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (6 tools).
 
 GDScript files are .gd resources living anywhere under res://. Each
 Godot node can have at most one attached script (vs Unity's many
@@ -177,6 +177,58 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["node_path", "script_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_third_person_controller",
+            "description": (
+                "Scaffold a complete, playable 3D third-person player in ONE atomic call. "
+                "ALWAYS PREFER THIS over hand-writing scripts for ANY request that wants a "
+                "player that moves with WASD AND is followed by a third-person / orbit camera. "
+                "It writes two VETTED, known-good GDScript files VERBATIM "
+                "(third_person_controller.gd = CharacterBody3D camera-relative movement + jump; "
+                "orbit_camera.gd = a decoupled mouse-orbit camera), then assembles the scene: "
+                "ensures a Player (CharacterBody3D with capsule collision + mesh), a Camera3D, a "
+                "ground plane, and a light; attaches both scripts; adds the Player to the 'player' "
+                "group; and creates the WASD + jump input actions. "
+                "Do NOT follow this with create_script / attach_script_to_node / add_input_action for "
+                "the controller — it already did all of that. Why prefer it: a hand-written orbit "
+                "camera almost always re-introduces a self-referential feedback loop that spins the "
+                "view while strafing with A/D; the vetted template fixes that. After it runs, your "
+                "only remaining step is save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the two generated scripts. Default 'res://scripts'."),
+                    },
+                    "player_name": {
+                        "type": "string",
+                        "description": (
+                            "Name of the player node to create or reuse. Default 'Player'. If a "
+                            "node with this name already exists it must be a CharacterBody3D."
+                        ),
+                    },
+                    "create_ground": {
+                        "type": "boolean",
+                        "description": (
+                            "Create a ground plane if the scene has none. Default true. Pass false "
+                            "when the scene already has a floor/level."
+                        ),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Overwrite the generated script files if they already exist. Default "
+                            "false (the tool refuses rather than clobber existing files)."
+                        ),
+                    },
+                },
             },
         },
     },

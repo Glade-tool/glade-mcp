@@ -33,6 +33,10 @@ const ModifyScriptTool       = preload("res://addons/com.gladekit.mcp-bridge/too
 const GetScriptContentTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/get_script_content.gd")
 const FindScriptsTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/find_scripts.gd")
 const AttachScriptToNodeTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/attach_script_to_node.gd")
+# Vetted-template scaffolder: writes a known-good CharacterBody3D controller +
+# decoupled orbit camera verbatim, so the model can't re-derive the
+# self-referential-camera bug. Lives in the script category (it's script-centric).
+const CreateThirdPersonControllerTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_third_person_controller.gd")
 
 # ── Camera / Lighting / Environment tools (Phase 3 + v0.5.3) ───────────────
 # create_camera is dimension-aware (space="2d"|"3d"); the legacy create_camera_3d
@@ -186,12 +190,13 @@ func _register_all() -> void:
 	register_tool(SetNodeTransformTool.new())
 	register_tool(SetNodeResourceTool.new())
 	register_tool(SetNodePropertyTool.new())
-	# Script (5)
+	# Script (6)
 	register_tool(CreateScriptTool.new())
 	register_tool(ModifyScriptTool.new())
 	register_tool(GetScriptContentTool.new())
 	register_tool(FindScriptsTool.new())
 	register_tool(AttachScriptToNodeTool.new())
+	register_tool(CreateThirdPersonControllerTool.new())
 	# Camera / Lighting / Environment (6) — 2 Phase 3 + 4 (v0.5.3)
 	register_tool(CreateCameraTool.new())
 	register_tool(CreateLightTool.new())
