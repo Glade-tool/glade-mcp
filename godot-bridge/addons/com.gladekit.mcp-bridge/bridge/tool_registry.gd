@@ -49,6 +49,14 @@ const Create2DControllerTool = preload("res://addons/com.gladekit.mcp-bridge/too
 # applied via offset so it composes with a following camera) and attaches it.
 const CreateScreenShakeTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_screen_shake.gd")
 
+# 2D gameplay-loop family: vetted scaffolders that turn a playable character into
+# a winnable/losable game. create_game_manager is the hub (score/lives/respawn/
+# win-lose + HUD, reached via the "game_manager" group); create_collectible and
+# create_hazard are Area2D pickups/dangers that wire into it.
+const CreateGameManagerTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_game_manager.gd")
+const CreateCollectibleTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_collectible.gd")
+const CreateHazardTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_hazard.gd")
+
 # ── Camera / Lighting / Environment tools (Phase 3 + v0.5.3) ───────────────
 # create_camera is dimension-aware (space="2d"|"3d"); the legacy create_camera_3d
 # name is kept as a registry alias (see _register_aliases).
@@ -207,7 +215,7 @@ func _register_all() -> void:
 	register_tool(SetNodeTransformTool.new())
 	register_tool(SetNodeResourceTool.new())
 	register_tool(SetNodePropertyTool.new())
-	# Script (8)
+	# Script (11)
 	register_tool(CreateScriptTool.new())
 	register_tool(ModifyScriptTool.new())
 	register_tool(GetScriptContentTool.new())
@@ -216,6 +224,9 @@ func _register_all() -> void:
 	register_tool(CreateThirdPersonControllerTool.new())
 	register_tool(Create2DControllerTool.new())
 	register_tool(CreateScreenShakeTool.new())
+	register_tool(CreateGameManagerTool.new())
+	register_tool(CreateCollectibleTool.new())
+	register_tool(CreateHazardTool.new())
 	# Camera / Lighting / Environment (6) — 2 Phase 3 + 4 (v0.5.3)
 	register_tool(CreateCameraTool.new())
 	register_tool(CreateLightTool.new())

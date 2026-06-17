@@ -345,4 +345,160 @@ TOOLS: List[Dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_game_manager",
+            "description": (
+                "Drop the HUB of a simple 2D game into the scene in ONE atomic call — the "
+                "piece that turns a playable character into a winnable/losable GAME. PREFER "
+                "THIS over hand-writing game-state code: it writes a VETTED GDScript VERBATIM "
+                "and builds a GameManager node plus a HUD (CanvasLayer with score + lives "
+                "readouts and a centered win/lose banner). It tracks score and lives, RESPAWNS "
+                "the player (first node in the 'player' group) on a non-fatal hit, and ends the "
+                "game on win/lose. The manager joins the 'game_manager' group; gameplay reaches "
+                "it without a reference: add_score(1) on a pickup, lose_life() on a hit, win() "
+                "at a goal. Pair it with create_collectible (pickups) and create_hazard "
+                "(dangers), which already call these methods. One manager per scene (the tool "
+                "refuses a second). After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "manager_name": {
+                        "type": "string",
+                        "description": "Name for the manager node. Default 'GameManager'.",
+                    },
+                    "starting_lives": {
+                        "type": "integer",
+                        "description": "Lives the player starts with. Default 3.",
+                    },
+                    "score_to_win": {
+                        "type": "integer",
+                        "description": (
+                            "Score that triggers an automatic win (e.g. 10 to 'collect 10 "
+                            "coins'). 0 disables auto-win so you call win() yourself from a "
+                            "goal/flag. Default 0."
+                        ),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Overwrite the generated script if it already exists. Default false "
+                            "(the tool refuses rather than clobber an existing file)."
+                        ),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_collectible",
+            "description": (
+                "Add a COLLECTIBLE (coin / pickup / star) to the scene in ONE atomic call. "
+                "PREFER THIS over hand-writing a pickup: it writes a VETTED Area2D script "
+                "VERBATIM (written once per project, reused on every call) and builds the node "
+                "with a collision shape + a visible diamond placeholder. On player touch it "
+                "calls the GameManager's add_score(value) and frees itself, so call "
+                "create_game_manager FIRST or the pickup vanishes without scoring. Place many "
+                "by calling this repeatedly or via duplicate_node. The node joins the "
+                "'collectibles' group. After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Default 'Collectible'.",
+                    },
+                    "parent_path": {
+                        "type": "string",
+                        "description": ("Scene-relative parent path. Default: the scene root."),
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Placement as 'x,y' (pixels). Default '0,0'.",
+                    },
+                    "value": {
+                        "type": "integer",
+                        "description": "Score added when picked up. Default 1.",
+                    },
+                    "radius": {
+                        "type": "number",
+                        "description": ("Collision + placeholder radius in pixels. Default 12."),
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": ("Placeholder fill color (name or 'r,g,b'). Default gold."),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Regenerate the shared collectible script if it already exists. Default false."
+                        ),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_hazard",
+            "description": (
+                "Add a HAZARD (spikes / lava / an enemy hurtbox) to the scene in ONE atomic "
+                "call — the threat that makes the level losable. PREFER THIS over hand-writing "
+                "a damage volume: it writes a VETTED Area2D script VERBATIM (written once per "
+                "project, reused on every call) and builds the node with a collision shape + a "
+                "red placeholder. On player touch it calls the GameManager's lose_life (which "
+                "respawns the player or ends the game), so call create_game_manager FIRST or "
+                "contact does nothing. Place many by calling this repeatedly or via "
+                "duplicate_node; pair it with create_screen_shake for a hit that feels like "
+                "one. The node joins the 'hazards' group. After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Default 'Hazard'.",
+                    },
+                    "parent_path": {
+                        "type": "string",
+                        "description": ("Scene-relative parent path. Default: the scene root."),
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Placement as 'x,y' (pixels). Default '0,0'.",
+                    },
+                    "size": {
+                        "type": "string",
+                        "description": ("Collision + placeholder size as 'w,h' (pixels). Default '48,16'."),
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": ("Placeholder fill color (name or 'r,g,b'). Default danger red."),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": ("Regenerate the shared hazard script if it already exists. Default false."),
+                    },
+                },
+            },
+        },
+    },
 ]
