@@ -501,4 +501,76 @@ TOOLS: List[Dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_enemy_2d",
+            "description": (
+                "Add a moving ENEMY (a goomba / patrolling guard / chaser) to the scene in ONE "
+                "atomic call — the threat that walks the level, hurts the player, and can be "
+                "DEFEATED by stomping on its head. PREFER THIS over create_hazard when the danger "
+                "should MOVE or be beatable (create_hazard is a STATIC damage volume). It writes a "
+                "VETTED CharacterBody2D script VERBATIM (written once per project, reused on every "
+                "call) and builds the node with a body collision shape, a placeholder, and a "
+                "Hurtbox. Two outcomes by where the player hits it: a STOMP (player drops onto its "
+                "head) kills it, adds score_value via the GameManager, and bounces the player; a "
+                "SIDE/below touch calls the GameManager's lose_life (which respawns the player or "
+                "ends the game) — so call create_game_manager FIRST or contact does nothing. "
+                "style='patrol' walks back and forth, turning at walls AND ledges; style='chaser' "
+                "homes in on the player when within aggro_range. Place many by calling this "
+                "repeatedly or via duplicate_node; pair it with create_screen_shake for a stomp "
+                "that feels like one. The node joins the 'enemies' group. After it runs, call "
+                "save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Default 'Enemy'.",
+                    },
+                    "parent_path": {
+                        "type": "string",
+                        "description": ("Scene-relative parent path. Default: the scene root."),
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Placement as 'x,y' (pixels). Default '0,0'.",
+                    },
+                    "style": {
+                        "type": "string",
+                        "enum": ["patrol", "chaser"],
+                        "description": (
+                            "'patrol' (default) walks back and forth, turning at walls and ledges. "
+                            "'chaser' homes in on the player when within aggro_range."
+                        ),
+                    },
+                    "size": {
+                        "type": "string",
+                        "description": ("Body + placeholder size as 'w,h' (pixels). Default '28,32'."),
+                    },
+                    "speed": {
+                        "type": "number",
+                        "description": "Horizontal move speed in px/s. Default 70.",
+                    },
+                    "score_value": {
+                        "type": "integer",
+                        "description": ("Score added when the player stomps this enemy. Default 1."),
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": ("Placeholder fill color (name or 'r,g,b'). Default menacing purple."),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": ("Regenerate the shared enemy script if it already exists. Default false."),
+                    },
+                },
+            },
+        },
+    },
 ]
