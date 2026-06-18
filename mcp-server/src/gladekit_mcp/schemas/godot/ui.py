@@ -1,5 +1,5 @@
 """
-Godot UI / Control tools (6 tools, v0.5.0).
+Godot UI / Control tools (8 tools).
 
 Built around three pieces of Control-tree convenience the agent otherwise
 discovers the hard way:
@@ -13,6 +13,11 @@ discovers the hard way:
 
 list_ui_hierarchy is the read-only counterpart — get_scene_tree filtered to
 Control nodes with UI-relevant fields (size, position, anchor preset, text).
+
+create_main_menu and create_pause_menu are higher-level scaffolders: each
+writes a vetted script plus its full node tree to deliver a working title
+screen / pause overlay in one call — the menu/scene-flow layer that turns a
+single playable level into a complete game (title -> play -> pause -> quit).
 """
 
 from typing import Dict, List
@@ -261,6 +266,113 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_main_menu",
+            "description": (
+                "Create a complete TITLE-SCREEN scene in ONE atomic call — the front "
+                "door that turns a single playable level into a real game. PREFER THIS "
+                "over hand-building a menu: it writes a NEW .tscn (it does NOT touch the "
+                "open scene) with a vetted Control tree — dim background, centered "
+                "title, a Play button that change_scene_to_file's into your gameplay "
+                "scene, and an optional Quit button — plus a VETTED script that wires "
+                "the buttons by node lookup in _ready (no fragile editor connections). "
+                "Pass play_target = the res:// path of your gameplay scene so Play "
+                "loads it. Optionally set_as_main_scene so 'run the project' opens the "
+                "menu first. Pairs with create_pause_menu (whose 'quit to menu' routes "
+                "back here). This is a SEPARATE scene — call open_scene to switch back "
+                "to the level afterward."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "res:// path for the new menu scene. Auto-appends .tscn. "
+                            "Default 'res://scenes/main_menu.tscn'."
+                        ),
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Title text shown on the screen. Default 'My Game'.",
+                    },
+                    "play_target": {
+                        "type": "string",
+                        "description": (
+                            "res:// path of the gameplay scene the Play button loads. "
+                            "May be empty (the button warns at runtime until it is set)."
+                        ),
+                    },
+                    "include_quit": {
+                        "type": "boolean",
+                        "description": "Add a Quit button that exits the app. Default true.",
+                    },
+                    "set_as_main_scene": {
+                        "type": "boolean",
+                        "description": (
+                            "Point the project's run/main_scene at this menu so the "
+                            "project boots into it. Default false."
+                        ),
+                    },
+                    "open": {
+                        "type": "boolean",
+                        "description": "Open the new scene in the editor after creating it. Default true.",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Overwrite the scene + script if they already exist. Default "
+                            "false (the tool refuses rather than clobber)."
+                        ),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_pause_menu",
+            "description": (
+                "Drop a working PAUSE OVERLAY into the CURRENTLY OPEN scene in ONE "
+                "atomic call. Esc (the built-in ui_cancel action) toggles "
+                "get_tree().paused; while paused a centered panel with Resume and "
+                "'Quit to menu' buttons appears. PREFER THIS over hand-writing pause "
+                "code: it writes a VETTED script and builds a CanvasLayer whose "
+                "process_mode is ALWAYS so it can un-pause itself — the trap that "
+                "breaks hand-written pause menus. Works in 2D and 3D scenes. One pause "
+                "menu per scene (the tool refuses a second). Set menu_target to a menu "
+                "scene (see create_main_menu) so 'Quit to menu' returns there; leave it "
+                "empty to make that button quit the app. After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "menu_target": {
+                        "type": "string",
+                        "description": (
+                            "res:// path of the menu scene 'Quit to menu' loads. Empty "
+                            "makes that button quit the application instead. Default ''."
+                        ),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": ("Overwrite the generated script if it already exists. Default false."),
+                    },
+                },
             },
         },
     },

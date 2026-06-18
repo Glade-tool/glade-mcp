@@ -42,10 +42,11 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# create_2d_controller (1) = 75; create_particles_2d (1) = 76;
 	# create_screen_shake (1) = 77; set_tilemap_collision (1) = 78;
 	# 2D gameplay loop create_game_manager + create_collectible +
-	# create_hazard (3) = 81; create_enemy_2d (1) = 82 total.
+	# create_hazard (3) = 81; create_enemy_2d (1) = 82;
+	# menu / scene-flow create_main_menu + create_pause_menu (2) = 84 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 82, "Catalog should register exactly 82 tools")
+	assert_eq(registry.get_tool_count(), 84, "Catalog should register exactly 84 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -85,6 +86,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		# v0.5.0 — UI / Control
 		"create_control", "set_control_anchors", "set_control_text",
 		"set_control_size", "list_ui_hierarchy", "create_theme",
+		# Menu / scene-flow (title screen + pause overlay)
+		"create_main_menu", "create_pause_menu",
 		# v0.5.2 — Structured runtime-event observation
 		"start_runtime_observation", "stop_runtime_observation",
 		"get_runtime_events",

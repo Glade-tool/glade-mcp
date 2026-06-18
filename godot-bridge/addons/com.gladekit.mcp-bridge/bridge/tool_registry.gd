@@ -123,6 +123,17 @@ const SetControlSizeTool     = preload("res://addons/com.gladekit.mcp-bridge/too
 const ListUiHierarchyTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/list_ui_hierarchy.gd")
 const CreateThemeTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_theme.gd")
 
+# ── Menu / scene-flow family (v0.7.x) ──────────────────────────────────────
+# Vetted scaffolders for the connective tissue between levels — the front door
+# and the in-game overlay. create_main_menu writes a standalone title-screen
+# scene whose Play button change_scene_to_file's into the gameplay scene;
+# create_pause_menu drops an Esc-toggled pause overlay (CanvasLayer, process_mode
+# ALWAYS so it can un-pause itself) into the open scene, with a "quit to menu"
+# that routes back to the menu scene. Together they turn one playable level into
+# a complete game (title → play → pause → quit to title).
+const CreateMainMenuTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_main_menu.gd")
+const CreatePauseMenuTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_pause_menu.gd")
+
 # ── Animation tools (v0.6.0) ───────────────────────────────────────────────
 # AnimationPlayer scaffolding: register Animation .tres files with a player,
 # add tracks (value / position_3d / rotation_3d / scale_3d / method), insert
@@ -279,6 +290,10 @@ func _register_all() -> void:
 	register_tool(SetControlSizeTool.new())
 	register_tool(ListUiHierarchyTool.new())
 	register_tool(CreateThemeTool.new())
+	# Menu / scene-flow (2, v0.7.x) — title screen + pause overlay; the
+	# connective tissue that makes a single level a complete game.
+	register_tool(CreateMainMenuTool.new())
+	register_tool(CreatePauseMenuTool.new())
 	# Animation (5, v0.6.0)
 	register_tool(AddAnimationToPlayerTool.new())
 	register_tool(AddAnimationTrackTool.new())
