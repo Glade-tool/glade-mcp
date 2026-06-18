@@ -309,7 +309,11 @@ TOOLS: List[Dict] = [
                         "type": "string",
                         "description": (
                             "res:// path of the gameplay scene the Play button loads. "
-                            "May be empty (the button warns at runtime until it is set)."
+                            "When building a complete game, ALWAYS set this: save the "
+                            "gameplay scene first, then pass its res:// path here so Play "
+                            "actually starts the game. An empty value ships a dead-end "
+                            "Play button (it only warns at runtime) — leave it empty ONLY "
+                            "when no gameplay scene exists yet."
                         ),
                     },
                     "include_quit": {
