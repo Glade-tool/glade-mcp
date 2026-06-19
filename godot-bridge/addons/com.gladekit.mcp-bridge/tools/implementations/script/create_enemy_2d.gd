@@ -24,7 +24,13 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #     it never strolls off the platform. The right default for a placed enemy.
 #   "chaser"  — homes in on the player's horizontal position whenever the player
 #     is within `aggro_range`, otherwise holds still. A simple "sees you and comes
-#     for you" threat without pathfinding.
+#     for you" threat without pathfinding — and it "sees" through walls.
+#   "guard"   — the smart one. Patrols like "patrol" UNTIL it actually SEES the
+#     player: within `vision_range`, inside a forward vision cone, AND with a clear
+#     line of sight (a wall between them hides the player). Then it gives chase;
+#     `give_up_time` seconds after losing sight it forgets the player and resumes
+#     patrolling. The classic alert-and-pursue guard, with real perception instead
+#     of an omniscient aggro bubble. Tune the cone/range/give-up in the inspector.
 #
 # Why a template tool: a good enemy is fiddly — gravity + move_and_slide, turning
 # at ledges (a raycast probe, not just walls), and a stomp test that distinguishes
@@ -40,7 +46,7 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #   name:         node name. Default "Enemy".
 #   parent_path:  scene-relative parent. Default: the scene root.
 #   position:     "x,y" placement. Default 0,0.
-#   style:        "patrol" (default) or "chaser".
+#   style:        "patrol" (default), "chaser", or "guard" (patrol + line-of-sight chase).
 #   size:         "w,h" body + placeholder size in px. Default 28,32.
 #   speed:        horizontal move speed in px/s. Default 70.
 #   score_value:  score added when the player stomps it. Default 1.
@@ -56,7 +62,7 @@ const SessionTracker = preload("res://addons/com.gladekit.mcp-bridge/bridge/sess
 const _GROUP := "enemies"
 const _DEFAULT_SIZE := Vector2(28, 32)
 const _DEFAULT_COLOR := Color(0.55, 0.22, 0.65)  # menacing purple
-const _VALID_STYLES := ["patrol", "chaser"]
+const _VALID_STYLES := ["patrol", "chaser", "guard"]
 
 # ── Vetted script: Enemy2D (moving, stompable threat) ───────────────────────
 const ENEMY_SRC := """extends CharacterBody2D
@@ -68,12 +74,21 @@ const ENEMY_SRC := """extends CharacterBody2D
 # Wires into the manager through the \"game_manager\" group; if no manager exists
 # yet, contact simply does nothing. Reacts only to nodes in the \"player\" group.
 
-@export_enum(\"patrol\", \"chaser\") var style: String = \"patrol\"
+@export_enum(\"patrol\", \"chaser\", \"guard\") var style: String = \"patrol\"
 @export var speed: float = 70.0
 # Score awarded to the GameManager when the player stomps this enemy.
 @export var score_value: int = 1
 # Chaser only: how close (px) the player must be before the enemy gives chase.
+# (The chaser \"sees\" through walls — for line-of-sight perception use style=guard.)
 @export var aggro_range: float = 260.0
+# Guard only: how far (px) it can see.
+@export var vision_range: float = 320.0
+# Guard only: half-angle (degrees) of the forward vision cone. The player is
+# only spotted when within this many degrees of the way the guard is facing.
+@export var vision_cone_degrees: float = 70.0
+# Guard only: seconds after losing sight of the player before the guard gives up
+# the chase and returns to patrolling.
+@export var give_up_time: float = 2.5
 # Upward velocity given to the player on a successful stomp, so the bounce feels
 # like Mario. Player must be a CharacterBody2D (has a `velocity`).
 @export var stomp_bounce: float = 420.0
@@ -81,6 +96,8 @@ const ENEMY_SRC := """extends CharacterBody2D
 var _gravity: float = float(ProjectSettings.get_setting(\"physics/2d/default_gravity\", 980.0))
 var _dir: int = -1  # current facing: -1 left, +1 right
 var _dead: bool = false
+var _alerted: bool = false  # guard: currently aware of / chasing the player
+var _lost_sight_for: float = 0.0  # guard: seconds since the player was last seen
 
 
 func _ready() -> void:
@@ -106,19 +123,71 @@ func _physics_process(delta: float) -> void:
 			velocity.x = _dir * speed
 		else:
 			velocity.x = move_toward(velocity.x, 0.0, speed)
+	elif style == \"guard\":
+		_update_alert(delta)
+		if _alerted:
+			var p := _player()
+			if p != null:
+				_dir = 1 if p.global_position.x > global_position.x else -1
+				velocity.x = _dir * speed
+			else:
+				velocity.x = move_toward(velocity.x, 0.0, speed)
+		else:
+			velocity.x = _dir * speed  # patrol while unaware
 	else:
 		velocity.x = _dir * speed
 
 	move_and_slide()
 
-	# Patrol: turn around at a wall, or before walking off a ledge.
-	if style == \"patrol\" and is_on_floor():
+	# Patrolling enemies turn at a wall or before walking off a ledge; pursuing
+	# enemies only turn at a wall (they don't fear ledges while giving chase).
+	var patrolling: bool = style == \"patrol\" or (style == \"guard\" and not _alerted)
+	var pursuing: bool = style == \"chaser\" or (style == \"guard\" and _alerted)
+	if patrolling and is_on_floor():
 		if is_on_wall() or not _ground_ahead():
 			_dir *= -1
-	elif style == \"chaser\" and is_on_wall():
+	elif pursuing and is_on_wall():
 		_dir *= -1
 
 	_face(_dir)
+
+
+# Guard alertness: become/stay alerted while the player is in sight; once sight is
+# lost, count up and give up the chase after give_up_time so the guard returns to
+# its patrol instead of homing forever.
+func _update_alert(delta: float) -> void:
+	if _can_see_player():
+		_alerted = true
+		_lost_sight_for = 0.0
+	elif _alerted:
+		_lost_sight_for += delta
+		if _lost_sight_for >= give_up_time:
+			_alerted = false
+
+
+# Guard perception: the player is seen when within vision_range, inside the forward
+# vision cone (vision_cone_degrees off the facing direction), AND with a clear line
+# of sight — a wall between the two hides the player. Cheap enough to run every
+# physics frame for a handful of guards.
+func _can_see_player() -> bool:
+	var player := _player()
+	if player == null:
+		return false
+	var to_player: Vector2 = player.global_position - global_position
+	var dist: float = to_player.length()
+	if dist > vision_range or dist < 0.001:
+		return false
+	# Forward cone: angle between our facing (along x by _dir) and the player.
+	var facing := Vector2(_dir, 0.0)
+	if absf(facing.angle_to(to_player)) > deg_to_rad(vision_cone_degrees):
+		return false
+	# Line of sight: raycast to the player against solid bodies (not areas), so
+	# walls/tilemaps block it. Visible if the ray reaches the player unobstructed.
+	var space := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(global_position, player.global_position)
+	query.exclude = [get_rid()]  # exclude is Array[RID]; skip our own body
+	var hit := space.intersect_ray(query)
+	return hit.is_empty() or hit.get(\"collider\") == player
 
 
 # True if there is solid ground just ahead in the current facing direction. A
@@ -213,6 +282,7 @@ func execute(args: Dictionary) -> Dictionary:
 			[
 				"Use style='patrol' for an enemy that walks back and forth (turns at walls and ledges)",
 				"Use style='chaser' for an enemy that homes in on the player when near",
+				"Use style='guard' for an enemy that patrols until it SEES the player (vision cone + line of sight), then gives chase and gives up when it loses sight",
 			]
 		)
 
@@ -301,11 +371,15 @@ func execute(args: Dictionary) -> Dictionary:
 	if not enemy.is_in_group(_GROUP):
 		enemy.add_to_group(_GROUP, true)
 
-	var hint := (
-		"It patrols back and forth, turning at walls and ledges."
-		if style == "patrol"
-		else "It chases the player whenever they come within aggro_range."
-	)
+	var hint := "It patrols back and forth, turning at walls and ledges."
+	if style == "chaser":
+		hint = "It chases the player whenever they come within aggro_range."
+	elif style == "guard":
+		hint = (
+			"It patrols until it SEES the player (vision cone + clear line of sight, "
+			+ "so walls hide the player), then gives chase and gives up give_up_time "
+			+ "seconds after losing sight. Tune vision_range/vision_cone_degrees/give_up_time in the inspector."
+		)
 
 	return ToolUtils.success(
 		"Added a %s enemy. %s This tool is ATOMIC: it wrote (once) a VETTED CharacterBody2D enemy script and built "

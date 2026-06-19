@@ -517,7 +517,10 @@ TOOLS: List[Dict] = [
                 "SIDE/below touch calls the GameManager's lose_life (which respawns the player or "
                 "ends the game) — so call create_game_manager FIRST or contact does nothing. "
                 "style='patrol' walks back and forth, turning at walls AND ledges; style='chaser' "
-                "homes in on the player when within aggro_range. Place many by calling this "
+                "homes in on the player when within aggro_range (through walls); style='guard' "
+                "patrols until it SEES the player (forward vision cone + clear line of sight, so "
+                "walls hide the player), gives chase, and gives up when it loses sight — the "
+                "classic alert-and-pursue guard. Place many by calling this "
                 "repeatedly or via duplicate_node; pair it with create_screen_shake for a stomp "
                 "that feels like one. The node joins the 'enemies' group. After it runs, call "
                 "save_scene."
@@ -543,10 +546,13 @@ TOOLS: List[Dict] = [
                     },
                     "style": {
                         "type": "string",
-                        "enum": ["patrol", "chaser"],
+                        "enum": ["patrol", "chaser", "guard"],
                         "description": (
                             "'patrol' (default) walks back and forth, turning at walls and ledges. "
-                            "'chaser' homes in on the player when within aggro_range."
+                            "'chaser' homes in on the player when within aggro_range (sees through walls). "
+                            "'guard' patrols until it SEES the player (forward vision cone + clear line "
+                            "of sight — walls block it), then chases and gives up after losing sight. "
+                            "Vision range/cone/give-up are inspector-tunable exports."
                         ),
                     },
                     "size": {
@@ -564,6 +570,82 @@ TOOLS: List[Dict] = [
                     "color": {
                         "type": "string",
                         "description": ("Placeholder fill color (name or 'r,g,b'). Default menacing purple."),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": ("Regenerate the shared enemy script if it already exists. Default false."),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_enemy_3d",
+            "description": (
+                "Add a moving ENEMY to a 3D scene (Node3D root) in ONE atomic call — the 3D "
+                "analog of create_enemy_2d: a CharacterBody3D threat that walks the level, "
+                "hurts the player, and can be DEFEATED by stomping on its head (the classic "
+                "3D-platformer stomp). USE THIS over create_enemy_2d when the open scene is 3D "
+                "(create_enemy_2d refuses to run in a 3D scene, and this one refuses in a 2D "
+                "scene). It writes a VETTED CharacterBody3D script VERBATIM (written once per "
+                "project, reused on every call) and builds the node with a capsule collision "
+                "shape, a placeholder mesh, and a Hurtbox. Two outcomes by where the player "
+                "hits it: a STOMP (player drops onto its head) kills it, adds score_value via "
+                "the GameManager, and bounces the player; a SIDE/below touch calls lose_life. "
+                "style='patrol' walks back and forth along X, turning at walls AND ledges; "
+                "style='chaser' homes in on the player on the XZ plane within aggro_range "
+                "(through walls); style='guard' patrols until it SEES the player (forward "
+                "vision cone + clear line of sight, so walls hide the player), gives chase, and "
+                "gives up when it loses sight. NOTE: create_game_manager is 2D-only, so in a "
+                "pure-3D scene scoring/lives stay inert until a node joins the 'game_manager' "
+                "group exposing add_score/lose_life — the movement + stomp/contact logic works "
+                "regardless. Ensure the player is in the 'player' group. Place many by calling "
+                "this repeatedly or via duplicate_node. The node joins the 'enemies' group. "
+                "After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Default 'Enemy'.",
+                    },
+                    "parent_path": {
+                        "type": "string",
+                        "description": ("Scene-relative parent path. Default: the scene root."),
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Placement as 'x,y,z' (meters). Default '0,0,0'.",
+                    },
+                    "style": {
+                        "type": "string",
+                        "enum": ["patrol", "chaser", "guard"],
+                        "description": (
+                            "'patrol' (default) walks back and forth along X, turning at walls and ledges. "
+                            "'chaser' homes in on the player on the XZ plane within aggro_range (sees "
+                            "through walls). 'guard' patrols until it SEES the player (forward vision cone "
+                            "+ clear line of sight — walls block it), then chases and gives up after losing "
+                            "sight. Vision range/cone/give-up are inspector-tunable exports."
+                        ),
+                    },
+                    "speed": {
+                        "type": "number",
+                        "description": "Move speed in m/s. Default 2.5.",
+                    },
+                    "score_value": {
+                        "type": "integer",
+                        "description": ("Score added when the player stomps this enemy. Default 1."),
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": ("Placeholder mesh color (name or 'r,g,b'). Default menacing purple."),
                     },
                     "overwrite": {
                         "type": "boolean",
