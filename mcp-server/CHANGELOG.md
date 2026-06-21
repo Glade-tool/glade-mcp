@@ -4,6 +4,23 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-06-21
+
+### Added
+
+- **Godot bridge addon v0.7.0 — first-class 2D support and a complete prototype-game toolkit (29 new tools, 60 → 88).** The bridge was previously 3D-biased; this release makes 2D a first-class citizen and adds vetted, one-call scaffolders for the pieces a playable prototype needs — controllers, enemies, a win/lose loop, menus, navigation, and juice. New tool schemas are exposed to MCP clients accordingly.
+  - **Dimension awareness.** `get_project_info` reports the project's `workspace` and `get_scene_tree` reports the scene's `root_space` (`2d` / `3d`), so a client can tell which kind of scene it's editing. The dimension-aware creators (`create_camera`, `create_light`, `create_material`, `create_physics_body`) **infer** the space from the open scene's root when it isn't passed, so a bare `create_camera` in a 2D scene yields a `Camera2D`. Single-dimension tools attach a self-correcting hint when used in the other kind of scene. `create_camera` supersedes the old `create_camera_3d` name, which remains callable as an alias.
+  - **2D scene building.** `create_sprite_2d`, `create_animated_sprite_2d` (with optional spritesheet slicing), `create_tilemap_layer` (TileMapLayer + TileSet atlas), `set_tilemap_cells` (paint / fill / erase), `set_tilemap_collision` (make tiles solid), and `create_parallax_2d` (scrolling backgrounds).
+  - **Asset pipeline.** `import_asset` downloads and installs an external asset and `list_imported_assets` reports what's been brought in, with a license/attribution audit. Imports apply pixel-art-friendly texture filtering and seamless music looping where appropriate.
+  - **Audio.** `create_audio_player` places a player and `set_audio_player_properties` configures it; stream assignment reuses the existing resource setter. Non-positional by default (music / UI), positional on request (`AudioStreamPlayer2D` / `3D`).
+  - **AnimationTree state machine.** `create_animation_tree`, `add_state_machine_state`, `add_state_machine_transition`, and `get_animation_tree_info` — a state-machine animation layer over an existing `AnimationPlayer`.
+  - **Vetted character controllers.** `create_third_person_controller` (3D) and `create_2d_controller` (`platformer` / `top_down`) write known-good movement scripts verbatim and assemble the player, camera, input actions, and (for platformers) ground — carrying the game-feel details a from-scratch script tends to drop (coyote time, jump buffering, variable jump height; normalized diagonals for top-down).
+  - **Game feel / juice.** `create_particles_2d` and `create_particles_3d` add a tuned `GPUParticles2D` / `GPUParticles3D` from a preset (`explosion` / `sparkle` / `smoke` / `fire` / `trail`) — visible immediately, no texture needed. `create_screen_shake` attaches a trauma-based, noise-driven shake to the camera that composes with a follow camera.
+  - **Gameplay loop.** `create_game_manager` builds a manager + HUD (score, lives, win/lose banner) and handles respawn and end-of-game; `create_collectible` and `create_hazard` add trigger areas that drive score and lives. The three compose into a winnable/losable game.
+  - **Enemies.** `create_enemy_2d` (moving, stompable) and `create_enemy_3d` (line-of-sight guard behavior, with optional navmesh pursuit).
+  - **3D navigation.** `add_navigation_agent` and `bake_navigation_mesh` set up pathfinding, including navmesh-driven enemy pursuit.
+  - **Menus / scene flow.** `create_main_menu` (title screen) and `create_pause_menu` (in-game overlay) with working scene transitions.
+
 ## [0.7.8] - 2026-06-11
 
 ### Added
