@@ -598,7 +598,11 @@ TOOLS: List[Dict] = [
                 "style='chaser' homes in on the player on the XZ plane within aggro_range "
                 "(through walls); style='guard' patrols until it SEES the player (forward "
                 "vision cone + clear line of sight, so walls hide the player), gives chase, and "
-                "gives up when it loses sight. NOTE: create_game_manager is 2D-only, so in a "
+                "gives up when it loses sight. pathfinding='navmesh' makes a chaser/guard PATH "
+                "AROUND obstacles via a NavigationAgent3D instead of walking straight at the "
+                "player — bake a NavigationRegion3D first with bake_navigation_mesh (this is how "
+                "you get a true 'enemy chases the player across the navmesh'). NOTE: "
+                "create_game_manager is 2D-only, so in a "
                 "pure-3D scene scoring/lives stay inert until a node joins the 'game_manager' "
                 "group exposing add_score/lose_life — the movement + stomp/contact logic works "
                 "regardless. Ensure the player is in the 'player' group. Place many by calling "
@@ -633,6 +637,16 @@ TOOLS: List[Dict] = [
                             "through walls). 'guard' patrols until it SEES the player (forward vision cone "
                             "+ clear line of sight — walls block it), then chases and gives up after losing "
                             "sight. Vision range/cone/give-up are inspector-tunable exports."
+                        ),
+                    },
+                    "pathfinding": {
+                        "type": "string",
+                        "enum": ["direct", "navmesh"],
+                        "description": (
+                            "How chaser/guard pursue. 'direct' (default) walks straight at the player. "
+                            "'navmesh' adds a NavigationAgent3D so the enemy paths AROUND obstacles — "
+                            "requires a baked NavigationRegion3D (call bake_navigation_mesh). Ignored for "
+                            "'patrol' (it never pursues)."
                         ),
                     },
                     "speed": {

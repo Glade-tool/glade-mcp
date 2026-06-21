@@ -47,6 +47,10 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #   parent_path:  scene-relative parent. Default: the scene root.
 #   position:     "x,y,z" placement. Default 0,0,0.
 #   style:        "patrol" (default), "chaser", or "guard".
+#   pathfinding:  "direct" (default) | "navmesh". "navmesh" gives chaser/guard a
+#                 NavigationAgent3D child so they path AROUND obstacles instead of
+#                 walking straight at the player — needs a baked NavigationRegion3D
+#                 (call bake_navigation_mesh). Ignored for patrol (it never pursues).
 #   speed:        move speed in m/s. Default 2.5.
 #   score_value:  score added when the player stomps it. Default 1.
 #   color:        placeholder mesh color. Default menacing purple.
@@ -63,6 +67,7 @@ const _RADIUS := 0.4
 const _HEIGHT := 1.6
 const _DEFAULT_COLOR := Color(0.55, 0.22, 0.65)  # menacing purple
 const _VALID_STYLES := ["patrol", "chaser", "guard"]
+const _VALID_PATHFINDING := ["direct", "navmesh"]
 
 # ── Vetted script: Enemy3D (moving, stompable threat) ───────────────────────
 const ENEMY_SRC := """extends CharacterBody3D
@@ -99,6 +104,7 @@ var _facing: Vector3 = Vector3(-1.0, 0.0, 0.0)  # logical horizontal facing (vis
 var _dead: bool = false
 var _alerted: bool = false  # guard: currently aware of / chasing the player
 var _lost_sight_for: float = 0.0  # guard: seconds since the player was last seen
+var _agent: NavigationAgent3D = null  # set in _ready; when present, pursuit follows the navmesh
 
 
 func _ready() -> void:
@@ -107,6 +113,9 @@ func _ready() -> void:
 	if hurtbox != null:
 		hurtbox.body_entered.connect(_on_touch)
 		hurtbox.area_entered.connect(_on_touch)
+	# When the scene placed a NavigationAgent3D under us, pursuit follows the baked
+	# navmesh AROUND obstacles instead of a straight line. No child → straight line.
+	_agent = get_node_or_null(\"NavigationAgent3D\")
 
 
 func _physics_process(delta: float) -> void:
@@ -143,20 +152,53 @@ func _patrol() -> void:
 	_facing = Vector3(_dir, 0.0, 0.0)
 
 
-# Steer horizontally toward the player on the XZ plane when within max_range; ease
-# to a stop otherwise. INF range = always pursue (used by an alerted guard).
+# Pursue the player on the XZ plane when within max_range; ease to a stop
+# otherwise. INF range = always pursue (used by an alerted guard). With a
+# NavigationAgent3D child the pursuit follows a baked navmesh path AROUND
+# obstacles; without one it makes a straight line (the through-walls chaser).
+# _facing is updated either way so the guard's vision cone keeps working.
 func _move_toward_player(max_range: float) -> void:
 	var player := _player()
-	if player != null:
-		var to: Vector3 = player.global_position - global_position
-		to.y = 0.0
-		var dist: float = to.length()
-		if dist <= max_range and dist > 0.001:
-			var d: Vector3 = to / dist
-			_facing = d
-			velocity.x = d.x * speed
-			velocity.z = d.z * speed
-			return
+	if player == null:
+		_brake()
+		return
+	var to: Vector3 = player.global_position - global_position
+	to.y = 0.0
+	var dist: float = to.length()
+	if dist > max_range or dist <= 0.001:
+		_brake()
+		return
+	if _agent != null:
+		_pursue_navmesh(player)
+	else:
+		var d: Vector3 = to / dist
+		_facing = d
+		velocity.x = d.x * speed
+		velocity.z = d.z * speed
+
+
+# Follow the navmesh toward the player. The target is refreshed every frame (the
+# player moves), then we step toward the next path point. Needs a baked
+# NavigationRegion3D in the scene; with none the agent reports the path finished
+# immediately and the enemy simply brakes — a missing bake fails safe.
+func _pursue_navmesh(player: Node3D) -> void:
+	_agent.target_position = player.global_position
+	if _agent.is_navigation_finished():
+		_brake()
+		return
+	var to: Vector3 = _agent.get_next_path_position() - global_position
+	to.y = 0.0
+	var dist: float = to.length()
+	if dist <= 0.001:
+		_brake()
+		return
+	var d: Vector3 = to / dist
+	_facing = d
+	velocity.x = d.x * speed
+	velocity.z = d.z * speed
+
+
+func _brake() -> void:
 	velocity.x = move_toward(velocity.x, 0.0, speed)
 	velocity.z = move_toward(velocity.z, 0.0, speed)
 
@@ -297,6 +339,18 @@ func execute(args: Dictionary) -> Dictionary:
 	if parent == null:
 		return ToolUtils.error("Parent '%s' not found" % parent_path)
 
+	var pathfinding: String = ToolUtils.parse_string_arg(args, "pathfinding", "direct").to_lower()
+	if not _VALID_PATHFINDING.has(pathfinding):
+		return ToolUtils.error_with_solutions(
+			"Unknown pathfinding '%s'" % pathfinding,
+			[
+				"Use pathfinding='direct' (default) for straight-line pursuit",
+				"Use pathfinding='navmesh' so chaser/guard path around obstacles (needs a baked NavigationRegion3D)",
+			]
+		)
+	# patrol never pursues, so a NavigationAgent3D would be inert there.
+	var use_navmesh: bool = pathfinding == "navmesh" and style != "patrol"
+
 	var speed: float = max(0.0, ToolUtils.parse_float_arg(args, "speed", 2.5))
 	var score_value: int = max(0, ToolUtils.parse_int_arg(args, "score_value", 1))
 	var color: Color = ToolUtils.parse_color_arg(args.get("color"), _DEFAULT_COLOR) if args.has("color") else _DEFAULT_COLOR
@@ -305,6 +359,13 @@ func execute(args: Dictionary) -> Dictionary:
 	# Write the shared script once; reuse it on every subsequent call.
 	var script_path := directory + "/enemy_3d.gd"
 	var script_exists := FileAccess.file_exists(script_path)
+	# A navmesh enemy needs the navmesh-aware script. If an OLDER enemy_3d.gd (no
+	# NavigationAgent3D support) is already on disk, regenerate it — the upgrade is
+	# backward-compatible (straight-line enemies have no agent child, so unaffected).
+	var upgraded_script := false
+	if use_navmesh and script_exists and not overwrite and not _file_supports_navmesh(script_path):
+		overwrite = true
+		upgraded_script = true
 	if not script_exists or overwrite:
 		var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
 		if make_err != OK and make_err != ERR_ALREADY_EXISTS:
@@ -365,6 +426,20 @@ func execute(args: Dictionary) -> Dictionary:
 	hurtbox.add_child(hurt_col)
 	hurt_col.owner = root
 
+	# Navmesh pursuit: a NavigationAgent3D lets chaser/guard path around obstacles.
+	# The vetted script auto-detects this child (see _ready) and routes pursuit
+	# through it; without it the enemy pursues in a straight line.
+	if use_navmesh:
+		var agent := NavigationAgent3D.new()
+		agent.name = "NavigationAgent3D"
+		agent.radius = _RADIUS
+		agent.height = _HEIGHT
+		agent.path_desired_distance = 0.5
+		agent.target_desired_distance = 1.0  # stop ~1m short so it doesn't jitter on the player
+		agent.max_speed = speed
+		enemy.add_child(agent)
+		agent.owner = root
+
 	var enemy_script = load(script_path)
 	if not (enemy_script is Script):
 		return ToolUtils.error("Wrote enemy script but could not load it from '%s'" % script_path)
@@ -385,25 +460,70 @@ func execute(args: Dictionary) -> Dictionary:
 			+ "seconds after losing sight. Tune vision_range/vision_cone_degrees/give_up_time in the inspector."
 		)
 
+	var payload := {
+		"created_script": script_path,
+		"node": ToolUtils.node_relative_path(enemy),
+		"group": _GROUP,
+		"style": style,
+		"pathfinding": "navmesh" if use_navmesh else "direct",
+	}
+
+	# Navmesh guidance: surface whether the runtime prerequisite (a baked region) is
+	# in place, so the full "chase across the navmesh" flow is unambiguous. nav_msg
+	# begins with a space when non-empty so it slots after the style hint.
+	var nav_msg := ""
+	if use_navmesh:
+		var navmesh_ready: bool = _scene_has_baked_navmesh(root)
+		payload["navigation_agent"] = ToolUtils.node_relative_path(enemy) + "/NavigationAgent3D"
+		payload["navmesh_ready"] = navmesh_ready
+		nav_msg = " It pursues via a NavigationAgent3D, pathing AROUND obstacles."
+		if upgraded_script:
+			nav_msg += " (Regenerated enemy_3d.gd to add navmesh support — backward-compatible.)"
+		if navmesh_ready:
+			nav_msg += " A baked NavigationRegion3D is present, so pathfinding is ready."
+		else:
+			nav_msg += " IMPORTANT: no baked NavigationRegion3D found yet — call bake_navigation_mesh once the floor geometry exists, or the enemy will stand still when pursuing."
+	elif pathfinding == "navmesh" and style == "patrol":
+		nav_msg = " NOTE: pathfinding='navmesh' is ignored for style='patrol' (a patroller never pursues) — use style='chaser' or 'guard'."
+
 	return ToolUtils.success(
-		"Added a %s 3D enemy. %s This tool is ATOMIC: it wrote (once) a VETTED CharacterBody3D enemy script and built "
-		% [style, hint]
+		"Added a %s 3D enemy. %s" % [style, hint]
+		+ nav_msg
+		+ " This tool is ATOMIC: it wrote (once) a VETTED CharacterBody3D enemy script and built "
 		+ "the node with a capsule collision shape, a placeholder mesh, and a Hurtbox. STOMPING it (dropping onto its "
 		+ "head) kills it, adds score_value via the GameManager, and bounces the player; a SIDE touch calls lose_life. "
 		+ "NOTE: create_game_manager is 2D-only, so in a pure-3D scene scoring/lives stay inert until a node joins the "
 		+ "'game_manager' group exposing add_score/lose_life — the movement + stomp/contact logic works regardless. "
 		+ "Place more by calling this again (the script is reused) or by duplicate_node. Replace the Mesh with real "
 		+ "art, and ensure the player is in the 'player' group. Then call save_scene.",
-		{
-			"created_script": script_path,
-			"node": ToolUtils.node_relative_path(enemy),
-			"group": _GROUP,
-			"style": style,
-		}
+		payload
 	)
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
+
+# True if the on-disk shared script already has navmesh-pursuit support. Used to
+# transparently upgrade an older enemy_3d.gd when a navmesh enemy is requested.
+func _file_supports_navmesh(path: String) -> bool:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return false
+	var text := f.get_as_text()
+	f.close()
+	return text.find("NavigationAgent3D") != -1
+
+
+# True if the scene already has a NavigationRegion3D whose mesh has been baked
+# (polygons > 0) — the runtime prerequisite for navmesh pursuit.
+func _scene_has_baked_navmesh(node: Node) -> bool:
+	if node is NavigationRegion3D:
+		var nm := (node as NavigationRegion3D).navigation_mesh
+		if nm != null and nm.get_polygon_count() > 0:
+			return true
+	for child in node.get_children():
+		if _scene_has_baked_navmesh(child):
+			return true
+	return false
 
 func _write_file(path: String, content: String) -> String:
 	var f := FileAccess.open(path, FileAccess.WRITE)

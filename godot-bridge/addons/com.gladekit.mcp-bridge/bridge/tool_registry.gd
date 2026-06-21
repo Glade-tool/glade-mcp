@@ -179,6 +179,16 @@ const ListImportedAssetsTool = preload("res://addons/com.gladekit.mcp-bridge/too
 const CreateAudioPlayerTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/audio/create_audio_player.gd")
 const SetAudioPlayerPropertiesTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/audio/set_audio_player_properties.gd")
 
+# ── Navigation tools (3D) ──────────────────────────────────────────────────
+# Pathfinding for 3D scenes — the foundation enemy/NPC AI needs. bake_navigation_mesh
+# makes a scene's geometry walkable (NavigationRegion3D + baked NavigationMesh,
+# group-sourced so no reparenting); add_navigation_agent drops a configured
+# NavigationAgent3D on a body so it can path across that region. Both are 3D-only
+# and refuse on a 2D root, mirroring create_enemy_3d's dimension guard. (2D nav,
+# obstacles, and off-mesh links are deliberate follow-ups.)
+const BakeNavigationMeshTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/navigation/bake_navigation_mesh.gd")
+const AddNavigationAgentTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/navigation/add_navigation_agent.gd")
+
 var _tools: Dictionary = {}
 
 # Backward-compat name → tool instance. Aliases keep an OLD tool name dispatching
@@ -320,6 +330,10 @@ func _register_all() -> void:
 	# stream so audio actually plays. create + mutate pair.
 	register_tool(CreateAudioPlayerTool.new())
 	register_tool(SetAudioPlayerPropertiesTool.new())
+	# Navigation (2) — 3D pathfinding: bake a walkable NavigationRegion3D +
+	# add a NavigationAgent3D to a body. The substrate for navmesh enemy AI.
+	register_tool(BakeNavigationMeshTool.new())
+	register_tool(AddNavigationAgentTool.new())
 
 
 func register_tool(tool_instance) -> void:
