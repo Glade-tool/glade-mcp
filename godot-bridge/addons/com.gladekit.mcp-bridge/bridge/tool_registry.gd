@@ -82,9 +82,10 @@ const CreateResourceTool      = preload("res://addons/com.gladekit.mcp-bridge/to
 const CreatePhysicsBodyTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/create_physics_body.gd")
 
 # ── Particles / juice ──────────────────────────────────────────────────────
-# Preset-driven GPUParticles2D + ParticleProcessMaterial scaffolder (explosion /
+# Preset-driven GPUParticles2D/3D + ParticleProcessMaterial scaffolder (explosion /
 # sparkle / smoke / fire / trail) — the highest-impact "juice" lever.
 const CreateParticles2DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/particles/create_particles_2d.gd")
+const CreateParticles3DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/particles/create_particles_3d.gd")
 
 # ── Scene I/O tools (Phase 3) ──────────────────────────────────────────────
 const CreateSceneTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene_io/create_scene.gd")
@@ -272,6 +273,7 @@ func _register_all() -> void:
 	register_tool(CreatePhysicsBodyTool.new())
 	# Particles / juice (1)
 	register_tool(CreateParticles2DTool.new())
+	register_tool(CreateParticles3DTool.new())
 	# Scene I/O (4)
 	register_tool(CreateSceneTool.new())
 	register_tool(OpenSceneTool.new())
