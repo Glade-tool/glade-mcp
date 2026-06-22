@@ -1,5 +1,5 @@
 """
-Godot UI / Control tools (8 tools).
+Godot UI / Control tools (9 tools).
 
 Built around three pieces of Control-tree convenience the agent otherwise
 discovers the hard way:
@@ -371,6 +371,73 @@ TOOLS: List[Dict] = [
                             "res:// path of the menu scene 'Quit to menu' loads. Empty "
                             "makes that button quit the application instead. Default ''."
                         ),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": ("Overwrite the generated script if it already exists. Default false."),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_health_bar",
+            "description": (
+                "Add a screen-space HEALTH BAR in ONE atomic call — the visible half of "
+                "the health system (pairs with create_health). PREFER THIS over hand-"
+                "building a HUD bar for any 'health bar / HP bar / show health / health "
+                "UI' request. It writes a VETTED script and builds a CanvasLayer overlay "
+                "with a styled ProgressBar + a 'current / max' readout. At runtime the "
+                "script finds a Health component (create_health) — by default the one on "
+                "the 'player'-group node; set target_group to track a boss/vehicle — "
+                "seeds the bar from max_health, then follows its damaged/healed signals so "
+                "the bar updates live. Add create_health to that entity FIRST or the bar "
+                "hides itself. Works in 2D and 3D scenes. Not one-per-scene — call again "
+                "with a different target_group for a boss bar. After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target_group": {
+                        "type": "string",
+                        "description": ("Group whose member's 'Health' child the bar tracks. Default 'player'."),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Default 'HealthBar'.",
+                    },
+                    "position": {
+                        "type": "string",
+                        "enum": [
+                            "top_left",
+                            "top_center",
+                            "top_right",
+                            "bottom_left",
+                            "bottom_right",
+                        ],
+                        "description": "Screen corner the bar anchors to. Default 'top_left'.",
+                    },
+                    "width": {
+                        "type": "number",
+                        "description": "Bar width in px. Default 240.",
+                    },
+                    "height": {
+                        "type": "number",
+                        "description": "Bar height in px. Default 22.",
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": ("Fill color (name or 'r,g,b'). Default health red; the track behind is dark."),
+                    },
+                    "show_text": {
+                        "type": "boolean",
+                        "description": "Overlay a 'current / max' number on the bar. Default true.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
                     },
                     "overwrite": {
                         "type": "boolean",

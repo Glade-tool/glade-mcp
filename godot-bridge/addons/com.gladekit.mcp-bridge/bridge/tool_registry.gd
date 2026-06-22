@@ -151,6 +151,11 @@ const CreateThemeTool        = preload("res://addons/com.gladekit.mcp-bridge/too
 const CreateMainMenuTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_main_menu.gd")
 const CreatePauseMenuTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_pause_menu.gd")
 
+# Screen-space health bar: a CanvasLayer overlay (ProgressBar + current/max readout)
+# that finds a create_health component (default the "player" group's) and follows
+# its damaged/healed signals so HP is VISIBLE. The HUD half of the health system.
+const CreateHealthBarTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/ui/create_health_bar.gd")
+
 # ── Animation tools (v0.6.0) ───────────────────────────────────────────────
 # AnimationPlayer scaffolding: register Animation .tres files with a player,
 # add tracks (value / position_3d / rotation_3d / scale_3d / method), insert
@@ -325,6 +330,7 @@ func _register_all() -> void:
 	# connective tissue that makes a single level a complete game.
 	register_tool(CreateMainMenuTool.new())
 	register_tool(CreatePauseMenuTool.new())
+	register_tool(CreateHealthBarTool.new())
 	# Animation (5, v0.6.0)
 	register_tool(AddAnimationToPlayerTool.new())
 	register_tool(AddAnimationTrackTool.new())
