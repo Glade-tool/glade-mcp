@@ -188,16 +188,13 @@ func execute(args: Dictionary) -> Dictionary:
 	var controller_path := directory + "/third_person_controller.gd"
 	var camera_path := directory + "/orbit_camera.gd"
 
-	# Refuse to clobber pre-existing scripts unless the caller explicitly opts in.
-	for p in [controller_path, camera_path]:
-		if FileAccess.file_exists(p) and not overwrite:
-			return ToolUtils.error_with_solutions(
-				"Refused to overwrite existing script '%s'" % p,
-				[
-					"Pass overwrite=true to regenerate the vetted scripts",
-					"Pass a different 'directory' so existing files aren't clobbered",
-				]
-			)
+	# The controller + camera are shared, vetted templates — not user assets.
+	# When they already exist, REUSE them rather than aborting the scaffold, so a
+	# second 3D game built in a fresh scene still gets its player + camera. Only
+	# (re)write each file when absent or overwrite=true, so a user's manual edits
+	# survive. Mirrors the write-once-or-reuse policy in create_collectible.
+	var controller_exists := FileAccess.file_exists(controller_path)
+	var camera_exists := FileAccess.file_exists(camera_path)
 
 	# If a node already occupies player_name, it must be a CharacterBody3D — the
 	# controller `extends CharacterBody3D`, so attaching it to anything else is a
@@ -212,22 +209,27 @@ func execute(args: Dictionary) -> Dictionary:
 			]
 		)
 
-	# Ensure the target directory exists.
-	var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
-	if make_err != OK and make_err != ERR_ALREADY_EXISTS:
-		return ToolUtils.error("Failed to create directory '%s' (error %d)" % [directory, make_err])
+	# Ensure the target directory exists (only needed when we're about to write).
+	if not controller_exists or not camera_exists or overwrite:
+		var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
+		if make_err != OK and make_err != ERR_ALREADY_EXISTS:
+			return ToolUtils.error("Failed to create directory '%s' (error %d)" % [directory, make_err])
 
-	# Write both vetted scripts verbatim.
-	var werr := _write_file(controller_path, PLAYER_CONTROLLER_SRC)
-	if werr != "":
-		return ToolUtils.error(werr)
-	werr = _write_file(camera_path, ORBIT_CAMERA_SRC)
-	if werr != "":
-		return ToolUtils.error(werr)
-	SessionTracker.mark_created(controller_path)
-	SessionTracker.mark_created(camera_path)
+	# Write each vetted script verbatim, skipping any that already exist (reuse).
+	if not controller_exists or overwrite:
+		var werr := _write_file(controller_path, PLAYER_CONTROLLER_SRC)
+		if werr != "":
+			return ToolUtils.error(werr)
+		if not controller_exists:
+			SessionTracker.mark_created(controller_path)
+	if not camera_exists or overwrite:
+		var werr2 := _write_file(camera_path, ORBIT_CAMERA_SRC)
+		if werr2 != "":
+			return ToolUtils.error(werr2)
+		if not camera_exists:
+			SessionTracker.mark_created(camera_path)
 
-	# Make the editor register the new files so load() resolves them this call.
+	# Make the editor register the files so load() resolves them this call.
 	var fs := EditorInterface.get_resource_filesystem()
 	if fs != null:
 		fs.update_file(controller_path)

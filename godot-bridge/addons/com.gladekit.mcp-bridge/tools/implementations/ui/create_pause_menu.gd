@@ -119,19 +119,23 @@ func execute(args: Dictionary) -> Dictionary:
 	var menu_target: String = ToolUtils.parse_string_arg(args, "menu_target", "")
 	var overwrite: bool = ToolUtils.parse_bool_arg(args, "overwrite", false)
 
+	# The pause-menu script is a shared, vetted template — not a user asset. When
+	# it already exists, REUSE it rather than aborting: the per-scene group guard
+	# above already prevents a duplicate overlay, so a fresh scene with no pause
+	# menu should still get one wired to the existing script. Only (re)write when
+	# absent or overwrite=true, so a user's manual edits survive. Mirrors
+	# create_collectible / create_hazard.
 	var script_path := directory + "/pause_menu.gd"
-	if FileAccess.file_exists(script_path) and not overwrite:
-		return ToolUtils.error_with_solutions(
-			"Refused to overwrite existing script '%s'" % script_path,
-			["Pass overwrite=true to regenerate the vetted script", "Or pass a different 'directory'"]
-		)
-	var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
-	if make_err != OK and make_err != ERR_ALREADY_EXISTS:
-		return ToolUtils.error("Failed to create directory '%s' (error %d)" % [directory, make_err])
-	var werr := _write_file(script_path, MENU_SRC)
-	if werr != "":
-		return ToolUtils.error(werr)
-	SessionTracker.mark_created(script_path)
+	var script_exists := FileAccess.file_exists(script_path)
+	if not script_exists or overwrite:
+		var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
+		if make_err != OK and make_err != ERR_ALREADY_EXISTS:
+			return ToolUtils.error("Failed to create directory '%s' (error %d)" % [directory, make_err])
+		var werr := _write_file(script_path, MENU_SRC)
+		if werr != "":
+			return ToolUtils.error(werr)
+		if not script_exists:
+			SessionTracker.mark_created(script_path)
 	var fs := EditorInterface.get_resource_filesystem()
 	if fs != null:
 		fs.update_file(script_path)

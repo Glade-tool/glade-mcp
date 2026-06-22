@@ -24,15 +24,18 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #   - lives start at `starting_lives`. lose_life() decrements; while lives remain
 #     it RESPAWNS the player (the first node in the "player" group) at its start
 #     position with zeroed velocity; at zero lives it fires game_over.
-#   - score_to_win > 0 auto-wins when score reaches it (e.g. "collect 10 coins");
-#     0 disables auto-win so you call win() yourself from a goal/flag.
+#   - score_to_win > 0 auto-wins when score reaches it (e.g. "collect 10 coins").
+#   - score_to_win == 0 (default) auto-wins when ALL collectibles in the level
+#     have been picked up (collect-them-all). A level with no collectibles stays
+#     a manual win — call win() yourself from a goal/flag.
 #   - on game over / win the HUD shows a banner; pressing R reloads the scene.
 #
 # Args:
 #   directory:       res:// folder for the generated script. Default "res://scripts".
 #   manager_name:    name for the manager node. Default "GameManager".
 #   starting_lives:  initial lives (exported on the script too). Default 3.
-#   score_to_win:    score that auto-wins; 0 = manual win only. Default 0.
+#   score_to_win:    score that auto-wins; 0 = win by collecting all collectibles
+#                    (or manual win() if the level has none). Default 0.
 #   overwrite:       overwrite the generated script if it exists. Default false.
 #
 # Response payload:
@@ -60,8 +63,9 @@ signal game_won
 signal game_over
 
 @export var starting_lives: int = 3
-# Score that triggers an automatic win. 0 disables it — call win() yourself from
-# a goal/flag instead.
+# Score that triggers an automatic win. 0 means \"no score target\": the game is
+# instead won by collecting every collectible in the level (or call win()
+# yourself from a goal/flag). A level with no collectibles stays a manual win.
 @export var score_to_win: int = 0
 
 @onready var _score_label: Label = get_node_or_null(\"HUD/ScoreLabel\")
@@ -73,6 +77,9 @@ var lives: int = 0
 var _finished: bool = false            # locks scoring once the game has ended
 var _player_start: Vector2 = Vector2.ZERO
 var _player_start_captured: bool = false
+# True when the level shipped with collectibles — gates the collect-all auto-win
+# so a score-only game (no pickups) does not auto-win on its first point.
+var _had_collectibles: bool = false
 
 
 func _ready() -> void:
@@ -82,17 +89,44 @@ func _ready() -> void:
 	if _message_label != null:
 		_message_label.visible = false
 	_refresh_hud()
+	# Detect collect-to-win eligibility after every sibling has entered the tree
+	# (collectibles add themselves to their group in their own _ready), so the
+	# check is order-independent.
+	_detect_collectibles.call_deferred()
 
 
-# Add to the score. Auto-wins when score_to_win is set and reached.
+# Add to the score. Wins when score_to_win is reached, or — when no explicit
+# target is set — when every collectible in the level has been picked up.
 func add_score(amount: int = 1) -> void:
 	if _finished:
 		return
 	score += amount
 	score_changed.emit(score)
 	_refresh_hud()
-	if score_to_win > 0 and score >= score_to_win:
-		win()
+	if score_to_win > 0:
+		if score >= score_to_win:
+			win()
+	else:
+		# Collect-all win. Deferred so the pickup that just called add_score (and
+		# queue_free()s itself right after) is already flagged for deletion and
+		# excluded from the remaining count below.
+		_check_collect_all_win.call_deferred()
+
+
+func _detect_collectibles() -> void:
+	_had_collectibles = not get_tree().get_nodes_in_group(\"collectibles\").is_empty()
+
+
+# Collect-them-all win: when no explicit score target is set, the game is won
+# once no un-collected collectible remains. Only fires for levels that actually
+# had collectibles (see _had_collectibles), so a score-only game never trips it.
+func _check_collect_all_win() -> void:
+	if _finished or not _had_collectibles:
+		return
+	for c in get_tree().get_nodes_in_group(\"collectibles\"):
+		if is_instance_valid(c) and not c.is_queued_for_deletion():
+			return
+	win()
 
 
 # Cost a life. Respawns while lives remain; ends the game at zero.
@@ -220,23 +254,23 @@ func execute(args: Dictionary) -> Dictionary:
 			]
 		)
 
+	# The manager script is a shared, vetted template — not a user asset. When it
+	# already exists (the project built a game before), REUSE it instead of
+	# aborting: the per-scene group guard above already prevents a duplicate
+	# manager, so a fresh scene with no manager should still get one wired to the
+	# existing script. Only (re)write the file when absent or overwrite=true, so a
+	# user's manual edits survive. Mirrors create_collectible / create_hazard.
 	var script_path := directory + "/game_manager.gd"
-	if FileAccess.file_exists(script_path) and not overwrite:
-		return ToolUtils.error_with_solutions(
-			"Refused to overwrite existing script '%s'" % script_path,
-			[
-				"Pass overwrite=true to regenerate the vetted script",
-				"Pass a different 'directory' so the existing file isn't clobbered",
-			]
-		)
-
-	var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
-	if make_err != OK and make_err != ERR_ALREADY_EXISTS:
-		return ToolUtils.error("Failed to create directory '%s' (error %d)" % [directory, make_err])
-	var werr := _write_file(script_path, MANAGER_SRC)
-	if werr != "":
-		return ToolUtils.error(werr)
-	SessionTracker.mark_created(script_path)
+	var script_exists := FileAccess.file_exists(script_path)
+	if not script_exists or overwrite:
+		var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
+		if make_err != OK and make_err != ERR_ALREADY_EXISTS:
+			return ToolUtils.error("Failed to create directory '%s' (error %d)" % [directory, make_err])
+		var werr := _write_file(script_path, MANAGER_SRC)
+		if werr != "":
+			return ToolUtils.error(werr)
+		if not script_exists:
+			SessionTracker.mark_created(script_path)
 
 	var fs := EditorInterface.get_resource_filesystem()
 	if fs != null:
@@ -259,7 +293,7 @@ func execute(args: Dictionary) -> Dictionary:
 		manager.add_to_group(_GROUP, true)
 
 	var win_note := (
-		"auto-win at score %d" % score_to_win if score_to_win > 0 else "manual win (call win() from a goal)"
+		"auto-win at score %d" % score_to_win if score_to_win > 0 else "win by collecting all collectibles (or call win() from a goal)"
 	)
 	return ToolUtils.success(
 		"Created a GameManager — the hub that makes this a winnable/losable game. This tool is ATOMIC: it wrote a "

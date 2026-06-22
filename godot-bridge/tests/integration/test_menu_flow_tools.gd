@@ -19,6 +19,7 @@ const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_util
 
 const TEST_DIR := "res://_gladekit_menu_test"
 const MENU_SCENE := "res://_gladekit_menu_test/main_menu.tscn"
+const MENU_SCENE_2 := "res://_gladekit_menu_test/main_menu_2.tscn"
 const PAUSE_NODE := "PauseMenu"
 
 var _registry = null
@@ -132,6 +133,20 @@ func test_create_main_menu_refuses_overwrite() -> void:
 	assert_true(second.has("possible_solutions"), "error should hand the agent a recovery path")
 
 
+func test_create_main_menu_reuses_script_for_a_new_scene() -> void:
+	# Composition regression: building a SECOND menu scene (a different path)
+	# must reuse the shared vetted main_menu.gd, not refuse because the script
+	# already exists. The scene path is still guarded against clobbering
+	# (test_create_main_menu_refuses_overwrite covers that); only the shared
+	# script is reused. Pre-fix this hard-refused, leaving the second menu unbuilt.
+	var first := _run("create_main_menu", {"path": MENU_SCENE, "directory": TEST_DIR, "open": false})
+	assert_true(first.success, "first menu should build")
+	assert_true(FileAccess.file_exists(first.created_script), "shared menu script should exist after the first call")
+	var second := _run("create_main_menu", {"path": MENU_SCENE_2, "directory": TEST_DIR, "open": false})
+	assert_true(second.success, "second menu at a NEW path must reuse the existing script, not refuse: %s" % second.get("message", ""))
+	assert_true(FileAccess.file_exists(MENU_SCENE_2), "second menu scene should be written to disk")
+
+
 # ── create_pause_menu ─────────────────────────────────────────────────────
 
 func test_create_pause_menu_adds_always_running_overlay() -> void:
@@ -163,3 +178,26 @@ func test_create_pause_menu_refuses_second_overlay() -> void:
 	var second := _run("create_pause_menu", {"directory": TEST_DIR})
 	assert_false(second.success, "a scene may hold only one pause overlay")
 	assert_true(second.has("possible_solutions"), "error should hand the agent a recovery path")
+
+
+func test_create_pause_menu_reuses_existing_script() -> void:
+	# Composition regression: once the shared pause_menu.gd exists (a prior game),
+	# adding a pause overlay to a DIFFERENT scene that has none must reuse the
+	# script and still build the overlay — not refuse. The per-scene group guard
+	# (test_create_pause_menu_refuses_second_overlay) is what prevents duplicates;
+	# an existing script file is not a reason to abort. Pre-fix this hard-refused,
+	# so a second game built in a fresh scene silently got no pause menu.
+	var first := _run("create_pause_menu", {"directory": TEST_DIR})
+	assert_true(first.success, "first overlay should build + write the shared script")
+	var script_path: String = first.get("created_script", TEST_DIR + "/pause_menu.gd")
+	assert_true(FileAccess.file_exists(script_path), "shared pause script should exist after the first call")
+	# Remove the overlay so the one-per-scene group guard doesn't mask the script
+	# path we're actually exercising (simulates a fresh scene with no overlay).
+	var root := EditorInterface.get_edited_scene_root()
+	var overlay := root.find_child(PAUSE_NODE, false, false)
+	if overlay:
+		root.remove_child(overlay)
+		overlay.free()
+	var second := _run("create_pause_menu", {"directory": TEST_DIR})
+	assert_true(second.success, "with the script present but no overlay in scene, the tool must reuse the script and rebuild the overlay: %s" % second.get("message", ""))
+	assert_not_null(EditorInterface.get_edited_scene_root().find_child(PAUSE_NODE, false, false), "overlay should be rebuilt on the reuse path")

@@ -198,15 +198,15 @@ func execute(args: Dictionary) -> Dictionary:
 
 	var script_path := directory + "/" + style + "_controller.gd"
 
-	# Refuse to clobber a pre-existing script unless the caller explicitly opts in.
-	if FileAccess.file_exists(script_path) and not overwrite:
-		return ToolUtils.error_with_solutions(
-			"Refused to overwrite existing script '%s'" % script_path,
-			[
-				"Pass overwrite=true to regenerate the vetted script",
-				"Pass a different 'directory' so the existing file isn't clobbered",
-			]
-		)
+	# The controller is a shared, vetted template — not a user asset. When the
+	# script already exists, REUSE it (attach to the player) rather than aborting
+	# the whole scaffold: that's what lets a second game built in a fresh scene
+	# still get its player. Hard-refusing here used to leave the new scene with
+	# no player at all whenever the project had built a controller before. Only
+	# (re)write the file when it's absent or the caller opts in via overwrite,
+	# so a user's manual edits to the script are preserved (reuse never clobbers).
+	# Mirrors the write-once-or-reuse policy in create_collectible / create_hazard.
+	var script_exists := FileAccess.file_exists(script_path)
 
 	# If a node already occupies player_name, it must be a CharacterBody2D — the
 	# controller `extends CharacterBody2D`, so attaching it to anything else is a
@@ -221,23 +221,27 @@ func execute(args: Dictionary) -> Dictionary:
 			]
 		)
 
-	# Ensure the target directory exists.
-	var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
-	if make_err != OK and make_err != ERR_ALREADY_EXISTS:
-		return ToolUtils.error("Failed to create directory '%s' (error %d)" % [directory, make_err])
+	if not script_exists or overwrite:
+		# Ensure the target directory exists.
+		var make_err := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
+		if make_err != OK and make_err != ERR_ALREADY_EXISTS:
+			return ToolUtils.error("Failed to create directory '%s' (error %d)" % [directory, make_err])
 
-	# Write the vetted script verbatim.
-	var werr := _write_file(script_path, script_src)
-	if werr != "":
-		return ToolUtils.error(werr)
-	SessionTracker.mark_created(script_path)
+		# Write the vetted script verbatim.
+		var werr := _write_file(script_path, script_src)
+		if werr != "":
+			return ToolUtils.error(werr)
+		if not script_exists:
+			SessionTracker.mark_created(script_path)
 
-	# Make the editor register the new file so load() resolves it this call.
+	# Make the editor register the file so load() resolves it this call.
 	var fs := EditorInterface.get_resource_filesystem()
 	if fs != null:
 		fs.update_file(script_path)
 
 	var notes: Array = []
+	if script_exists and not overwrite:
+		notes.append("reused existing vetted controller script '%s' (pass overwrite=true to regenerate)" % script_path)
 
 	# ── Player (CharacterBody2D) ──
 	if player == null:

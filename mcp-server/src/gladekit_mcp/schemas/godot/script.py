@@ -381,8 +381,11 @@ TOOLS: List[Dict] = [
                         "type": "integer",
                         "description": (
                             "Score that triggers an automatic win (e.g. 10 to 'collect 10 "
-                            "coins'). 0 disables auto-win so you call win() yourself from a "
-                            "goal/flag. Default 0."
+                            "coins'). Default 0, which means the game is won by collecting "
+                            "EVERY collectible in the level (collect-them-all) — so a coins "
+                            "game is winnable without setting this. Set it only for an "
+                            "explicit numeric target; a level with no collectibles stays a "
+                            "manual win() (e.g. from a goal)."
                         ),
                     },
                     "overwrite": {
