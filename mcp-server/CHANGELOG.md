@@ -4,6 +4,15 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.10] - 2026-06-22
+
+### Added
+
+- **Godot bridge addon v0.7.1 — the combat loop (3 new tools, 88 → 91).** A scene could already have enemies and impact VFX, but nothing could fight: no way to shoot, no hit points, no on-screen health. These three vetted scaffolders close that loop, and they compose automatically.
+  - **`create_projectile`** — the shoot verb. One call writes a flying projectile (an `Area2D` / `Area3D` that travels along its aim, damages the first node in a target group it overlaps, and self-frees on hit or after a lifetime) plus a Shooter added as a child of the player/turret that spawns one on an input action (default `shoot` on left-click). Dimension-aware (`space` inferred from the scene root): 2D aims at the mouse, 3D along the shooter's forward.
+  - **`create_health`** — hit points. Attaches a reusable `Health` component (a child node, so it never collides with the target's own script; pure logic, so the same script works in 2D and 3D) exposing `take_damage(amount)` / `heal` / `is_alive`, with `max_health` + invulnerability frames + free-on-death, emitting `damaged` / `healed` / `died`. A projectile routes damage through a `Health` child automatically, turning one-shot-destroy into real multi-hit HP.
+  - **`create_health_bar`** — the HUD. A `CanvasLayer` overlay (styled `ProgressBar` + a `current / max` readout) that finds a Health component (by default the `player` group's; set `target_group` for a boss), seeds from `max_health`, and follows its `damaged` / `healed` signals so HP is visible and live.
+
 ## [0.7.9] - 2026-06-21
 
 ### Added
