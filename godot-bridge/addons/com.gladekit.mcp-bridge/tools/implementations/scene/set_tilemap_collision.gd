@@ -22,10 +22,17 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #                          (created if the TileSet has none).
 #   clear_existing:  bool — remove existing collision polygons on each tile first
 #                          so re-running doesn't stack duplicates. Default true.
+#   one_way:         bool — make the tiles ONE-WAY platforms: a body lands on top
+#                          but jumps up through them from below. The classic
+#                          platformer pass-through floor. Default false (solid all
+#                          around). The full-tile rectangle is wound so the
+#                          one-way direction blocks from above.
+#   one_way_margin:  float — thickness (px) of the one-way detection band. Default
+#                          1.0. Only meaningful when one_way is true.
 #
 # Response payload:
 #   tilemap_path, physics_layer, collision_layer, collision_mask,
-#   tiles_modified, sources_processed
+#   tiles_modified, sources_processed, one_way
 
 const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 
@@ -69,6 +76,8 @@ func execute(args: Dictionary) -> Dictionary:
 	var collision_mask: int = ToolUtils.parse_int_arg(args, "collision_mask", 1)
 	var physics_layer: int = ToolUtils.parse_int_arg(args, "physics_layer", 0)
 	var clear_existing: bool = ToolUtils.parse_bool_arg(args, "clear_existing", true)
+	var one_way: bool = ToolUtils.parse_bool_arg(args, "one_way", false)
+	var one_way_margin: float = ToolUtils.parse_float_arg(args, "one_way_margin", 1.0)
 
 	# Ensure the requested physics layer exists. add_physics_layer appends, so add
 	# until the index is valid (almost always a single add from 0 → 1).
@@ -106,6 +115,11 @@ func execute(args: Dictionary) -> Dictionary:
 			td.add_collision_polygon(physics_layer)
 			var poly_index := td.get_collision_polygons_count(physics_layer) - 1
 			td.set_collision_polygon_points(physics_layer, poly_index, rect)
+			# One-way: the rect is wound top-left → top-right → … so the first
+			# edge's outward normal points up, giving land-on-top / pass-from-below.
+			if one_way:
+				td.set_collision_polygon_one_way(physics_layer, poly_index, true)
+				td.set_collision_polygon_one_way_margin(physics_layer, poly_index, one_way_margin)
 			tiles_modified += 1
 
 	if tiles_modified == 0:
@@ -124,9 +138,10 @@ func execute(args: Dictionary) -> Dictionary:
 	if Engine.is_editor_hint():
 		EditorInterface.get_edited_scene_root().notify_property_list_changed()
 
+	var kind := "one-way (land on top, jump up through)" if one_way else "solid"
 	return ToolUtils.success(
-		"Made %d tile%s solid on '%s' (physics layer %d). The TileMapLayer's painted cells are now collidable — "
-		% [tiles_modified, "" if tiles_modified == 1 else "s", tilemap_path, physics_layer]
+		"Made %d tile%s %s on '%s' (physics layer %d). The TileMapLayer's painted cells are now collidable — "
+		% [tiles_modified, "" if tiles_modified == 1 else "s", kind, tilemap_path, physics_layer]
 		+ "a CharacterBody2D will stand on them. Call save_scene to persist.",
 		{
 			"tilemap_path": ToolUtils.node_relative_path(layer),
@@ -135,5 +150,6 @@ func execute(args: Dictionary) -> Dictionary:
 			"collision_mask": collision_mask,
 			"tiles_modified": tiles_modified,
 			"sources_processed": sources_processed,
+			"one_way": one_way,
 		}
 	)

@@ -47,10 +47,10 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# create_enemy_3d (1) = 85; 3D navigation add_navigation_agent +
 	# bake_navigation_mesh (2) = 87; create_particles_3d (1) = 88;
 	# create_projectile (1) = 89; create_health (1) = 90;
-	# create_health_bar (1) = 91 total.
+	# create_health_bar (1) = 91; create_moving_platform (1) = 92 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 91, "Catalog should register exactly 91 tools")
+	assert_eq(registry.get_tool_count(), 92, "Catalog should register exactly 92 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -59,7 +59,7 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"get_scene_tree", "get_node_info", "find_nodes", "create_node",
 		"create_primitive_3d", "create_sprite_2d", "create_animated_sprite_2d",
 		"create_tilemap_layer", "set_tilemap_cells", "set_tilemap_collision",
-		"create_parallax_2d",
+		"create_parallax_2d", "create_moving_platform",
 		"delete_node", "rename_node", "duplicate_node",
 		"set_node_parent", "set_node_transform", "set_node_resource",
 		# Phase 2 — Script

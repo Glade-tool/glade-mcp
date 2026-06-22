@@ -427,8 +427,9 @@ TOOLS: List[Dict] = [
                 "A painted TileMapLayer is purely visual until this runs — without it a "
                 "player (e.g. from create_2d_controller) falls straight through the floor. "
                 "Adds a physics layer to the TileSet and a full-tile rectangle collision "
-                "polygon to every atlas tile. Call this once after building a tile level "
-                "(create_tilemap_layer + set_tilemap_cells), then save_scene."
+                "polygon to every atlas tile. Pass one_way=true for pass-through platformer "
+                "floors (land on top, jump up through from below). Call this once after "
+                "building a tile level (create_tilemap_layer + set_tilemap_cells), then save_scene."
             ),
             "parameters": {
                 "type": "object",
@@ -455,6 +456,17 @@ TOOLS: List[Dict] = [
                             "Remove existing collision polygons on each tile first so re-running "
                             "doesn't stack duplicates. Default true."
                         ),
+                    },
+                    "one_way": {
+                        "type": "boolean",
+                        "description": (
+                            "Make the tiles ONE-WAY platforms: a body lands on top but jumps up "
+                            "through from below. The classic pass-through floor. Default false."
+                        ),
+                    },
+                    "one_way_margin": {
+                        "type": "number",
+                        "description": "Thickness (px) of the one-way detection band. Default 1.0. Only used when one_way is true.",
                     },
                 },
                 "required": ["tilemap_path"],
@@ -495,6 +507,78 @@ TOOLS: List[Dict] = [
                     "position": {
                         "type": "string",
                         "description": "Initial position in pixels, 'x,y'. Default '0,0'.",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_moving_platform",
+            "description": (
+                "Build a moving platform (or send an existing node patrolling a route) in one "
+                "call: a Path2D waypoint curve, a PathFollow2D that travels it at constant speed, "
+                "and a rider. The default rider is a scaffolded AnimatableBody2D platform that "
+                "CARRIES a CharacterBody2D player (a StaticBody2D would not); pass target_path to "
+                "send an existing node along instead, leaving its script intact. Writes a vetted "
+                "mover script once (reused across calls). 2D-only. loop_mode: loop / pingpong / once."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "points": {
+                        "type": "string",
+                        "description": (
+                            "Route waypoints relative to position, as a 'x,y;x,y;...' string or a JSON "
+                            "array like [[0,0],[200,0]]. First point is the start. Default '0,0;200,0'."
+                        ),
+                    },
+                    "speed": {
+                        "type": "number",
+                        "description": "Pixels per second along the curve. Default 80.",
+                    },
+                    "loop_mode": {
+                        "type": "string",
+                        "enum": ["loop", "pingpong", "once"],
+                        "description": "loop = wrap around, pingpong = back and forth, once = travel then stop. Default loop.",
+                    },
+                    "wait_time": {
+                        "type": "number",
+                        "description": "Seconds to pause at each end (pingpong/once). Default 0.",
+                    },
+                    "size": {
+                        "type": "string",
+                        "description": "Scaffolded platform size 'w,h' in pixels. Default '96,16'. Ignored when target_path is set.",
+                    },
+                    "one_way": {
+                        "type": "boolean",
+                        "description": "Make the scaffolded platform one-way (land on top, jump up through from below). Default false. Ignored when target_path is set.",
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Placeholder fill color for the scaffolded platform (hex or 'r,g,b').",
+                    },
+                    "target_path": {
+                        "type": "string",
+                        "description": "Scene-relative path to an existing Node2D to send along the route instead of scaffolding a platform.",
+                    },
+                    "name": {"type": "string", "description": "Path2D node name. Default 'MovingPlatform'."},
+                    "parent_path": {
+                        "type": "string",
+                        "description": "Scene-relative parent path. Defaults to scene root.",
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "Path2D placement in pixels 'x,y' (waypoints are relative to it). Default '0,0'.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "res:// folder for the generated mover script. Default 'res://scripts'.",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": "Regenerate the shared mover script if it exists. Default false.",
                     },
                 },
             },
