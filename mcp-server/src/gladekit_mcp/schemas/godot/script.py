@@ -1,5 +1,5 @@
 """
-Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (8 tools).
+Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (14 tools).
 
 GDScript files are .gd resources living anywhere under res://. Each
 Godot node can have at most one attached script (vs Unity's many
@@ -664,6 +664,109 @@ TOOLS: List[Dict] = [
                     "overwrite": {
                         "type": "boolean",
                         "description": ("Regenerate the shared enemy script if it already exists. Default false."),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_projectile",
+            "description": (
+                "Give a node the ability to SHOOT in ONE atomic call — the combat verb that "
+                "pairs with create_enemy_2d/3d. PREFER THIS over hand-wiring a bullet system "
+                "for any 'shoot / fire / launch a projectile' request. Dimension-aware: "
+                "space='2d'|'3d' (inferred from the open scene's root when omitted) — 2D builds "
+                "an Area2D projectile + Node2D shooter, 3D an Area3D + Node3D. It writes TWO "
+                "VETTED scripts VERBATIM (once per project, reused on every call): a PROJECTILE "
+                "that flies straight along its aim, damages the first node in target_group "
+                "(default 'enemies') it overlaps — calling take_damage(amount) if present, else "
+                "freeing the target (a destroy-on-hit fallback so it works before a health "
+                "system exists) — and self-frees on hit or after lifetime; and a SHOOTER added "
+                "as a CHILD of the target (it can't replace the player's existing controller "
+                "script) that spawns a projectile on the input_action, respecting cooldown. The "
+                "shooter is parented to the 'player'-group node by default (or shooter_path, or "
+                "the scene root). Registers input_action (default 'shoot') bound to key (default "
+                "'mouse_left' — click to shoot). 2D aims at the mouse by default; 3D aims along "
+                "the shooter's forward (-Z). Projectiles join the 'projectiles' group. Pair with "
+                "create_particles_2d/3d for an impact burst. After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "space": {
+                        "type": "string",
+                        "enum": ["2d", "3d"],
+                        "description": ("Dimension. Default: inferred from the open scene's root node."),
+                    },
+                    "shooter_path": {
+                        "type": "string",
+                        "description": (
+                            "Node the Shooter is parented to. Default: the 'player'-group node if one "
+                            "exists, else the scene root."
+                        ),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Shooter node name. Default 'Shooter'.",
+                    },
+                    "input_action": {
+                        "type": "string",
+                        "description": "InputMap action that fires. Default 'shoot'.",
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": (
+                            "Binding for the action: 'mouse_left' (default), 'mouse_right', "
+                            "'mouse_middle', or a keyboard key name ('J', 'Space', ...)."
+                        ),
+                    },
+                    "aim": {
+                        "type": "string",
+                        "description": (
+                            "Travel direction. 2D: 'mouse' (default), 'right', 'left', 'up', 'down'. "
+                            "3D: 'forward' (default), 'back', 'left', 'right', 'up', 'down' (relative "
+                            "to the shooter's facing)."
+                        ),
+                    },
+                    "speed": {
+                        "type": "number",
+                        "description": "Projectile speed. Default 600 (2D, px/s) / 24 (3D, m/s).",
+                    },
+                    "damage": {
+                        "type": "integer",
+                        "description": "Damage dealt to a hit target. Default 1.",
+                    },
+                    "lifetime": {
+                        "type": "number",
+                        "description": ("Seconds before a projectile frees itself. Default 2 (2D) / 3 (3D)."),
+                    },
+                    "cooldown": {
+                        "type": "number",
+                        "description": "Minimum seconds between shots. Default 0.25.",
+                    },
+                    "radius": {
+                        "type": "number",
+                        "description": "Projectile size. Default 6 (2D, px) / 0.15 (3D, m).",
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": ("Projectile placeholder color (name or 'r,g,b'). Default warm yellow."),
+                    },
+                    "target_group": {
+                        "type": "string",
+                        "description": "Group a projectile damages. Default 'enemies'.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated scripts. Default 'res://scripts'."),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Regenerate the shared projectile/shooter scripts if they exist. Default false."
+                        ),
                     },
                 },
             },

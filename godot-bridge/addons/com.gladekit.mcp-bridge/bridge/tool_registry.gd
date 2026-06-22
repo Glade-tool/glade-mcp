@@ -63,6 +63,12 @@ const CreateEnemy2DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/im
 # refuses to run in the other's dimension.
 const CreateEnemy3DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_enemy_3d.gd")
 
+# The shoot verb: a vetted projectile (flying Area2D/3D that travels, damages a
+# target group, and self-frees) + a Shooter child node that spawns one on an input
+# action. Dimension-aware via space inference. Composes with create_enemy_* and a
+# future create_health.
+const CreateProjectileTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_projectile.gd")
+
 # ── Camera / Lighting / Environment tools (Phase 3 + v0.5.3) ───────────────
 # create_camera is dimension-aware (space="2d"|"3d"); the legacy create_camera_3d
 # name is kept as a registry alias (see _register_aliases).
@@ -257,6 +263,7 @@ func _register_all() -> void:
 	register_tool(CreateHazardTool.new())
 	register_tool(CreateEnemy2DTool.new())
 	register_tool(CreateEnemy3DTool.new())
+	register_tool(CreateProjectileTool.new())
 	# Camera / Lighting / Environment (6) — 2 Phase 3 + 4 (v0.5.3)
 	register_tool(CreateCameraTool.new())
 	register_tool(CreateLightTool.new())

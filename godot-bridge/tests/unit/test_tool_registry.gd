@@ -45,10 +45,11 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# create_hazard (3) = 81; create_enemy_2d (1) = 82;
 	# menu / scene-flow create_main_menu + create_pause_menu (2) = 84;
 	# create_enemy_3d (1) = 85; 3D navigation add_navigation_agent +
-	# bake_navigation_mesh (2) = 87; create_particles_3d (1) = 88 total.
+	# bake_navigation_mesh (2) = 87; create_particles_3d (1) = 88;
+	# create_projectile (1) = 89 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 88, "Catalog should register exactly 88 tools")
+	assert_eq(registry.get_tool_count(), 89, "Catalog should register exactly 89 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -111,6 +112,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"create_enemy_3d", "add_navigation_agent", "bake_navigation_mesh",
 		# Particles / juice — 3D twin of create_particles_2d
 		"create_particles_3d",
+		# Combat — the shoot verb (projectile + shooter, 2D/3D)
+		"create_projectile",
 	]
 	for expected in expected_names:
 		assert_true(registry.has_tool(expected), "Missing registration for tool '%s'" % expected)
