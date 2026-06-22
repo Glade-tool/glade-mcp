@@ -65,9 +65,14 @@ const CreateEnemy3DTool = preload("res://addons/com.gladekit.mcp-bridge/tools/im
 
 # The shoot verb: a vetted projectile (flying Area2D/3D that travels, damages a
 # target group, and self-frees) + a Shooter child node that spawns one on an input
-# action. Dimension-aware via space inference. Composes with create_enemy_* and a
-# future create_health.
+# action. Dimension-aware via space inference. Composes with create_enemy_* and
+# create_health.
 const CreateProjectileTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_projectile.gd")
+
+# Reusable HP component: a "Health" child node (space-agnostic) with take_damage/
+# heal + damaged/healed/died signals and i-frames. Projectiles auto-route damage to
+# it, turning one-shot-destroy into real multi-hit HP. Completes the combat loop.
+const CreateHealthTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_health.gd")
 
 # ── Camera / Lighting / Environment tools (Phase 3 + v0.5.3) ───────────────
 # create_camera is dimension-aware (space="2d"|"3d"); the legacy create_camera_3d
@@ -264,6 +269,7 @@ func _register_all() -> void:
 	register_tool(CreateEnemy2DTool.new())
 	register_tool(CreateEnemy3DTool.new())
 	register_tool(CreateProjectileTool.new())
+	register_tool(CreateHealthTool.new())
 	# Camera / Lighting / Environment (6) — 2 Phase 3 + 4 (v0.5.3)
 	register_tool(CreateCameraTool.new())
 	register_tool(CreateLightTool.new())

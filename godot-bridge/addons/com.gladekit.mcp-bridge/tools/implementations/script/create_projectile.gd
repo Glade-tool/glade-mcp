@@ -84,6 +84,7 @@ const PROJECTILE_2D_SRC := """extends Area2D
 # Set by the Shooter before the node enters the tree; world-space travel.
 var direction: Vector2 = Vector2.RIGHT
 var _age: float = 0.0
+var _consumed: bool = false  # guard: a hit may fire both area_entered AND body_entered
 
 
 func _ready() -> void:
@@ -114,13 +115,24 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_overlap(node: Node) -> void:
+	if _consumed:
+		return
 	var target := _target(node)
 	if target == null:
 		return
-	if target.has_method(\"take_damage\"):
+	# One projectile = one hit: an enemy is a body WITH a Hurtbox child Area, so a
+	# single pass fires both body_entered and area_entered in the same frame (and
+	# queue_free is deferred). Latch on the first valid target so damage lands once.
+	_consumed = true
+	# Prefer a Health child (create_health) so the entity takes HP damage and dies
+	# when it runs out; fall back to a direct take_damage(), then to destroy-on-hit.
+	var health := target.get_node_or_null(\"Health\")
+	if health != null and health.has_method(\"take_damage\"):
+		health.take_damage(damage)
+	elif target.has_method(\"take_damage\"):
 		target.take_damage(damage)
 	else:
-		target.queue_free()  # no health system yet: destroy on hit
+		target.queue_free()  # no health component: destroy on hit
 	queue_free()
 
 
@@ -214,6 +226,7 @@ const PROJECTILE_3D_SRC := """extends Area3D
 
 var direction: Vector3 = Vector3.FORWARD
 var _age: float = 0.0
+var _consumed: bool = false  # guard: a hit may fire both area_entered AND body_entered
 
 
 func _ready() -> void:
@@ -246,13 +259,24 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_overlap(node: Node) -> void:
+	if _consumed:
+		return
 	var target := _target(node)
 	if target == null:
 		return
-	if target.has_method(\"take_damage\"):
+	# One projectile = one hit: an enemy is a body WITH a Hurtbox child Area, so a
+	# single pass fires both body_entered and area_entered in the same frame (and
+	# queue_free is deferred). Latch on the first valid target so damage lands once.
+	_consumed = true
+	# Prefer a Health child (create_health) so the entity takes HP damage and dies
+	# when it runs out; fall back to a direct take_damage(), then to destroy-on-hit.
+	var health := target.get_node_or_null(\"Health\")
+	if health != null and health.has_method(\"take_damage\"):
+		health.take_damage(damage)
+	elif target.has_method(\"take_damage\"):
 		target.take_damage(damage)
 	else:
-		target.queue_free()  # no health system yet: destroy on hit
+		target.queue_free()  # no health component: destroy on hit
 	queue_free()
 
 

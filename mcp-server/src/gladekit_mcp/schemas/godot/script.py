@@ -1,5 +1,5 @@
 """
-Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (14 tools).
+Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (15 tools).
 
 GDScript files are .gd resources living anywhere under res://. Each
 Godot node can have at most one attached script (vs Unity's many
@@ -767,6 +767,75 @@ TOOLS: List[Dict] = [
                         "description": (
                             "Regenerate the shared projectile/shooter scripts if they exist. Default false."
                         ),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_health",
+            "description": (
+                "Give a node HIT POINTS in ONE atomic call — the other half of the combat "
+                "loop (pairs with create_projectile / create_enemy_2d/3d). PREFER THIS over "
+                "hand-writing an HP script for any 'health / hit points / takes N hits / can "
+                "be damaged / dies after' request. It writes a VETTED, reusable Health script "
+                "VERBATIM (once per project) and attaches it as a CHILD node named 'Health' of "
+                "the target (a child because a Godot node holds one script and the target "
+                "usually already has one; the component is pure logic so the SAME script works "
+                "in 2D and 3D). The component exposes take_damage(amount), heal(amount), "
+                "get_health(), is_alive(), with @export max_health + invuln_seconds + "
+                "free_owner_on_death, and emits 'damaged'/'healed'/'died'. It composes "
+                "AUTOMATICALLY with create_projectile: a projectile looks for a 'Health' child "
+                "on what it hits and routes damage there, so adding Health to an enemy turns "
+                "one-shot-destroy into real multi-hit HP. Other sources call "
+                "$Health.take_damage(n). free_owner_on_death=true (default) frees the parent at "
+                "0 HP — right for enemies/destructibles; for the PLAYER pass false and handle "
+                "'died' (respawn / game over) plus invuln_seconds for i-frames. KEEP the name "
+                "'Health' so the projectile lookup works. After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target_path": {
+                        "type": "string",
+                        "description": (
+                            "Node to attach Health to (an enemy, a destructible, the player). "
+                            "Default: the 'player'-group node if one exists, else REQUIRED."
+                        ),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": (
+                            "Component node name. Default 'Health' — keep it so the projectile auto-lookup finds it."
+                        ),
+                    },
+                    "max_health": {
+                        "type": "integer",
+                        "description": "Maximum (and starting) hit points. Default 3.",
+                    },
+                    "invuln_seconds": {
+                        "type": "number",
+                        "description": (
+                            "Invulnerability window after a hit (i-frames). Default 0 (every hit "
+                            "lands). Set ~0.5 for a player."
+                        ),
+                    },
+                    "free_owner_on_death": {
+                        "type": "boolean",
+                        "description": (
+                            "Free the parent entity at 0 HP. Default true (enemies/destructibles). "
+                            "Set false for the player and handle 'died' yourself."
+                        ),
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": ("res:// folder for the generated script. Default 'res://scripts'."),
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": ("Regenerate the shared health script if it exists. Default false."),
                     },
                 },
             },
