@@ -683,7 +683,7 @@ namespace GladeAgenticAI.Services
         private static string GetStateBackupPath(string turnId, string gameObjectPath)
         {
             string safePath = gameObjectPath.Replace('/', '_').Replace('\\', '_');
-            return Path.Combine(BACKUP_ROOT, $"turn-{turnId}", "gameobjects", $"{safePath}.json");
+            return Path.Combine(BACKUP_ROOT, BackupManager.TurnSubdir(turnId), "gameobjects", $"{safePath}.json");
         }
         
         /// <summary>
@@ -695,7 +695,7 @@ namespace GladeAgenticAI.Services
             string safePath = gameObjectPath.Replace('/', '_').Replace('\\', '_');
             // Create under Assets/Temp/GladeKitBackups/ so Unity can manage it
             // These are temporary and can be cleaned up
-            string prefabPath = Path.Combine("Assets", "Temp", "GladeKitBackups", $"turn-{turnId}", $"{safePath}.prefab");
+            string prefabPath = Path.Combine("Assets", "Temp", "GladeKitBackups", BackupManager.TurnSubdir(turnId), $"{safePath}.prefab");
             return prefabPath;
         }
     }

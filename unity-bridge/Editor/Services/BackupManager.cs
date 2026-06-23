@@ -13,6 +13,25 @@ namespace GladeAgenticAI.Services
         private static readonly string BackupRootPath = Path.Combine(Application.dataPath, "..", ".gladekit-backups");
 
         /// <summary>
+        /// Build the per-turn backup subdirectory name. Turn ids already arrive
+        /// prefixed with "turn-" (e.g. "turn-1780445512211-5pkwwr"), so prepend
+        /// the prefix only when it is absent — otherwise we produce
+        /// "turn-turn-…", a path the caller never looks under.
+        ///
+        /// This MUST match the convention the calling client uses to compute
+        /// backup paths, and the Godot bridge's _turn_subdir. Backups are
+        /// written here and restored by path; if the write path and the
+        /// caller-computed path disagree, File.Exists is false at revert time,
+        /// the restore is skipped, and undo silently does nothing while still
+        /// reporting success.
+        /// </summary>
+        public static string TurnSubdir(string turnId)
+        {
+            if (string.IsNullOrEmpty(turnId)) return "turn-";
+            return turnId.StartsWith("turn-") ? turnId : $"turn-{turnId}";
+        }
+
+        /// <summary>
         /// Deletes all backup files (accessible via Window > GladeKit > Delete Backup Files)
         /// </summary>
         [MenuItem("Window/GladeKit/Delete Backup Files")]

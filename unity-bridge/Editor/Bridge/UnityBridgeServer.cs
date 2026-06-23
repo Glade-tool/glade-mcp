@@ -1361,7 +1361,7 @@ namespace GladeAgenticAI.Bridge
                 }
                 
                 // Create backup path
-                string backupDir = Path.Combine(".gladekit-backups", $"turn-{request.turnId}", "files");
+                string backupDir = Path.Combine(".gladekit-backups", BackupManager.TurnSubdir(request.turnId), "files");
                 string relativePath = filePath.Replace("Assets/", "");
                 string backupPath = Path.Combine(backupDir, relativePath);
                 string backupDirPath = Path.GetDirectoryName(backupPath);
@@ -1701,7 +1701,7 @@ namespace GladeAgenticAI.Bridge
                 
                 // Delete backup folders after revert (cleanup)
                 // 1. JSON backups in .gladekit-backups/
-                string backupDir = Path.Combine(".gladekit-backups", $"turn-{request.turnId}");
+                string backupDir = Path.Combine(".gladekit-backups", BackupManager.TurnSubdir(request.turnId));
                 if (Directory.Exists(backupDir))
                 {
                     try
@@ -1716,7 +1716,7 @@ namespace GladeAgenticAI.Bridge
                 }
                 
                 // 2. Prefab backups in Assets/Temp/GladeKitBackups/
-                string prefabBackupDir = Path.Combine("Assets", "Temp", "GladeKitBackups", $"turn-{request.turnId}");
+                string prefabBackupDir = Path.Combine("Assets", "Temp", "GladeKitBackups", BackupManager.TurnSubdir(request.turnId));
                 if (Directory.Exists(prefabBackupDir))
                 {
                     try
@@ -1779,7 +1779,7 @@ namespace GladeAgenticAI.Bridge
                 
                 // Delete backup folders for this turn
                 // 1. JSON backups in .gladekit-backups/
-                string backupDir = Path.Combine(".gladekit-backups", $"turn-{request.turnId}");
+                string backupDir = Path.Combine(".gladekit-backups", BackupManager.TurnSubdir(request.turnId));
                 if (Directory.Exists(backupDir))
                 {
                     try
@@ -1798,7 +1798,7 @@ namespace GladeAgenticAI.Bridge
                 }
                 
                 // 2. Prefab backups in Assets/Temp/GladeKitBackups/
-                string prefabBackupDir = Path.Combine("Assets", "Temp", "GladeKitBackups", $"turn-{request.turnId}");
+                string prefabBackupDir = Path.Combine("Assets", "Temp", "GladeKitBackups", BackupManager.TurnSubdir(request.turnId));
                 if (Directory.Exists(prefabBackupDir))
                 {
                     try
