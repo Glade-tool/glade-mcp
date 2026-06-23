@@ -1,0 +1,26 @@
+using UnityEngine;
+
+// A danger volume (spikes, lava, a pit trigger). When the player (tag 'Player')
+// enters it, it costs the player lives via the GameManager — which respawns the
+// player while lives remain and ends the game at zero. Degrades gracefully when
+// no GameManager is in the scene (nothing happens) — pair with
+// create_game_manager. One vetted script is shared by every hazard; each carries
+// its own `damage`.
+[RequireComponent(typeof(Collider))]
+public class Hazard : MonoBehaviour
+{
+    [Tooltip("Lives removed when the player touches this hazard. The GameManager respawns the player while lives remain, and ends the game at zero.")]
+    public int damage = 1;
+
+    private void Start()
+    {
+        var col = GetComponent<Collider>();
+        if (col != null) col.isTrigger = true;
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (!other.CompareTag("Player")) return;
+        if (GameManager.Instance != null) GameManager.Instance.LoseLife(damage);
+    }
+}

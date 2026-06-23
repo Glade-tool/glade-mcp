@@ -1,0 +1,63 @@
+using UnityEngine;
+
+// A simple 3D enemy: chases the player across the ground plane and, on contact,
+// costs the player a life via the GameManager (which respawns the player / ends
+// the game). It also carries Health (added by create_enemy) so projectiles can
+// destroy it. No navmesh — straight-line chase, good for open arenas. Loosely
+// coupled: finds the player by the 'Player' tag, the hub via GameManager.Instance.
+[RequireComponent(typeof(Collider))]
+public class Enemy : MonoBehaviour
+{
+    [Tooltip("Movement speed (units/second) while chasing.")]
+    public float moveSpeed = 3f;
+
+    [Tooltip("Seconds between hits while in contact with the player.")]
+    public float damageInterval = 1f;
+
+    [Tooltip("If false the enemy stays put and only damages on contact.")]
+    public bool chase = true;
+
+    private Transform player;
+    private float lastHitTime = -999f;
+
+    private void Start()
+    {
+        var col = GetComponent<Collider>();
+        if (col != null) col.isTrigger = true;
+        FindPlayer();
+    }
+
+    private void Update()
+    {
+        if (!chase) return;
+        if (player == null) { FindPlayer(); if (player == null) return; }
+
+        // Move on the ground plane only (don't chase the player's vertical pos).
+        Vector3 target = new Vector3(player.position.x, transform.position.y, player.position.z);
+        transform.position = Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
+
+        Vector3 look = target - transform.position;
+        if (look.sqrMagnitude > 0.0001f)
+            transform.rotation = Quaternion.LookRotation(look, Vector3.up);
+    }
+
+    private void OnTriggerEnter(Collider other) { TryHit(other); }
+    private void OnTriggerStay(Collider other) { TryHit(other); }
+
+    private void TryHit(Collider other)
+    {
+        if (!other.CompareTag("Player")) return;
+        if (Time.time - lastHitTime < damageInterval) return;
+        lastHitTime = Time.time;
+        if (GameManager.Instance != null) GameManager.Instance.LoseLife(1);
+    }
+
+    private void FindPlayer()
+    {
+        GameObject go = null;
+        try { go = GameObject.FindWithTag("Player"); }
+        catch { /* 'Player' tag not defined */ }
+        if (go == null) go = GameObject.Find("Player");
+        if (go != null) player = go.transform;
+    }
+}

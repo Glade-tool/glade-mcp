@@ -1,5 +1,6 @@
 using GladeAgenticAI.Core.Tools.Implementations.Assets;
 using GladeAgenticAI.Core.Tools.Implementations.AssetPipeline;
+using GladeAgenticAI.Core.Tools.Implementations.Gameplay;
 using GladeAgenticAI.Core.Tools.Implementations.ImportSettings;
 using GladeAgenticAI.Core.Tools.Implementations.Scene;
 using GladeAgenticAI.Core.Tools.Implementations.SceneManagement;
@@ -59,6 +60,15 @@ namespace GladeAgenticAI.Services
             Register(new GetUnityConsoleLogsTool());
             Register(new CreateScriptTool());
             Register(new CreateThirdPersonControllerScriptTool());
+
+            // Gameplay scaffolders (vetted-template "describe → playable game" layer)
+            Register(new CreateGameManagerTool());
+            Register(new CreateCollectibleTool());
+            Register(new CreateHazardTool());
+            Register(new CreateHealthTool());
+            Register(new CreateHealthBarTool());
+            Register(new CreateEnemyTool());
+            Register(new CreateProjectileTool());
             Register(new ModifyScriptTool());
 
             // Assets

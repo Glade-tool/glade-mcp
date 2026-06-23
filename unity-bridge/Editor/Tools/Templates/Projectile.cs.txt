@@ -1,0 +1,49 @@
+using UnityEngine;
+
+// A projectile: flies straight, damages the first Health it hits, and self-
+// destructs on impact or after `lifetime`. Spawned by PlayerShooter via Launch()
+// — it ignores the shooter so it never hits the player who fired it.
+[RequireComponent(typeof(Collider))]
+[RequireComponent(typeof(Rigidbody))]
+public class Projectile : MonoBehaviour
+{
+    public float speed = 14f;
+    public int damage = 1;
+    public float lifetime = 4f;
+
+    private GameObject owner;
+
+    // Fire the projectile in a direction. The shooter is remembered so the
+    // projectile passes through whoever fired it.
+    public void Launch(Vector3 direction, GameObject shooter)
+    {
+        owner = shooter;
+
+        var col = GetComponent<Collider>();
+        if (col != null) col.isTrigger = true;
+
+        var rb = GetComponent<Rigidbody>();
+        rb.useGravity = false;
+        Vector3 v = (direction.sqrMagnitude > 0.0001f ? direction.normalized : transform.forward) * speed;
+#if UNITY_6000_0_OR_NEWER
+        rb.linearVelocity = v;
+#else
+        rb.velocity = v;
+#endif
+        if (v.sqrMagnitude > 0.0001f) transform.forward = v.normalized;
+
+        Destroy(gameObject, lifetime);
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        // Pass through the shooter (and its children).
+        if (owner != null && (other.gameObject == owner || other.transform.IsChildOf(owner.transform)))
+            return;
+
+        var health = other.GetComponentInParent<Health>();
+        if (health != null) health.TakeDamage(damage);
+
+        Destroy(gameObject);
+    }
+}

@@ -315,5 +315,69 @@ namespace GladeAgenticAI.Tests
             Assert.IsFalse(PendingControllerWiring.HasPending,
                 "a resolvable-type/missing-object entry must clear, not loop");
         }
+
+        [Test]
+        public void Queue_Accumulates_AcrossSeparateCalls()
+        {
+            // Models the real flow: one scaffolder queues its component, then a
+            // SECOND scaffolder queues a different one before the single compile
+            // that wires them all. The second call must NOT clobber the first.
+            var go2 = new GameObject("WiringTarget2");
+            try
+            {
+                PendingControllerWiring.Queue(new[]
+                {
+                    new PendingControllerWiring.WiringRequest("WiringTarget", null, "Rigidbody"),
+                });
+                PendingControllerWiring.Queue(new[]
+                {
+                    new PendingControllerWiring.WiringRequest("WiringTarget2", null, "BoxCollider"),
+                });
+
+                PendingControllerWiring.TryComplete();
+
+                Assert.IsNotNull(_go.GetComponent<Rigidbody>(),
+                    "the first scaffolder's queued component must survive a later Queue call");
+                Assert.IsNotNull(go2.GetComponent<BoxCollider>(),
+                    "the second scaffolder's component must attach too");
+                Assert.IsFalse(PendingControllerWiring.HasPending,
+                    "the merged queue must clear once every entry resolves");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go2);
+            }
+        }
+
+        [Test]
+        public void Queue_DedupesSameAttachment_NewestFieldsWin()
+        {
+            // Re-queuing the same target+component (e.g. create_game_manager run
+            // twice before a compile) must not stack duplicates; the latest call's
+            // field values are the ones that take effect.
+            PendingControllerWiring.Queue(new[]
+            {
+                new PendingControllerWiring.WiringRequest("WiringTarget", null, "Rigidbody",
+                    new System.Collections.Generic.List<PendingControllerWiring.FieldValue>
+                    {
+                        new PendingControllerWiring.FieldValue("mass", "float", "5"),
+                    }),
+            });
+            PendingControllerWiring.Queue(new[]
+            {
+                new PendingControllerWiring.WiringRequest("WiringTarget", null, "Rigidbody",
+                    new System.Collections.Generic.List<PendingControllerWiring.FieldValue>
+                    {
+                        new PendingControllerWiring.FieldValue("mass", "float", "9"),
+                    }),
+            });
+
+            PendingControllerWiring.TryComplete();
+
+            var rb = _go.GetComponent<Rigidbody>();
+            Assert.IsNotNull(rb, "the deduped attachment must still attach exactly once");
+            Assert.AreEqual(9f, rb.mass,
+                "the newest Queue call's field value must win (no stale first-call value)");
+        }
     }
 }

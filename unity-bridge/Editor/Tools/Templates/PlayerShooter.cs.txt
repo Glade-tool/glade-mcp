@@ -1,0 +1,62 @@
+using UnityEngine;
+using UnityEngine.InputSystem; // project inputSystem is BOTH/NEW (matches ThirdPersonController)
+
+// Lets the player SHOOT. On fire input (left mouse or F) it spawns a projectile
+// sphere just in front of the player and launches it — aimed by the camera if one
+// exists, else the player's facing. Self-contained: it builds the projectile in
+// code (no prefab to wire). Attach to the player; pairs with create_enemy targets.
+public class PlayerShooter : MonoBehaviour
+{
+    [Tooltip("Shots per second.")]
+    public float fireRate = 3f;
+
+    [Tooltip("Projectile travel speed (units/second).")]
+    public float projectileSpeed = 14f;
+
+    [Tooltip("Damage each projectile deals to a Health it hits.")]
+    public int projectileDamage = 1;
+
+    [Tooltip("Diameter of the projectile sphere.")]
+    public float projectileScale = 0.3f;
+
+    private float nextFireTime;
+    private Transform cam;
+
+    private void Start()
+    {
+        if (Camera.main != null) cam = Camera.main.transform;
+    }
+
+    private void Update()
+    {
+        var mouse = Mouse.current;
+        var kb = Keyboard.current;
+        bool fire = (mouse != null && mouse.leftButton.wasPressedThisFrame)
+                 || (kb != null && kb.fKey.wasPressedThisFrame);
+
+        if (fire && Time.time >= nextFireTime)
+        {
+            nextFireTime = Time.time + 1f / Mathf.Max(0.01f, fireRate);
+            Shoot();
+        }
+    }
+
+    private void Shoot()
+    {
+        Vector3 dir = (cam != null) ? cam.forward : transform.forward;
+        // Keep shots roughly level so they reach ground-bound enemies.
+        dir.y = Mathf.Clamp(dir.y, -0.25f, 0.5f);
+        if (dir.sqrMagnitude < 0.0001f) dir = transform.forward;
+        dir.Normalize();
+
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "Projectile";
+        go.transform.localScale = Vector3.one * projectileScale;
+        go.transform.position = transform.position + Vector3.up * 1f + dir * 1.2f;
+
+        var proj = go.AddComponent<Projectile>(); // also pulls in Rigidbody (RequireComponent)
+        proj.speed = projectileSpeed;
+        proj.damage = projectileDamage;
+        proj.Launch(dir, gameObject);
+    }
+}

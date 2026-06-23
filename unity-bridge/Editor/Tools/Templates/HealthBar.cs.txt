@@ -1,0 +1,87 @@
+using UnityEngine;
+
+// A floating health bar that follows a target's Health and faces the camera. It
+// reads the Health on its parent each frame and scales a colored fill (green →
+// red). Built from two SpriteRenderers (no Canvas / no custom material), so it
+// renders in any pipeline (Built-in / URP / HDRP). Add it as a CHILD of the
+// Health-bearing object (create_health_bar does this); it vanishes with its
+// parent when the parent dies.
+public class HealthBar : MonoBehaviour
+{
+    [Tooltip("Height above the parent's origin to float the bar.")]
+    public float offsetY = 2.2f;
+
+    [Tooltip("Bar width in world units.")]
+    public float width = 1.2f;
+
+    [Tooltip("Bar height in world units.")]
+    public float height = 0.18f;
+
+    [Tooltip("Hide the bar while the target is at full health.")]
+    public bool hideWhenFull = false;
+
+    private Health target;
+    private Transform follow;
+    private Transform cam;
+    private Transform fill;
+    private SpriteRenderer bgRenderer;
+    private SpriteRenderer fillRenderer;
+
+    private void Start()
+    {
+        target = GetComponentInParent<Health>();
+        follow = (target != null) ? target.transform
+               : (transform.parent != null ? transform.parent : transform);
+        if (Camera.main != null) cam = Camera.main.transform;
+        Build();
+    }
+
+    private void LateUpdate()
+    {
+        if (follow == null) { Destroy(gameObject); return; }
+
+        transform.position = follow.position + Vector3.up * offsetY;
+        if (cam != null)
+            transform.rotation = Quaternion.LookRotation(transform.position - cam.position, Vector3.up);
+
+        float frac = 1f;
+        if (target != null && target.Max > 0) frac = Mathf.Clamp01((float)target.Current / target.Max);
+
+        if (fill != null) fill.localScale = new Vector3(width * frac, height * 0.8f, 1f);
+        if (fillRenderer != null) fillRenderer.color = Color.Lerp(Color.red, Color.green, frac);
+
+        bool dead = (target != null && target.IsDead);
+        bool show = !dead && !(hideWhenFull && frac >= 1f);
+        if (bgRenderer != null) bgRenderer.enabled = show;
+        if (fillRenderer != null) fillRenderer.enabled = show;
+    }
+
+    private void Build()
+    {
+        // Background: centered, dark.
+        var bg = new GameObject("BG");
+        bg.transform.SetParent(transform, false);
+        bgRenderer = bg.AddComponent<SpriteRenderer>();
+        bgRenderer.sprite = MakeSprite(new Vector2(0.5f, 0.5f));
+        bgRenderer.color = new Color(0f, 0f, 0f, 0.65f);
+        bg.transform.localScale = new Vector3(width, height, 1f);
+        bgRenderer.sortingOrder = 32766;
+
+        // Fill: left-pivoted so scaling X shrinks it from the right.
+        var f = new GameObject("Fill");
+        f.transform.SetParent(transform, false);
+        fillRenderer = f.AddComponent<SpriteRenderer>();
+        fillRenderer.sprite = MakeSprite(new Vector2(0f, 0.5f));
+        fillRenderer.color = Color.green;
+        f.transform.localPosition = new Vector3(-width / 2f, 0f, -0.01f);
+        f.transform.localScale = new Vector3(width, height * 0.8f, 1f);
+        fillRenderer.sortingOrder = 32767;
+        fill = f.transform;
+    }
+
+    // A 1-unit white sprite from the built-in white texture, with the given pivot.
+    private static Sprite MakeSprite(Vector2 pivot)
+    {
+        return Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, 1f, 1f), pivot, 1f);
+    }
+}

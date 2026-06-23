@@ -1,0 +1,41 @@
+using UnityEngine;
+
+// A pickup (coin / star / orb). When the player (tag 'Player') enters its trigger
+// it adds to the score via the GameManager and removes itself. Degrades
+// gracefully when no GameManager is in the scene (it simply disappears on
+// pickup) — pair with create_game_manager so the score actually counts. One
+// vetted script is shared by every collectible in the level; each carries its
+// own `value`.
+[RequireComponent(typeof(Collider))]
+public class Collectible : MonoBehaviour
+{
+    [Tooltip("Score added when this collectible is picked up.")]
+    public int value = 1;
+
+    private bool collected;
+
+    private void Start()
+    {
+        // Be robust no matter how the collider was authored.
+        var col = GetComponent<Collider>();
+        if (col != null) col.isTrigger = true;
+
+        // Register so the GameManager can detect a collect-them-all win.
+        if (GameManager.Instance != null) GameManager.Instance.RegisterCollectible();
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (collected) return;
+        if (!other.CompareTag("Player")) return;
+
+        collected = true;
+        var gm = GameManager.Instance;
+        if (gm != null)
+        {
+            gm.AddScore(value);
+            gm.NotifyCollectibleCollected();
+        }
+        Destroy(gameObject);
+    }
+}

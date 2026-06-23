@@ -81,6 +81,256 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "create_game_manager",
+            "description": "Use this — not create_script — to add the HUB of a simple game: a GameManager that tracks SCORE and LIVES, RESPAWNS the player on a hit, handles WIN/LOSE, and builds its own on-screen HUD (score + lives readouts and a centered win/lose banner, R to restart). It is what turns a playable character into an actual game — something you can win or lose — and it is the counterpart create_collectible and create_hazard wire into. Call it once per scene. Hand-written game-state hubs reliably ship subtle bugs (scoring that keeps counting after the game ends, respawn that forgets to clear the player's velocity); this tool copies a vetted, Play-tested script VERBATIM instead. It is ATOMIC: it writes the script, creates the GameManager object, and attaches the GameManager component automatically as soon as the script compiles — so after it returns your ONLY remaining step is to call compile_scripts and wait for status='idle'. DO NOT call add_component for GameManager. Gameplay code reaches it WITHOUT a reference via the static GameManager.Instance (e.g. GameManager.Instance?.AddScore(1)); create_collectible and create_hazard already emit those calls. Currently 3D-oriented (respawn handles CharacterController/Rigidbody).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) to write GameManager.cs into. Defaults to 'Scripts'. The filename is fixed (GameManager.cs) because Unity requires the MonoBehaviour class name to match the file name.",
+                    },
+                    "managerName": {
+                        "type": "string",
+                        "description": "Name of the GameManager GameObject. Defaults to 'GameManager'. If a manager already exists in the scene the tool refuses (two HUDs would fight) — reuse the existing one via GameManager.Instance.",
+                    },
+                    "startingLives": {
+                        "type": "integer",
+                        "description": "Lives the player starts with. Defaults to 3. 0 means a single life (game over on the first fatal hit).",
+                    },
+                    "scoreToWin": {
+                        "type": "integer",
+                        "description": "Score that triggers an automatic win. Defaults to 0, which means 'no score target': the game is instead won by collecting every collectible in the level (or by calling GameManager.Instance.Win() yourself from a goal). Set this to e.g. 10 for 'collect 10 coins to win'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set to true ONLY when the user explicitly asked to regenerate the GameManager script. The shared GameManager.cs is REUSED (not clobbered) when it already exists; this forces a fresh copy of the vetted template. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_collectible",
+            "description": "Use this — not create_script — to add a COLLECTIBLE (coin / star / pickup): a visible sphere with a trigger collider that, when the player (tag 'Player') touches it, adds to the score via the GameManager and removes itself. With create_game_manager and create_hazard it completes the core gameplay loop. ATOMIC: it writes a vetted trigger-pickup script, builds the sphere, and attaches the Collectible component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_game_manager too, or the pickup vanishes without scoring (this tool ensures GameManager.cs exists so the pickup compiles, but does NOT add the HUD/win-logic hub — only create_game_manager does). Call repeatedly to place many pickups; the script is shared and each object gets a unique name. Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for the generated scripts. Defaults to 'Scripts'. Filenames are fixed (Collectible.cs, and GameManager.cs as the compile contract).",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the collectible GameObject. Defaults to 'Collectible'. If one with this name exists, a numeric suffix is added so each pickup is addressable.",
+                    },
+                    "value": {
+                        "type": "integer",
+                        "description": "Score added when this collectible is picked up. Defaults to 1.",
+                    },
+                    "x": {"type": "number", "description": "World X position. Defaults to 0."},
+                    "y": {
+                        "type": "number",
+                        "description": "World Y position. Defaults to 1 (so it floats above a ground plane).",
+                    },
+                    "z": {"type": "number", "description": "World Z position. Defaults to 0."},
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared Collectible.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_hazard",
+            "description": "Use this — not create_script — to add a HAZARD (spikes / lava / a pit trigger): a visible cube with a trigger collider that, when the player (tag 'Player') touches it, costs the player lives via the GameManager — which respawns the player while lives remain and ends the game at zero. With create_game_manager and create_collectible it completes the core gameplay loop (the way to LOSE). ATOMIC: it writes a vetted trigger-danger script, builds the cube, and attaches the Hazard component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_game_manager too, or nothing happens on contact (this tool ensures GameManager.cs exists so the hazard compiles, but does NOT add the lives/respawn hub — only create_game_manager does). Call repeatedly to place many hazards. Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for the generated scripts. Defaults to 'Scripts'. Filenames are fixed (Hazard.cs, and GameManager.cs as the compile contract).",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the hazard GameObject. Defaults to 'Hazard'. A numeric suffix is added if the name is taken, so each hazard is addressable.",
+                    },
+                    "damage": {
+                        "type": "integer",
+                        "description": "Lives removed when the player touches this hazard. Defaults to 1. The GameManager respawns the player while lives remain and ends the game at zero.",
+                    },
+                    "x": {"type": "number", "description": "World X position. Defaults to 0."},
+                    "y": {"type": "number", "description": "World Y position. Defaults to 0.5."},
+                    "z": {"type": "number", "description": "World Z position. Defaults to 0."},
+                    "size": {
+                        "type": "number",
+                        "description": "Uniform scale of the hazard cube. Defaults to 1.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared Hazard.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_health",
+            "description": "Use this — not create_script — to add HEALTH (hit points) to an existing object: the foundation of the combat loop. Other systems damage it via Health.TakeDamage; at 0 HP it dies (and by default destroys the object). create_projectile damages Health; create_health_bar visualizes it; create_enemy already adds its own Health. ATOMIC: writes a vetted Health.cs and attaches the Health component on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component. For a PLAYER pass destroyOnDeath=false (the GameManager owns player death via lives); for enemies/destructibles leave it true. Currently 3D-oriented but engine-agnostic.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target": {
+                        "type": "string",
+                        "description": "Name (or tag) of the GameObject to add Health to. Defaults to 'Player'. Must already exist.",
+                    },
+                    "maxHealth": {
+                        "type": "integer",
+                        "description": "Maximum and starting hit points. Defaults to 3.",
+                    },
+                    "destroyOnDeath": {
+                        "type": "boolean",
+                        "description": "Destroy the object at 0 HP. Defaults to true (enemies/destructibles). Pass false for a player.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for Health.cs. Defaults to 'Scripts'.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_health_bar",
+            "description": "Use this — not create_script — to add a floating HEALTH BAR above an object that has Health: a camera-facing bar (green → red) that tracks the target's Current/Max each frame and disappears when the target dies. Visualizes the Health added by create_health / create_enemy. Built from SpriteRenderers (no Canvas, no custom material) so it renders in any pipeline. ATOMIC: writes a vetted HealthBar.cs, creates a child bar object, and attaches the HealthBar component on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component. The target must have (or be queued to get) a Health component — add one with create_health or use create_enemy. Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target": {
+                        "type": "string",
+                        "description": "Name (or tag) of the Health-bearing object to float the bar above. Defaults to 'Enemy'. Must already exist.",
+                    },
+                    "offsetY": {
+                        "type": "number",
+                        "description": "Height above the target's origin to float the bar. Defaults to 2.2.",
+                    },
+                    "width": {
+                        "type": "number",
+                        "description": "Bar width in world units. Defaults to 1.2.",
+                    },
+                    "height": {
+                        "type": "number",
+                        "description": "Bar height in world units. Defaults to 0.18.",
+                    },
+                    "hideWhenFull": {
+                        "type": "boolean",
+                        "description": "Hide the bar while the target is at full health. Defaults to false.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for HealthBar.cs. Defaults to 'Scripts'.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_enemy",
+            "description": "Use this — not create_script — to add an ENEMY: a visible capsule that chases the player across the ground and, on contact, costs the player a life via the GameManager. It carries Health, so create_projectile can destroy it. The antagonist of the combat loop. Hand-written chasers reliably ship bugs (chasing the player's vertical position so the enemy flies; draining every life in one contact frame); the vetted template chases on the ground plane and rate-limits its hits. ATOMIC: builds the capsule and attaches Enemy + Health on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_game_manager too (contact does nothing without it). Call repeatedly for many enemies (each gets a unique name). Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the enemy GameObject. Defaults to 'Enemy'. A numeric suffix is added if taken so each enemy is addressable.",
+                    },
+                    "moveSpeed": {
+                        "type": "number",
+                        "description": "Chase speed in units/second. Defaults to 3.",
+                    },
+                    "health": {
+                        "type": "integer",
+                        "description": "Enemy hit points (how many projectile hits to kill it). Defaults to 3.",
+                    },
+                    "chase": {
+                        "type": "boolean",
+                        "description": "Whether the enemy chases the player. Defaults to true. False = stationary, damages only on contact.",
+                    },
+                    "x": {"type": "number", "description": "World X position. Defaults to 0."},
+                    "y": {"type": "number", "description": "World Y position. Defaults to 1."},
+                    "z": {
+                        "type": "number",
+                        "description": "World Z position. Defaults to 5 (in front of a player at the origin).",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for the generated scripts. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared Enemy.cs. Reused (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_projectile",
+            "description": "Use this — not create_script — to give the player the SHOOT verb: a PlayerShooter that on fire input (left mouse or F) spawns a projectile and launches it forward, aimed by the camera. Projectiles damage any Health they hit — so with create_enemy (enemies carry Health) this closes the combat loop (fight back). Hand-written shooters reliably re-derive broken code (projectiles that hit the firer, never despawn, or don't collide); the vetted templates handle ignore-the-shooter, a lifetime, and physics movement. No prefab — the projectile is built in code. ATOMIC: writes Projectile.cs + PlayerShooter.cs and attaches PlayerShooter to the player on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component. Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "shooter": {
+                        "type": "string",
+                        "description": "Name (or tag) of the object to mount the shooter on. Defaults to 'Player'. Must already exist.",
+                    },
+                    "fireRate": {
+                        "type": "number",
+                        "description": "Shots per second. Defaults to 3.",
+                    },
+                    "projectileSpeed": {
+                        "type": "number",
+                        "description": "Projectile travel speed in units/second. Defaults to 14.",
+                    },
+                    "damage": {
+                        "type": "integer",
+                        "description": "Damage each projectile deals to a Health it hits. Defaults to 1.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for the generated scripts. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared Projectile.cs / PlayerShooter.cs. Reused (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "modify_script",
             "description": "Modify an existing text-based asset file (.cs, .shader, .compute, etc.). File MUST exist in the project — verify in Unity context first. Provide the complete file content including all existing code. SAFETY: the bridge refuses modify_script against scripts the agentic loop did NOT create in this session unless confirmExistingFileModification=true is set. Set the flag ONLY when the user explicitly named the file (e.g. 'update PlayerMovement.cs') or used language like 'extend' / 'modify the existing X'. Absent that signal, do NOT set the flag and do NOT call modify_script — call create_script with a new path for fresh-scaffold prompts.",
             "parameters": {

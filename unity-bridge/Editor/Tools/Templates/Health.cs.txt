@@ -1,0 +1,49 @@
+using UnityEngine;
+using UnityEngine.Events;
+
+// Hit points for any object — player, enemy, or destructible. Other systems call
+// TakeDamage(amount); at 0 HP it dies (invokes onDeath and, by default, destroys
+// the object). Heal(amount) restores HP. A HealthBar reads Current/Max. Loosely
+// coupled: nothing needs a reference INTO this beyond calling its public methods.
+[DisallowMultipleComponent]
+public class Health : MonoBehaviour
+{
+    [Tooltip("Maximum (and starting) hit points.")]
+    public int maxHealth = 3;
+
+    [Tooltip("Destroy the GameObject when health reaches 0. Turn OFF for a player whose death is handled by the GameManager's lives instead.")]
+    public bool destroyOnDeath = true;
+
+    [Tooltip("Invoked once when health reaches 0.")]
+    public UnityEvent onDeath;
+
+    public int Current { get; private set; }
+    public int Max { get { return maxHealth; } }
+    public bool IsDead { get; private set; }
+
+    private void Awake()
+    {
+        Current = maxHealth;
+    }
+
+    public void TakeDamage(int amount)
+    {
+        if (IsDead || amount <= 0) return;
+        Current = Mathf.Max(0, Current - amount);
+        if (Current == 0) Die();
+    }
+
+    public void Heal(int amount)
+    {
+        if (IsDead || amount <= 0) return;
+        Current = Mathf.Min(maxHealth, Current + amount);
+    }
+
+    private void Die()
+    {
+        if (IsDead) return;
+        IsDead = true;
+        if (onDeath != null) onDeath.Invoke();
+        if (destroyOnDeath) Destroy(gameObject);
+    }
+}

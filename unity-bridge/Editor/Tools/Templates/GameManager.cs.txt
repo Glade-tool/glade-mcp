@@ -1,0 +1,245 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem; // project inputSystem is BOTH/NEW (matches ThirdPersonController)
+
+// The HUB of a simple game: tracks SCORE and LIVES, RESPAWNS the player on a
+// non-fatal hit, ends the game on win/lose, and builds + drives an on-screen HUD
+// (score + lives readouts and a centered win/lose banner). It is the piece that
+// turns a playable character into an actual game — something you can win or lose.
+//
+// Reach it from anywhere WITHOUT a hard reference, via the static Instance — the
+// Unity counterpart of a Godot autoload/group:
+//     GameManager.Instance?.AddScore(1);   // a pickup was collected
+//     GameManager.Instance?.LoseLife();     // the player took a hit
+//     GameManager.Instance?.Win();          // the player reached a goal
+// The Collectible and Hazard templates already call exactly these.
+//
+// Win/lose model:
+//   - lives start at startingLives. LoseLife() decrements; while lives remain it
+//     RESPAWNS the player (tag 'Player') at its start position with velocity
+//     cleared; at zero lives the game is lost.
+//   - scoreToWin > 0 auto-wins when score reaches it ("collect 10 coins").
+//   - scoreToWin == 0 (default) auto-wins when every registered collectible has
+//     been collected. A level with no collectibles stays a manual win — call
+//     Win() yourself from a goal/flag.
+//   - on win/lose the HUD shows a banner; pressing R reloads the scene.
+[DisallowMultipleComponent]
+public class GameManager : MonoBehaviour
+{
+    // Single point of contact for gameplay code. Set in Awake; a second manager
+    // destroys itself so two HUDs can never fight.
+    public static GameManager Instance { get; private set; }
+
+    [Tooltip("Lives the player starts with.")]
+    public int startingLives = 3;
+
+    [Tooltip("Score that auto-wins. 0 = win by collecting all collectibles (or call Win() from a goal).")]
+    public int scoreToWin = 0;
+
+    public int Score { get; private set; }
+    public int Lives { get; private set; }
+
+    private bool finished;           // locks scoring + lives once the game has ended
+    private bool hadCollectibles;    // gates the collect-all win for score-only levels
+    private int activeCollectibles;  // live count of un-collected pickups
+    private Transform player;
+    private Vector3 playerStart;
+    private CharacterController playerController;
+    private Rigidbody playerBody;
+
+    private Text scoreLabel;
+    private Text livesLabel;
+    private Text messageLabel;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        Lives = startingLives;
+        BuildHud();
+        CapturePlayer();
+        RefreshHud();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    private void Update()
+    {
+        if (!finished) return;
+        var kb = Keyboard.current;
+        if (kb != null && kb.rKey.wasPressedThisFrame)
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    // ── Scoring ──────────────────────────────────────────────────────────────
+
+    // Add to the score. Auto-wins when scoreToWin is reached (when one is set).
+    public void AddScore(int amount = 1)
+    {
+        if (finished) return;
+        Score += amount;
+        RefreshHud();
+        if (scoreToWin > 0 && Score >= scoreToWin) Win();
+    }
+
+    // ── Collect-all win (loose coupling — no Collectible type reference) ───────
+    // Pickups register in their own Start and report collection on pickup. The
+    // game is won when the last registered pickup is gone — but only for levels
+    // that actually shipped pickups, so a score-only game never trips it.
+
+    public void RegisterCollectible()
+    {
+        activeCollectibles++;
+        hadCollectibles = true;
+    }
+
+    public void NotifyCollectibleCollected()
+    {
+        activeCollectibles = Mathf.Max(0, activeCollectibles - 1);
+        if (scoreToWin <= 0 && hadCollectibles && activeCollectibles == 0) Win();
+    }
+
+    // ── Lives / respawn ───────────────────────────────────────────────────────
+
+    // Cost a life. Respawns while lives remain; ends the game at zero.
+    public void LoseLife(int amount = 1)
+    {
+        if (finished) return;
+        Lives = Mathf.Max(0, Lives - amount);
+        RefreshHud();
+        if (Lives <= 0) EndGame(false);
+        else Respawn();
+    }
+
+    // Return the player to where it started, velocity cleared.
+    public void Respawn()
+    {
+        if (player == null) CapturePlayer();
+        if (player == null) return;
+
+        if (playerBody != null)
+        {
+            // Rigidbody.velocity was renamed to linearVelocity in Unity 6; guard so
+            // the template compiles clean on both (and never trips the API Updater).
+#if UNITY_6000_0_OR_NEWER
+            playerBody.linearVelocity = Vector3.zero;
+#else
+            playerBody.velocity = Vector3.zero;
+#endif
+            playerBody.angularVelocity = Vector3.zero;
+        }
+        if (playerController != null)
+        {
+            // A CharacterController overrides direct transform writes while
+            // enabled; toggle it so the teleport actually lands.
+            playerController.enabled = false;
+            player.position = playerStart;
+            playerController.enabled = true;
+        }
+        else
+        {
+            player.position = playerStart;
+        }
+    }
+
+    public void Win()
+    {
+        if (finished) return;
+        EndGame(true);
+    }
+
+    public void ResetGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    // ── Internals ─────────────────────────────────────────────────────────────
+
+    private void CapturePlayer()
+    {
+        GameObject go = null;
+        try { go = GameObject.FindWithTag("Player"); }
+        catch { /* 'Player' tag not defined in this project */ }
+        if (go == null) go = GameObject.Find("Player");
+        if (go == null) return;
+
+        player = go.transform;
+        playerController = go.GetComponent<CharacterController>();
+        playerBody = go.GetComponent<Rigidbody>();
+        playerStart = player.position;
+    }
+
+    private void EndGame(bool won)
+    {
+        finished = true;
+        if (messageLabel != null)
+        {
+            messageLabel.text = won ? "You Win!" : "Game Over\nPress R to restart";
+            messageLabel.enabled = true;
+        }
+    }
+
+    private void RefreshHud()
+    {
+        if (scoreLabel != null) scoreLabel.text = "Score: " + Score;
+        if (livesLabel != null) livesLabel.text = "Lives: " + Lives;
+    }
+
+    // ── HUD (built at runtime so the manager is fully self-contained) ──────────
+
+    private void BuildHud()
+    {
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        var canvasGo = new GameObject("HUD Canvas");
+        canvasGo.transform.SetParent(transform, false);
+        var canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        var scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+        scoreLabel = MakeLabel(canvas.transform, font, "Score: 0",
+            new Vector2(0f, 1f), new Vector2(20f, -16f), TextAnchor.UpperLeft);
+        livesLabel = MakeLabel(canvas.transform, font, "Lives: " + startingLives,
+            new Vector2(1f, 1f), new Vector2(-20f, -16f), TextAnchor.UpperRight);
+
+        messageLabel = MakeLabel(canvas.transform, font, "",
+            new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter);
+        messageLabel.fontSize = 64;
+        messageLabel.rectTransform.sizeDelta = new Vector2(900f, 240f);
+        messageLabel.enabled = false;
+    }
+
+    private Text MakeLabel(Transform parent, Font font, string text, Vector2 anchor,
+                           Vector2 anchoredPos, TextAnchor align)
+    {
+        var go = new GameObject("Label");
+        go.transform.SetParent(parent, false);
+        var label = go.AddComponent<Text>();
+        label.font = font;
+        label.text = text;
+        label.fontSize = 32;
+        label.alignment = align;
+        label.color = Color.white;
+        label.horizontalOverflow = HorizontalWrapMode.Overflow;
+        label.verticalOverflow = VerticalWrapMode.Overflow;
+
+        var rect = label.rectTransform;
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = anchor;
+        rect.sizeDelta = new Vector2(400f, 60f);
+        rect.anchoredPosition = anchoredPos;
+        return label;
+    }
+}
