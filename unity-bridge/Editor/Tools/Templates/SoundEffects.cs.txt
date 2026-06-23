@@ -1,0 +1,177 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+// The SOUND layer: a self-contained jukebox that gives a game audio with ZERO imported
+// clips. It SYNTHESIZES short retro blips at runtime (square / sine / saw sweeps and
+// arpeggios), then plays them on demand — so a freshly-scaffolded game stops being
+// silent the moment this is in the scene. It also AUTO-WIRES combat feel: it watches
+// every Health in the scene and plays a "hit" on damage and a "death" when one dies, so
+// shooting an enemy makes a sound without any per-object wiring.
+//
+// Why a vetted template: hand-rolled SFX reliably stalls on the asset problem — there
+// are no .wav files to import, so the AI either skips sound entirely or writes a system
+// that references clips that don't exist (silent, or a null-ref). Procedural generation
+// sidesteps that: every cue is built from math in Awake, so it always works in any
+// project. The synthesis math (per-sample envelopes, phase-accurate sweeps, clean note
+// boundaries) is also easy to get subtly wrong (clicks, DC offset, clipping).
+//
+// Reach it from anywhere WITHOUT a reference, via the static API — the Unity counterpart
+// of a Godot autoload:
+//     SoundEffects.Play("jump");     // also: "shoot", "collect", "levelup", "hit", "death", "hurt"
+// Wire it into a jump (ThirdPersonController), a shot (PlayerShooter), or a pickup
+// (Collectible) by adding that one line. Combat cues ("hit"/"death") fire automatically.
+[DisallowMultipleComponent]
+public class SoundEffects : MonoBehaviour
+{
+    // Single point of contact for gameplay code. Set in Awake; a second instance
+    // destroys itself so cues never double-fire.
+    public static SoundEffects Instance { get; private set; }
+
+    [Tooltip("Master volume for every cue (0..1).")]
+    [Range(0f, 1f)] public float volume = 0.5f;
+
+    [Tooltip("Automatically play 'hit' when any Health takes damage and 'death' when one dies.")]
+    public bool autoHookCombat = true;
+
+    private AudioSource source;
+    private readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
+
+    // Combat auto-hook bookkeeping: remember each tracked Health's last HP so a DROP
+    // reads as a hit, and which ones we've already subscribed to onDeath.
+    private readonly Dictionary<Health, int> lastHp = new Dictionary<Health, int>();
+    private readonly List<Health> scratch = new List<Health>();
+    private float nextScan;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+
+        source = gameObject.AddComponent<AudioSource>();
+        source.playOnAwake = false;
+        source.spatialBlend = 0f; // 2D — UI/feedback sound, not positional
+
+        BuildClips();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    private void Update()
+    {
+        if (!autoHookCombat) return;
+
+        // Re-scan occasionally so enemies spawned after start get hooked too.
+        if (Time.unscaledTime >= nextScan)
+        {
+            nextScan = Time.unscaledTime + 0.5f;
+            foreach (var h in Object.FindObjectsByType<Health>(FindObjectsSortMode.None))
+            {
+                if (h == null || lastHp.ContainsKey(h)) continue;
+                lastHp[h] = h.Current;
+                h.onDeath.AddListener(() => Play("death"));
+            }
+        }
+
+        // Detect non-fatal damage by watching Current fall. The death frame (Current 0,
+        // IsDead) is skipped here so it plays "death" (via onDeath), not "hit". Iterate a
+        // snapshot so removing dead/destroyed entries never mutates the live dictionary
+        // mid-enumeration.
+        scratch.Clear();
+        foreach (var k in lastHp.Keys) scratch.Add(k);
+        foreach (var h in scratch)
+        {
+            if (h == null) { lastHp.Remove(h); continue; } // Health was destroyed
+            if (!h.IsDead && h.Current < lastHp[h]) Play("hit");
+            if (h.IsDead) lastHp.Remove(h);
+            else lastHp[h] = h.Current;
+        }
+    }
+
+    // ── Public API ─────────────────────────────────────────────────────────────
+
+    // Play a named cue. Unknown names no-op. Safe before Awake finishes (Instance null).
+    public static void Play(string cue)
+    {
+        if (Instance != null) Instance.PlayCue(cue);
+    }
+
+    private void PlayCue(string cue)
+    {
+        if (source == null || string.IsNullOrEmpty(cue)) return;
+        if (clips.TryGetValue(cue, out var clip) && clip != null)
+            source.PlayOneShot(clip, volume);
+    }
+
+    // ── Procedural synthesis (built once in Awake) ─────────────────────────────
+
+    private void BuildClips()
+    {
+        clips["jump"] = Sweep("jump", 330f, 660f, 0.13f, Sine, 0.4f);
+        clips["shoot"] = Sweep("shoot", 720f, 520f, 0.09f, Square, 0.35f);
+        clips["hit"] = Sweep("hit", 320f, 140f, 0.11f, Square, 0.4f);
+        clips["hurt"] = Sweep("hurt", 200f, 110f, 0.18f, Square, 0.45f);
+        clips["death"] = Sweep("death", 260f, 60f, 0.40f, Saw, 0.45f);
+        clips["collect"] = Seq("collect", new[] { 660f, 990f }, 0.07f, Sine, 0.4f);
+        clips["levelup"] = Seq("levelup", new[] { 523f, 659f, 784f, 1047f }, 0.09f, Sine, 0.4f);
+    }
+
+    private const int SampleRate = 44100;
+    private const int Sine = 0, Square = 1, Saw = 2;
+
+    // A single tone whose pitch glides f0 → f1 over dur, with an exponential decay so it
+    // ends cleanly (no click). Phase is integrated sample-by-sample so the glide is
+    // continuous.
+    private static AudioClip Sweep(string name, float f0, float f1, float dur, int wave, float vol)
+    {
+        int n = Mathf.Max(1, (int)(SampleRate * dur));
+        var data = new float[n];
+        float phase = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float u = (float)i / n;
+            float f = Mathf.Lerp(f0, f1, u);
+            phase += 2f * Mathf.PI * f / SampleRate;
+            float env = Mathf.Exp(-3.5f * u);
+            data[i] = Wave(wave, phase, i) * env * vol;
+        }
+        var clip = AudioClip.Create(name, n, 1, SampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
+    // A sequence of notes (an arpeggio), each held noteDur with its own decay — for
+    // coins and level-ups. Phase resets per note so each starts clean.
+    private static AudioClip Seq(string name, float[] freqs, float noteDur, int wave, float vol)
+    {
+        int per = Mathf.Max(1, (int)(SampleRate * noteDur));
+        int n = per * freqs.Length;
+        var data = new float[n];
+        for (int k = 0; k < freqs.Length; k++)
+        {
+            float phase = 0f;
+            for (int i = 0; i < per; i++)
+            {
+                float u = (float)i / per;
+                phase += 2f * Mathf.PI * freqs[k] / SampleRate;
+                float env = Mathf.Exp(-4.5f * u);
+                data[k * per + i] = Wave(wave, phase, k * per + i) * env * vol;
+            }
+        }
+        var clip = AudioClip.Create(name, n, 1, SampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
+    private static float Wave(int type, float phase, int index)
+    {
+        switch (type)
+        {
+            case Square: return Mathf.Sin(phase) >= 0f ? 1f : -1f;
+            case Saw: return Mathf.Repeat(phase / (2f * Mathf.PI), 1f) * 2f - 1f;
+            default: return Mathf.Sin(phase); // Sine
+        }
+    }
+}

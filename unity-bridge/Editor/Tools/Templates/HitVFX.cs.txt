@@ -1,0 +1,212 @@
+using System.Collections.Generic;
+using System.Reflection;
+using UnityEngine;
+
+// The VISUAL half of "juice": a self-contained particle burst that pops where a hit
+// lands and where something dies — the spark that makes a hit read as CONNECTING. It
+// builds its own ParticleSystem at runtime (no art, no prefab) and AUTO-WIRES combat:
+// it watches every Health in the scene and bursts on damage (small) and on death
+// (big). It also composes with screen shake — if a CameraShake exists in the project it
+// nudges it on each burst (via reflection, so there's no compile-time dependency on it).
+//
+// Why a vetted template: a runtime particle burst with no imported material reliably
+// renders pink/invisible (the default ParticleSystem material isn't pipeline-safe). This
+// builds a Sprites/Default material with a generated soft-dot texture, which renders in
+// both URP and the built-in pipeline. Hand-rolled bursts also tend to leak GameObjects
+// (one ParticleSystem per hit, never cleaned up); this reuses a single pooled system and
+// just re-positions it per burst.
+//
+// Reach it from anywhere WITHOUT a reference, via the static API:
+//     HitVFX.Burst(transform.position);            // default spark
+//     HitVFX.Burst(point, 2f);                      // bigger
+// Combat bursts (hit / death) fire automatically when a Health is present.
+[DisallowMultipleComponent]
+public class HitVFX : MonoBehaviour
+{
+    // Single point of contact for gameplay code. Set in Awake; a second instance
+    // destroys itself so bursts never double up.
+    public static HitVFX Instance { get; private set; }
+
+    [Tooltip("Hex color of the spark (e.g. #FFD27F). Falls back to a warm white if unparseable.")]
+    public string colorHex = "#FFD27F";
+
+    [Tooltip("Automatically burst when any Health takes damage (small) or dies (big).")]
+    public bool autoHookCombat = true;
+
+    private ParticleSystem ps;
+    private Color sparkColor = new Color(1f, 0.82f, 0.5f, 1f);
+
+    // Combat auto-hook bookkeeping: remember each tracked Health's last HP so a DROP
+    // reads as a hit, and which ones we've already subscribed to onDeath.
+    private readonly Dictionary<Health, int> lastHp = new Dictionary<Health, int>();
+    private readonly List<Health> scratch = new List<Health>();
+    private float nextScan;
+
+    // Cached reflection handle to CameraShake.Shake(float), resolved once. Optional, so
+    // a project without screen shake just skips it.
+    private static MethodInfo shakeMethod;
+    private static bool shakeResolved;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+
+        if (!ColorUtility.TryParseHtmlString(colorHex, out sparkColor))
+            sparkColor = new Color(1f, 0.82f, 0.5f, 1f);
+
+        ps = BuildSystem();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    private void Update()
+    {
+        if (!autoHookCombat) return;
+
+        // Re-scan occasionally so enemies spawned after start get hooked too.
+        if (Time.unscaledTime >= nextScan)
+        {
+            nextScan = Time.unscaledTime + 0.5f;
+            foreach (var h in Object.FindObjectsByType<Health>(FindObjectsSortMode.None))
+            {
+                if (h == null || lastHp.ContainsKey(h)) continue;
+                lastHp[h] = h.Current;
+                var captured = h;
+                h.onDeath.AddListener(() => BurstAt(captured.transform.position, 2.2f));
+            }
+        }
+
+        // Detect non-fatal damage by watching Current fall (death is handled by onDeath).
+        // Iterate a snapshot so pruning never mutates the live dictionary mid-enumeration.
+        scratch.Clear();
+        foreach (var k in lastHp.Keys) scratch.Add(k);
+        foreach (var h in scratch)
+        {
+            if (h == null) { lastHp.Remove(h); continue; }
+            if (!h.IsDead && h.Current < lastHp[h]) BurstAt(h.transform.position, 1f);
+            if (h.IsDead) lastHp.Remove(h);
+            else lastHp[h] = h.Current;
+        }
+    }
+
+    // ── Public API ─────────────────────────────────────────────────────────────
+
+    public static void Burst(Vector3 position) { if (Instance != null) Instance.BurstAt(position, 1f); }
+    public static void Burst(Vector3 position, float scale) { if (Instance != null) Instance.BurstAt(position, scale); }
+
+    public void BurstAt(Vector3 position, float scale)
+    {
+        if (ps == null) return;
+        ps.transform.position = position;
+
+        var main = ps.main;
+        main.startColor = new ParticleSystem.MinMaxGradient(sparkColor);
+        main.startSpeed = 3.5f * Mathf.Max(0.25f, scale);
+        main.startSize = 0.14f * Mathf.Max(0.25f, scale);
+
+        ps.Emit(Mathf.RoundToInt(14f * Mathf.Max(0.5f, scale)));
+        TryShake(0.12f * scale); // compose with CameraShake if the project has one
+    }
+
+    // ── Runtime particle system (built once in Awake, no assets) ───────────────
+
+    private ParticleSystem BuildSystem()
+    {
+        var go = new GameObject("Burst");
+        go.transform.SetParent(transform, false);
+        var system = go.AddComponent<ParticleSystem>();
+        system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        var main = system.main;
+        main.loop = false;
+        main.playOnAwake = false;
+        main.duration = 1f;
+        main.startLifetime = 0.5f;
+        main.startSpeed = 3.5f;
+        main.startSize = 0.14f;
+        main.gravityModifier = 0.7f;
+        main.maxParticles = 400;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.startColor = new ParticleSystem.MinMaxGradient(sparkColor);
+
+        var emission = system.emission;
+        emission.enabled = true;
+        emission.rateOverTime = 0f; // bursts only, driven by Emit()
+
+        var shape = system.shape;
+        shape.enabled = true;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.08f;
+
+        // Fade each particle out over its life so the burst dissolves cleanly.
+        var col = system.colorOverLifetime;
+        col.enabled = true;
+        var grad = new Gradient();
+        grad.SetKeys(
+            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
+        col.color = new ParticleSystem.MinMaxGradient(grad);
+
+        var renderer = system.GetComponent<ParticleSystemRenderer>();
+        renderer.material = BuildParticleMaterial();
+        renderer.sortingOrder = 50;
+
+        return system;
+    }
+
+    // Sprites/Default is alpha-blended and exists in URP AND the built-in pipeline, so
+    // the burst renders correctly regardless of project setup.
+    private static Material BuildParticleMaterial()
+    {
+        var shader = Shader.Find("Sprites/Default");
+        if (shader == null) shader = Shader.Find("Particles/Standard Unlit");
+        if (shader == null) shader = Shader.Find("Unlit/Transparent");
+        var mat = new Material(shader);
+        mat.mainTexture = BuildDotTexture();
+        return mat;
+    }
+
+    // A soft round white dot — no imported sprite needed.
+    private static Texture2D BuildDotTexture()
+    {
+        const int s = 16;
+        var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
+        var center = new Vector2((s - 1) * 0.5f, (s - 1) * 0.5f);
+        float maxD = s * 0.5f;
+        for (int y = 0; y < s; y++)
+        {
+            for (int x = 0; x < s; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x, y), center) / maxD;
+                float a = Mathf.Clamp01(1f - d);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
+    // ── Optional screen-shake composition (no compile-time dependency) ─────────
+
+    private static void TryShake(float amount)
+    {
+        if (!shakeResolved)
+        {
+            shakeResolved = true;
+            foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var t = asm.GetType("CameraShake");
+                if (t == null) continue;
+                shakeMethod = t.GetMethod("Shake", BindingFlags.Public | BindingFlags.Static);
+                if (shakeMethod != null) break;
+            }
+        }
+        if (shakeMethod == null) return;
+        try { shakeMethod.Invoke(null, new object[] { amount }); }
+        catch { /* signature changed — skip silently */ }
+    }
+}

@@ -1,0 +1,226 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;        // project inputSystem is BOTH/NEW (matches ThirdPersonController)
+using UnityEngine.InputSystem.UI;     // InputSystemUIInputModule — what makes the buttons clickable
+
+// A self-contained PAUSE MENU: press a key (Escape by default) to FREEZE the game
+// (Time.timeScale = 0) and show a dimmed overlay with Resume / Restart / Quit. Press
+// the key again — or click Resume — to un-freeze. It builds its own Canvas, buttons and
+// EventSystem at runtime, so it needs no scene setup and no art (an Image with no sprite
+// draws a solid quad, which renders in any pipeline).
+//
+// Why a vetted template: a hand-rolled pause menu reliably ships the same four bugs —
+//   * sets Time.timeScale = 0 but reads the toggle key with Input.GetKeyDown / a
+//     timeScale-bound clock, so the UNPAUSE key never registers (menu is stuck);
+//   * forgets the EventSystem / input module, so the buttons are dead on click;
+//   * hard-restores Time.timeScale = 1 on resume, stomping a slow-mo / hit-stop another
+//     system set;
+//   * Restart reloads the scene WITHOUT restoring timeScale, so the next scene loads
+//     frozen.
+// This one polls the key through the new Input System (Keyboard.current is read every
+// frame, unaffected by timeScale), ensures an EventSystem with an
+// InputSystemUIInputModule, remembers the timeScale it INTERRUPTED and restores THAT on
+// resume (not a hard 1), and always resets timeScale before a scene reload.
+//
+// Reach it from gameplay code without a reference via the static Instance:
+//     PauseMenu.Instance?.SetPausable(false);                       // lock pausing in a cutscene
+//     bool paused = PauseMenu.Instance != null && PauseMenu.Instance.IsPaused;
+[DisallowMultipleComponent]
+public class PauseMenu : MonoBehaviour
+{
+    // Single point of contact for gameplay code. Set in Awake; a second menu destroys
+    // itself so two overlays can never fight over timeScale.
+    public static PauseMenu Instance { get; private set; }
+
+    [Tooltip("Key that toggles pause. Any UnityEngine.InputSystem.Key name — Escape, P, Tab, Backspace, ...")]
+    public string pauseKey = "Escape";
+
+    [Tooltip("Whether the pause key currently does anything. Set false from gameplay code to lock pausing.")]
+    public bool canPause = true;
+
+    public bool IsPaused { get; private set; }
+
+    private GameObject panel;            // the dimmed overlay root, toggled on/off
+    private float resumeTimeScale = 1f;  // the timeScale we interrupted, restored on resume
+    private Key toggleKey = Key.Escape;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+
+        // Map the inspector string to a Key once; fall back to Escape on a typo.
+        if (!System.Enum.TryParse(pauseKey, true, out toggleKey)) toggleKey = Key.Escape;
+
+        EnsureEventSystem();
+        BuildMenu();
+        SetPanel(false);
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    private void Update()
+    {
+        if (!canPause) return;
+        var kb = Keyboard.current;
+        if (kb == null) return;                 // no keyboard device (e.g. gamepad-only build)
+        if (kb[toggleKey].wasPressedThisFrame) Toggle();
+    }
+
+    // ── Public API ─────────────────────────────────────────────────────────────
+
+    public void Toggle() { if (IsPaused) Resume(); else Pause(); }
+
+    public void Pause()
+    {
+        if (IsPaused) return;
+        IsPaused = true;
+        // Remember whatever clock we interrupted so resume doesn't stomp a slow-mo
+        // effect; never store 0, or resume would leave the game frozen.
+        resumeTimeScale = Time.timeScale > 0f ? Time.timeScale : 1f;
+        Time.timeScale = 0f;
+        SetPanel(true);
+    }
+
+    public void Resume()
+    {
+        if (!IsPaused) return;
+        IsPaused = false;
+        Time.timeScale = resumeTimeScale;
+        SetPanel(false);
+    }
+
+    public void Restart()
+    {
+        Time.timeScale = 1f;   // never hand the next scene a frozen clock
+        IsPaused = false;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void Quit()
+    {
+        Time.timeScale = 1f;
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    public void SetPausable(bool value) { canPause = value; }
+
+    // ── UI (built at runtime so the menu is fully self-contained) ──────────────
+
+    private void SetPanel(bool on) { if (panel != null) panel.SetActive(on); }
+
+    // Buttons are dead without an EventSystem + input module. Build one (matching the
+    // new Input System backend) only if the scene has none, so we never duplicate it.
+    private void EnsureEventSystem()
+    {
+        if (Object.FindFirstObjectByType<EventSystem>() != null) return;
+        var es = new GameObject("EventSystem");
+        es.AddComponent<EventSystem>();
+        var module = es.AddComponent<InputSystemUIInputModule>();
+        module.AssignDefaultActions(); // wire the built-in UI actions (point/click/navigate)
+    }
+
+    private void BuildMenu()
+    {
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        var canvasGo = new GameObject("Pause Menu Canvas");
+        canvasGo.transform.SetParent(transform, false);
+        var canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 100;   // draw above gameplay HUDs (GameManager / LevelSystem)
+        var scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        canvasGo.AddComponent<GraphicRaycaster>(); // without this the buttons receive no clicks
+
+        // Full-screen dim overlay — the root we toggle on/off.
+        panel = new GameObject("Panel");
+        panel.transform.SetParent(canvas.transform, false);
+        var dim = panel.AddComponent<Image>();
+        dim.color = new Color(0f, 0f, 0f, 0.6f);
+        var pr = dim.rectTransform;
+        pr.anchorMin = Vector2.zero;
+        pr.anchorMax = Vector2.one;
+        pr.offsetMin = Vector2.zero;
+        pr.offsetMax = Vector2.zero;
+
+        var title = MakeLabel(panel.transform, font, "Paused",
+            new Vector2(0.5f, 0.5f), new Vector2(0f, 180f), TextAnchor.MiddleCenter);
+        title.fontSize = 72;
+        title.rectTransform.sizeDelta = new Vector2(600f, 120f);
+
+        MakeButton(panel.transform, font, "Resume", new Vector2(0f, 40f), Resume);
+        MakeButton(panel.transform, font, "Restart", new Vector2(0f, -40f), Restart);
+        MakeButton(panel.transform, font, "Quit", new Vector2(0f, -120f), Quit);
+    }
+
+    private Button MakeButton(Transform parent, Font font, string label, Vector2 anchoredPos,
+                              UnityEngine.Events.UnityAction onClick)
+    {
+        var go = new GameObject(label + " Button");
+        go.transform.SetParent(parent, false);
+        var img = go.AddComponent<Image>();
+        var rect = img.rectTransform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(320f, 64f);
+        rect.anchoredPosition = anchoredPos;
+
+        var btn = go.AddComponent<Button>();
+        btn.targetGraphic = img;
+        var colors = btn.colors;
+        colors.normalColor = new Color(1f, 1f, 1f, 0.12f);
+        colors.highlightedColor = new Color(1f, 1f, 1f, 0.28f);
+        colors.pressedColor = new Color(1f, 1f, 1f, 0.45f);
+        colors.selectedColor = new Color(1f, 1f, 1f, 0.28f);
+        colors.fadeDuration = 0.08f;
+        btn.colors = colors;
+        img.color = colors.normalColor;
+        if (onClick != null) btn.onClick.AddListener(onClick);
+
+        // Label fills the button so it stays centered at any resolution.
+        var text = MakeLabel(go.transform, font, label, new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter);
+        text.fontSize = 30;
+        var tr = text.rectTransform;
+        tr.anchorMin = Vector2.zero;
+        tr.anchorMax = Vector2.one;
+        tr.offsetMin = Vector2.zero;
+        tr.offsetMax = Vector2.zero;
+        return btn;
+    }
+
+    private Text MakeLabel(Transform parent, Font font, string text, Vector2 anchor,
+                           Vector2 anchoredPos, TextAnchor align)
+    {
+        var go = new GameObject("Label");
+        go.transform.SetParent(parent, false);
+        var label = go.AddComponent<Text>();
+        label.font = font;
+        label.text = text;
+        label.fontSize = 32;
+        label.alignment = align;
+        label.color = Color.white;
+        label.horizontalOverflow = HorizontalWrapMode.Overflow;
+        label.verticalOverflow = VerticalWrapMode.Overflow;
+
+        var rect = label.rectTransform;
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = anchor;
+        rect.sizeDelta = new Vector2(400f, 60f);
+        rect.anchoredPosition = anchoredPos;
+        return label;
+    }
+}

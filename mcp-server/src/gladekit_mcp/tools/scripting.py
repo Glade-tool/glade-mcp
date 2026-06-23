@@ -466,6 +466,138 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "create_pause_menu",
+            "description": "Use this — not create_script — to add a PAUSE MENU: a vetted PauseMenu that freezes the game (Time.timeScale = 0) on a key press (Escape by default) and shows a dimmed overlay with Resume / Restart / Quit, then un-freezes on resume. It builds its own Canvas, buttons, and EventSystem at runtime, so the scene needs no UI setup. Hand-written pause menus reliably ship bugs — the unpause key read on a timeScale-bound clock (so the menu can't be closed), a missing EventSystem / input module (so the buttons are dead on click), or a Restart that reloads the scene without restoring timeScale (so it loads frozen). The vetted PauseMenu.cs polls the key through the new Input System (immune to timeScale), ensures an EventSystem, restores the interrupted timeScale on resume, and always resets timeScale before a reload. Lock pausing from gameplay code via PauseMenu.Instance?.SetPausable(false). ATOMIC: writes the vetted script, creates the PauseMenu object, and attaches the PauseMenu component automatically on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component, create_canvas, or create_event_system. Call once per scene.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the PauseMenu GameObject. Defaults to 'PauseMenu'. A second pause menu is refused (reuse the existing one via PauseMenu.Instance).",
+                    },
+                    "pauseKey": {
+                        "type": "string",
+                        "description": "Key that toggles pause. Any UnityEngine.InputSystem.Key name — 'Escape' (default), 'P', 'Tab', 'Backspace', etc. An unrecognized name falls back to Escape.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for PauseMenu.cs. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared PauseMenu.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_main_menu",
+            "description": "Use this — not create_script — to add a START / TITLE SCREEN: a vetted StartMenu that freezes the game (Time.timeScale = 0) on play and shows a full-screen title card with Play and Quit buttons, then un-freezes and removes itself when the player presses Play. It builds its own Canvas, buttons, and EventSystem at runtime, so the scene needs no UI setup — and no second scene or Build Settings change. This is an IN-SCENE overlay: it gives the 'title → game' flow immediately in the current scene (a separate menu scene would need both scenes saved AND registered in Build Settings, which is brittle to scaffold). Hand-written title screens reliably ship bugs — a missing EventSystem / input module (Play unclickable), a menu that doesn't actually freeze the game (it plays out behind the card), or a dismiss that forgets to restore timeScale (game stays frozen). The vetted StartMenu.cs handles all three. ATOMIC: writes the vetted script, creates the StartMenu object, and attaches the StartMenu component automatically on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component, create_canvas, or create_event_system. Call once per scene.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the StartMenu GameObject. Defaults to 'StartMenu'. A second start menu is refused (reuse the existing one via StartMenu.Instance).",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Big title shown on the start screen. Defaults to 'My Game'. Use the game's name when the user has given one.",
+                    },
+                    "subtitle": {
+                        "type": "string",
+                        "description": "Smaller line under the title (e.g. a controls hint like 'WASD to move, Space to jump'). Defaults to 'Press Play to start'. Empty string hides it.",
+                    },
+                    "freezeUntilStart": {
+                        "type": "boolean",
+                        "description": "Freeze the game (Time.timeScale = 0) until the player presses Play. Defaults to true. Set false for a title card that overlays a scene already in motion (e.g. an attract/demo loop behind the menu).",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for StartMenu.cs. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared StartMenu.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_sound_effects",
+            "description": "Use this — not create_script / create_audio_source — to add SOUND EFFECTS: a vetted SoundEffects jukebox that SYNTHESIZES short retro blips at runtime (no imported .wav files needed) and plays them on demand, so a freshly-scaffolded game stops being silent. It auto-wires combat audio — it watches every Health and plays a 'hit' on damage and a 'death' on death — and exposes a static SoundEffects.Play(cue) for the rest. Hand-rolled SFX stalls on the asset problem (no clips to import, so the AI skips sound or references clips that don't exist); procedural generation always works in any project, and the synthesis (phase-accurate sweeps, per-sample envelopes, clean note boundaries) is easy to get subtly wrong by hand (clicks, clipping). Cues: 'jump', 'shoot', 'collect', 'levelup', 'hit', 'death', 'hurt'. Combat cues fire automatically; wire the others with one line where the event happens — e.g. SoundEffects.Play(\"jump\") in the jump code, Play(\"shoot\") on fire, Play(\"collect\") on pickup, Play(\"levelup\") on level up. ATOMIC: writes the vetted script (and ensures Health.cs, the type its combat hook reads), creates the SoundEffects object, and attaches the SoundEffects component automatically on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component, create_audio_source, or assign_audio_clip. Call once per scene.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the SoundEffects GameObject. Defaults to 'SoundEffects'. A second one is refused (reuse via the static SoundEffects.Play).",
+                    },
+                    "volume": {
+                        "type": "number",
+                        "description": "Master volume for every cue, 0..1. Defaults to 0.5.",
+                    },
+                    "autoHookCombat": {
+                        "type": "boolean",
+                        "description": "Automatically play 'hit' when any Health takes damage and 'death' when one dies. Defaults to true. Set false to drive every cue manually via SoundEffects.Play(cue).",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for the generated scripts. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared SoundEffects.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_hit_vfx",
+            "description": "Use this — not create_script — to add HIT VFX: a vetted HitVFX system that pops a particle burst where a hit lands and where something dies — the spark that makes a hit read as CONNECTING (the visual half of 'juice' alongside create_screen_shake). It builds its own ParticleSystem at runtime (no art, no prefab) and auto-wires combat — it watches every Health and bursts on damage (small) and on death (big) — and composes with create_screen_shake (nudges CameraShake on each burst if one is present, via reflection, so there's no hard dependency). A runtime particle burst with no imported material reliably renders pink/invisible (the default ParticleSystem material isn't pipeline-safe); the vetted HitVFX builds a Sprites/Default material with a generated soft-dot texture that renders in both URP and the built-in pipeline, and reuses one pooled system instead of leaking a GameObject per hit. Trigger a manual burst with the static HitVFX.Burst(transform.position) (or HitVFX.Burst(point, 2f) for a bigger pop). ATOMIC: writes the vetted script (and ensures Health.cs, the type its combat hook reads), creates the HitVFX object, and attaches the HitVFX component automatically on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component. Call once per scene.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the HitVFX GameObject. Defaults to 'HitVFX'. A second one is refused (reuse via the static HitVFX.Burst).",
+                    },
+                    "colorHex": {
+                        "type": "string",
+                        "description": "Hex color of the spark, e.g. '#FFD27F' (warm) or '#66CCFF' (cool). Defaults to '#FFD27F'. An unparseable value falls back to warm white.",
+                    },
+                    "autoHookCombat": {
+                        "type": "boolean",
+                        "description": "Automatically burst when any Health takes damage (small) or dies (big). Defaults to true. Set false to drive bursts manually via HitVFX.Burst(position).",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for the generated scripts. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared HitVFX.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "modify_script",
             "description": "Modify an existing text-based asset file (.cs, .shader, .compute, etc.). File MUST exist in the project — verify in Unity context first. Provide the complete file content including all existing code. SAFETY: the bridge refuses modify_script against scripts the agentic loop did NOT create in this session unless confirmExistingFileModification=true is set. Set the flag ONLY when the user explicitly named the file (e.g. 'update PlayerMovement.cs') or used language like 'extend' / 'modify the existing X'. Absent that signal, do NOT set the flag and do NOT call modify_script — call create_script with a new path for fresh-scaffold prompts.",
             "parameters": {

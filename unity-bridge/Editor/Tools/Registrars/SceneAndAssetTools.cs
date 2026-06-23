@@ -73,6 +73,10 @@ namespace GladeAgenticAI.Services
             Register(new CreateScreenShakeTool());
             Register(new CreateLevelSystemTool());
             Register(new CreateLootDropTool());
+            Register(new CreatePauseMenuTool());
+            Register(new CreateMainMenuTool());
+            Register(new CreateSoundEffectsTool());
+            Register(new CreateHitVfxTool());
             Register(new ModifyScriptTool());
 
             // Assets

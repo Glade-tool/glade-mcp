@@ -1,0 +1,191 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;     // InputSystemUIInputModule — what makes the buttons clickable
+
+// A self-contained START / TITLE SCREEN: on play it FREEZES the game
+// (Time.timeScale = 0) and shows a full-screen title with a Play and a Quit button.
+// Press Play and the menu tears itself down and un-freezes the game — so the player
+// starts on a title card instead of being dropped straight into a moving scene. It
+// builds its own Canvas, buttons and EventSystem at runtime (no art, no extra scene,
+// no Build Settings surgery).
+//
+// Why an in-scene overlay instead of a separate menu scene: a scaffolded start screen
+// that lives in its OWN scene needs both scenes saved AND added to Build Settings, or
+// Play does nothing — a brittle, multi-step setup. Freezing the live scene behind an
+// overlay gives the same "title → game" flow immediately, in any scene, with no build
+// configuration. (For a true multi-scene menu, save a menu scene and load the gameplay
+// scene with SceneManager.LoadScene from Play() instead.)
+//
+// Why a vetted template: hand-rolled title screens reliably ship the same bugs — they
+// forget the EventSystem / input module so Play is unclickable; they don't actually
+// freeze the game, so it plays out behind the menu; or they disable the menu without
+// restoring timeScale, leaving the game frozen after Play.
+//
+// Reach it from gameplay code without a reference via the static Instance:
+//     StartMenu.Instance?.Play();   // e.g. start on any key, not just the button
+[DisallowMultipleComponent]
+public class StartMenu : MonoBehaviour
+{
+    public static StartMenu Instance { get; private set; }
+
+    [Tooltip("Big title shown on the start screen.")]
+    public string title = "My Game";
+
+    [Tooltip("Smaller line under the title (e.g. a controls hint). Empty hides it.")]
+    public string subtitle = "Press Play to start";
+
+    [Tooltip("Freeze the game (Time.timeScale = 0) until the player presses Play.")]
+    public bool freezeUntilStart = true;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+
+        EnsureEventSystem();
+        BuildMenu();
+        if (freezeUntilStart) Time.timeScale = 0f;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    // ── Public API ─────────────────────────────────────────────────────────────
+
+    // Dismiss the title screen and run the game. Always restores timeScale, then
+    // destroys this object — taking its title Canvas (a child) down with it.
+    public void Play()
+    {
+        Time.timeScale = 1f;
+        Destroy(gameObject);
+    }
+
+    public void Quit()
+    {
+        Time.timeScale = 1f;
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    // ── UI (built at runtime so the menu is fully self-contained) ──────────────
+
+    // Buttons are dead without an EventSystem + input module. Build one (matching the
+    // new Input System backend) only if the scene has none, so we never duplicate it.
+    private void EnsureEventSystem()
+    {
+        if (Object.FindFirstObjectByType<EventSystem>() != null) return;
+        var es = new GameObject("EventSystem");
+        es.AddComponent<EventSystem>();
+        var module = es.AddComponent<InputSystemUIInputModule>();
+        module.AssignDefaultActions(); // wire the built-in UI actions (point/click/navigate)
+    }
+
+    private void BuildMenu()
+    {
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        var canvasGo = new GameObject("Start Menu Canvas");
+        canvasGo.transform.SetParent(transform, false);
+        var canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 100;   // draw above any gameplay HUD behind the title card
+        var scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        canvasGo.AddComponent<GraphicRaycaster>(); // without this the buttons receive no clicks
+
+        // Full-screen opaque backdrop so the live scene doesn't show through the title.
+        var bg = new GameObject("Backdrop");
+        bg.transform.SetParent(canvas.transform, false);
+        var bgImg = bg.AddComponent<Image>();
+        bgImg.color = new Color(0.06f, 0.07f, 0.10f, 1f);
+        var br = bgImg.rectTransform;
+        br.anchorMin = Vector2.zero;
+        br.anchorMax = Vector2.one;
+        br.offsetMin = Vector2.zero;
+        br.offsetMax = Vector2.zero;
+
+        var titleLabel = MakeLabel(canvas.transform, font, title,
+            new Vector2(0.5f, 0.5f), new Vector2(0f, 220f), TextAnchor.MiddleCenter);
+        titleLabel.fontSize = 96;
+        titleLabel.rectTransform.sizeDelta = new Vector2(1200f, 160f);
+
+        if (!string.IsNullOrEmpty(subtitle))
+        {
+            var sub = MakeLabel(canvas.transform, font, subtitle,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), TextAnchor.MiddleCenter);
+            sub.fontSize = 34;
+            sub.color = new Color(1f, 1f, 1f, 0.75f);
+            sub.rectTransform.sizeDelta = new Vector2(900f, 60f);
+        }
+
+        MakeButton(canvas.transform, font, "Play", new Vector2(0f, 0f), Play);
+        MakeButton(canvas.transform, font, "Quit", new Vector2(0f, -84f), Quit);
+    }
+
+    private Button MakeButton(Transform parent, Font font, string label, Vector2 anchoredPos,
+                              UnityEngine.Events.UnityAction onClick)
+    {
+        var go = new GameObject(label + " Button");
+        go.transform.SetParent(parent, false);
+        var img = go.AddComponent<Image>();
+        var rect = img.rectTransform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(320f, 64f);
+        rect.anchoredPosition = anchoredPos;
+
+        var btn = go.AddComponent<Button>();
+        btn.targetGraphic = img;
+        var colors = btn.colors;
+        colors.normalColor = new Color(1f, 1f, 1f, 0.14f);
+        colors.highlightedColor = new Color(1f, 1f, 1f, 0.30f);
+        colors.pressedColor = new Color(1f, 1f, 1f, 0.48f);
+        colors.selectedColor = new Color(1f, 1f, 1f, 0.30f);
+        colors.fadeDuration = 0.08f;
+        btn.colors = colors;
+        img.color = colors.normalColor;
+        if (onClick != null) btn.onClick.AddListener(onClick);
+
+        // Label fills the button so it stays centered at any resolution.
+        var text = MakeLabel(go.transform, font, label, new Vector2(0.5f, 0.5f), Vector2.zero, TextAnchor.MiddleCenter);
+        text.fontSize = 30;
+        var tr = text.rectTransform;
+        tr.anchorMin = Vector2.zero;
+        tr.anchorMax = Vector2.one;
+        tr.offsetMin = Vector2.zero;
+        tr.offsetMax = Vector2.zero;
+        return btn;
+    }
+
+    private Text MakeLabel(Transform parent, Font font, string text, Vector2 anchor,
+                           Vector2 anchoredPos, TextAnchor align)
+    {
+        var go = new GameObject("Label");
+        go.transform.SetParent(parent, false);
+        var label = go.AddComponent<Text>();
+        label.font = font;
+        label.text = text;
+        label.fontSize = 32;
+        label.alignment = align;
+        label.color = Color.white;
+        label.horizontalOverflow = HorizontalWrapMode.Overflow;
+        label.verticalOverflow = VerticalWrapMode.Overflow;
+
+        var rect = label.rectTransform;
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = anchor;
+        rect.sizeDelta = new Vector2(400f, 60f);
+        rect.anchoredPosition = anchoredPos;
+        return label;
+    }
+}
