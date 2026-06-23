@@ -1,0 +1,182 @@
+using System.Collections.Generic;
+using System.Globalization;
+using UnityEngine;
+
+// A MOVING PLATFORM that travels a fixed route at constant speed and CARRIES the
+// player standing on it — the core verticality verb of a platformer (elevators,
+// patrolling ledges, gap-crossers).
+//
+// Two things hand-written moving platforms reliably get wrong, both handled here:
+//
+//   1. MOTION. The platform is driven by a KINEMATIC Rigidbody via MovePosition in
+//      FixedUpdate (not transform writes in Update). That keeps it in lockstep with
+//      the physics step a CharacterController/Rigidbody player is also simulated on,
+//      so the player never jitters or sinks through on a fast platform.
+//
+//   2. CARRY. Unity does NOT auto-carry a player on a moving platform. A
+//      CharacterController slides off a platform that moves out from under it, and a
+//      kinematic platform transfers no friction. The robust fix is to PARENT the
+//      player to the platform while it stands on top, then restore its original
+//      parent on exit — so the player inherits the platform's motion exactly. We
+//      detect "standing on top" with a trigger zone built procedurally just above the
+//      surface (a CharacterController fires trigger events against a kinematic body),
+//      not OnCollisionEnter (which a CharacterController does not reliably raise on
+//      the other collider).
+//
+// loopMode covers the three real cases: "loop" (run the route start→end→start…),
+// "pingpong" (bounce end-to-end), "once" (travel the route then stop). Because the
+// platform always MoveTowards its next waypoint, even "loop" travels back smoothly
+// rather than teleporting.
+[DisallowMultipleComponent]
+public class MovingPlatform : MonoBehaviour
+{
+    [Tooltip("Waypoints as LOCAL offsets from the platform's start, \"x,y,z;x,y,z;...\". " +
+             "The first point is the start; needs at least two points to move.")]
+    public string route = "0,0,0;4,0,0";
+
+    [Tooltip("Travel speed in units per second.")]
+    public float speed = 2f;
+
+    [Tooltip("loop | pingpong | once")]
+    public string loopMode = "loop";
+
+    [Tooltip("Seconds to pause at each endpoint (pingpong / once).")]
+    public float waitTime = 0f;
+
+    private readonly List<Vector3> _points = new List<Vector3>();
+    private Vector3 _origin;       // world position the offsets are measured from
+    private int _index;            // waypoint we're currently moving toward
+    private int _dir = 1;          // +1 forward, -1 back (pingpong)
+    private float _wait;
+    private Rigidbody _rb;         // kinematic body moved via MovePosition, if present
+
+    private Transform _rider;          // the player we're carrying, if any
+    private Transform _riderOldParent; // where to put it back on exit
+
+    private void Awake()
+    {
+        _origin = transform.position;
+        ParseRoute();
+
+        _rb = GetComponent<Rigidbody>();
+        if (_rb != null) _rb.isKinematic = true; // platforms are driven, not simulated
+
+        // Snap to the first waypoint so we don't lurch on the first frame.
+        SetPosition(_origin + _points[0]);
+        _index = _points.Count > 1 ? 1 : 0;
+
+        BuildRiderZone();
+    }
+
+    private void FixedUpdate()
+    {
+        if (_points.Count < 2) return;
+        if (_wait > 0f) { _wait -= Time.fixedDeltaTime; return; }
+
+        Vector3 cur = _rb != null ? _rb.position : transform.position;
+        Vector3 target = _origin + _points[_index];
+        Vector3 next = Vector3.MoveTowards(cur, target, speed * Time.fixedDeltaTime);
+        SetPosition(next);
+
+        if ((next - target).sqrMagnitude <= 1e-6f) Advance();
+    }
+
+    // Drive a kinematic Rigidbody (carries resting bodies, physics-synced) when one
+    // exists; fall back to the transform for a platform that has no Rigidbody.
+    private void SetPosition(Vector3 p)
+    {
+        if (_rb != null) _rb.MovePosition(p);
+        else transform.position = p;
+    }
+
+    private void Advance()
+    {
+        int last = _points.Count - 1;
+        switch ((loopMode ?? "loop").ToLowerInvariant())
+        {
+            case "pingpong":
+                if (_index >= last) { _dir = -1; _wait = waitTime; }
+                else if (_index <= 0) { _dir = 1; _wait = waitTime; }
+                _index = Mathf.Clamp(_index + _dir, 0, last);
+                break;
+            case "once":
+                if (_index >= last) { _wait = waitTime; enabled = false; return; }
+                _index++;
+                break;
+            default: // "loop" — wrap to the start (MoveTowards still travels there smoothly)
+                _index = _index >= last ? 0 : _index + 1;
+                break;
+        }
+    }
+
+    // ── Carry by parenting ────────────────────────────────────────────────────
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (_rider != null || !IsPlayer(other)) return;
+        _rider = other.transform;
+        _riderOldParent = _rider.parent;
+        _rider.SetParent(transform, true); // keep world position
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (_rider == null || other.transform != _rider) return;
+        _rider.SetParent(_riderOldParent, true);
+        _rider = null;
+    }
+
+    private static bool IsPlayer(Collider c)
+    {
+        if (c.CompareTag("Player")) return true;
+        return c.GetComponentInParent<CharacterController>() != null;
+    }
+
+    // Add a trigger box sitting ~0.5 world units above the platform surface, sized
+    // to the solid collider but normalized by world scale so a thin platform still
+    // gets a ~1-unit-tall detection volume. Procedural so the scaffolder only has to
+    // build a plain cube — the vetted geometry lives here.
+    private void BuildRiderZone()
+    {
+        var solid = GetComponent<BoxCollider>();
+        var zone = gameObject.AddComponent<BoxCollider>();
+        zone.isTrigger = true;
+
+        Vector3 ls = transform.lossyScale;
+        float invY = 1f / Mathf.Max(0.01f, Mathf.Abs(ls.y));
+        if (solid != null)
+        {
+            float topLocal = solid.center.y + solid.size.y * 0.5f;
+            zone.size = new Vector3(solid.size.x * 0.95f, invY, solid.size.z * 0.95f);
+            zone.center = new Vector3(solid.center.x, topLocal + 0.5f * invY, solid.center.z);
+        }
+        else
+        {
+            zone.size = new Vector3(0.95f, invY, 0.95f);
+            zone.center = new Vector3(0f, 0.5f + 0.5f * invY, 0f);
+        }
+    }
+
+    private void ParseRoute()
+    {
+        _points.Clear();
+        if (!string.IsNullOrEmpty(route))
+        {
+            foreach (var chunk in route.Split(';'))
+            {
+                var parts = chunk.Split(',');
+                if (parts.Length < 3) continue;
+                if (float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float px) &&
+                    float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float py) &&
+                    float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float pz))
+                    _points.Add(new Vector3(px, py, pz));
+            }
+        }
+        if (_points.Count < 2)
+        {
+            _points.Clear();
+            _points.Add(Vector3.zero);
+            _points.Add(new Vector3(4f, 0f, 0f));
+        }
+    }
+}

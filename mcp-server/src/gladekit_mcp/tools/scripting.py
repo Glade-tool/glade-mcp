@@ -331,6 +331,141 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "create_moving_platform",
+            "description": "Use this — not create_script — to add a MOVING PLATFORM (elevator / patrolling ledge / gap-crosser): a flat kinematic box that travels a waypoint route at constant speed and CARRIES the player standing on it. The core verticality verb of a platformer. Hand-written moving platforms are reliably buggy (a CharacterController slides off; a transform-driven platform the physics step never sees; no platform-friction carry at all); the vetted MovingPlatform.cs drives a kinematic Rigidbody via MovePosition and carries the rider by parenting it while it stands on top. ATOMIC: it writes the vetted script, builds the box + kinematic Rigidbody, and attaches the MovingPlatform component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component. Waypoints are LOCAL offsets from where the platform is placed. Call repeatedly to place many platforms (the script is shared; each object gets a unique name). Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the platform GameObject. Defaults to 'MovingPlatform'. A numeric suffix is added if the name is taken.",
+                    },
+                    "x": {"type": "number", "description": "World X of the platform's start position. Defaults to 0."},
+                    "y": {"type": "number", "description": "World Y of the platform's start position. Defaults to 1."},
+                    "z": {"type": "number", "description": "World Z of the platform's start position. Defaults to 0."},
+                    "route": {
+                        "type": "string",
+                        "description": "Waypoints as LOCAL offsets from the start, formatted 'x,y,z;x,y,z;...'. The first point is the start; needs at least two points. Example: '0,0,0;0,4,0' for a vertical elevator. Defaults to '0,0,0;4,0,0' (a short horizontal sweep).",
+                    },
+                    "speed": {"type": "number", "description": "Travel speed in units per second. Defaults to 2."},
+                    "loopMode": {
+                        "type": "string",
+                        "enum": ["loop", "pingpong", "once"],
+                        "description": "How the platform repeats its route: 'loop' (run start→end→start…), 'pingpong' (bounce end to end), 'once' (travel then stop). Defaults to 'loop'.",
+                    },
+                    "waitTime": {
+                        "type": "number",
+                        "description": "Seconds to pause at each endpoint (pingpong/once). Defaults to 0.",
+                    },
+                    "width": {"type": "number", "description": "Platform width (X) in world units. Defaults to 3."},
+                    "depth": {"type": "number", "description": "Platform depth (Z) in world units. Defaults to 3."},
+                    "thickness": {
+                        "type": "number",
+                        "description": "Platform thickness (Y) in world units. Defaults to 0.4.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared MovingPlatform.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_screen_shake",
+            "description": "Use this — not create_script — to add trauma-based SCREEN SHAKE to the camera: writes a vetted CameraShake script and attaches it to the main camera (found, or created if the scene has none). The other half of 'juice' alongside hit VFX — a camera kick on impact/landing/death makes a hit feel like it connected. Hand-written shake is reliably bad (per-frame random jitter that reads as static; intensity-linear shake that can't be both subtle and violent; shake that never decays; shake that fights a following camera). The vetted CameraShake.cs is trauma-based (shake = trauma squared), smooth-noise driven, self-decaying, and RECOVERS the follow pose each frame so it composes with FollowCamera instead of fighting it. Trigger it from gameplay code with 'CameraShake.Shake(0.5f);' (0..1). ATOMIC: writes the script and attaches the CameraShake component on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component. Call once per scene. Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "cameraName": {
+                        "type": "string",
+                        "description": "Name of the camera object to shake. Defaults to the main camera (Camera.main, then any camera, else a new one is created). Pass a name only to target a specific non-main camera.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for CameraShake.cs. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared CameraShake.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_level_system",
+            "description": "Use this — not create_script — to add the PROGRESSION hub: a LevelSystem that tracks XP and LEVEL, levels the player up when XP fills, grows the player's max health (and heals to full) on each level up, and builds its own on-screen HUD (a level readout + XP bar). The counterpart to create_game_manager's score/lives — the part that makes the game worth continuing to play. Hand-written XP/level systems reliably ship bugs (XP that doesn't roll over on a big reward, a bar that divides by zero at the cap, growth that fights whichever object inits first); the vetted LevelSystem.cs avoids those and exposes a static LevelSystem.Instance so gameplay code reaches it without a reference (LevelSystem.Instance?.AddXP(5)). ATOMIC: writes the vetted script (and ensures Health.cs, the stat it grows), creates the LevelSystem object, and attaches the LevelSystem component automatically on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component. Call once per scene; pair with create_loot_drop so enemies feed it XP. Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the LevelSystem GameObject. Defaults to 'LevelSystem'. A second LevelSystem is refused (reuse the existing one via LevelSystem.Instance).",
+                    },
+                    "baseXP": {
+                        "type": "integer",
+                        "description": "XP required to go from level 1 to level 2. Defaults to 5.",
+                    },
+                    "xpGrowth": {
+                        "type": "integer",
+                        "description": "Extra XP each subsequent level needs over the previous one (a gentle ramp). Defaults to 3.",
+                    },
+                    "healthPerLevel": {
+                        "type": "integer",
+                        "description": "Max health added to the player on each level up (then healed to full). Defaults to 1. Set 0 to disable health growth (e.g. if you grow other stats via the OnLevelUp broadcast).",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for the generated scripts. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared LevelSystem.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_loot_drop",
+            "description": "Use this — not create_script — to make an object GRANT XP WHEN IT DIES: turns an enemy (or any Health-bearing destructible) into a source of progression, so killing it levels the player up. Closes the progression loop alongside create_level_system. The reliable way to reward a kill is to hook the object's Health.onDeath (fires once, right before destroy) — not to poll or bake the reward into the killer; the vetted LootDrop.cs does exactly that and no-ops cleanly when no LevelSystem is present. ATOMIC: writes the vetted script (and ensures Health.cs + the LevelSystem.cs contract it feeds) and attaches the LootDrop component to the target on the next compile — your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_level_system too, or the XP has nowhere to land. Call repeatedly to reward many enemies. Currently 3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target": {
+                        "type": "string",
+                        "description": "Name (or tag) of the object that should grant XP on death. Defaults to 'Enemy'. Must already exist; RequireComponent adds a Health if it has none, but use create_enemy / create_health for real hit points.",
+                    },
+                    "xp": {
+                        "type": "integer",
+                        "description": "XP granted to the player's LevelSystem when the target dies. Defaults to 3.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) for the generated scripts. Defaults to 'Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared LootDrop.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "modify_script",
             "description": "Modify an existing text-based asset file (.cs, .shader, .compute, etc.). File MUST exist in the project — verify in Unity context first. Provide the complete file content including all existing code. SAFETY: the bridge refuses modify_script against scripts the agentic loop did NOT create in this session unless confirmExistingFileModification=true is set. Set the flag ONLY when the user explicitly named the file (e.g. 'update PlayerMovement.cs') or used language like 'extend' / 'modify the existing X'. Absent that signal, do NOT set the flag and do NOT call modify_script — call create_script with a new path for fresh-scaffold prompts.",
             "parameters": {

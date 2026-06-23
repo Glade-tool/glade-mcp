@@ -1,0 +1,110 @@
+using UnityEngine;
+
+// Trauma-based camera shake (the "Art of Screenshake" approach) — the other half of
+// "juice" alongside hit VFX. A camera kick on impact, landing, or death is what
+// makes a hit feel like it connected.
+//
+// Hand-written shake is reliably bad in four specific ways, all avoided here:
+//   (a) pure per-frame random jitter reads as cheap static, not a kick — this uses
+//       smooth Perlin noise instead;
+//   (b) shake linear in intensity can't be both a subtle footstep and a violent
+//       explosion — this is TRAUMA-based (visible shake = trauma SQUARED);
+//   (c) shake that never decays, or decays per-frame — this decays to zero on its
+//       own in real time;
+//   (d) shaking a camera that is ALSO being moved by a follow script fights it —
+//       this RECOVERS the follow's pose each frame and layers the shake on top.
+//
+// The compose trick (d): the script runs in LateUpdate AFTER a follow script (high
+// execution order). Each frame it figures out the camera's true base pose — if
+// nothing moved the transform since we last wrote it, the base is current-minus-our-
+// offset (a static camera); if something did (a follow script set a fresh pose), the
+// base is the current transform. Then it adds a transient offset/roll on top. So it
+// works on a fixed camera AND on a camera being driven by FollowCamera, with no rig
+// restructuring.
+//
+// Trigger from anywhere in gameplay code:
+//     CameraShake.Shake(0.5f);   // 0..1, bigger = harder kick
+// Call it on a hit, a death, a hard landing, or where you spawn explosion VFX.
+[DisallowMultipleComponent]
+[DefaultExecutionOrder(100)] // run after a follow script's LateUpdate
+public class CameraShake : MonoBehaviour
+{
+    // The active shaker, so gameplay code can kick the camera without a reference.
+    public static CameraShake Instance { get; private set; }
+
+    [Tooltip("Trauma lost per second — the shake fades out over roughly 1/decay seconds.")]
+    public float decay = 1.6f;
+
+    [Tooltip("Positional kick in world units at full trauma.")]
+    public float maxOffset = 0.35f;
+
+    [Tooltip("Roll in degrees at full trauma.")]
+    public float maxRoll = 4f;
+
+    [Tooltip("How fast the noise is sampled — higher is busier.")]
+    public float frequency = 22f;
+
+    private float _trauma;
+    private float _seed;
+    private Vector3 _lastPosOffset;
+    private Quaternion _lastRotOffset = Quaternion.identity;
+    private Vector3 _expectedPos;
+    private Quaternion _expectedRot = Quaternion.identity;
+    private bool _primed;
+
+    private void Awake()
+    {
+        Instance = this;
+        _seed = Random.value * 100f;
+    }
+
+    private void OnEnable() { Instance = this; }
+    private void OnDestroy() { if (Instance == this) Instance = null; }
+
+    // Add trauma (0..1). Stacks, so rapid calls build up and decay together.
+    public void AddTrauma(float amount) { _trauma = Mathf.Clamp01(_trauma + amount); }
+
+    // Convenience: shake the active camera from anywhere. No-ops if no CameraShake
+    // is in the scene, so gameplay code can call it unconditionally.
+    public static void Shake(float amount = 0.5f)
+    {
+        if (Instance != null) Instance.AddTrauma(amount);
+    }
+
+    private void LateUpdate()
+    {
+        // Recover the base pose (see header note (d)).
+        Vector3 basePos = transform.position;
+        if (_primed && (transform.position - _expectedPos).sqrMagnitude < 1e-6f)
+            basePos = transform.position - _lastPosOffset;
+
+        Quaternion baseRot = transform.rotation;
+        if (_primed && Quaternion.Angle(transform.rotation, _expectedRot) < 0.01f)
+            baseRot = transform.rotation * Quaternion.Inverse(_lastRotOffset);
+
+        Vector3 posOffset = Vector3.zero;
+        Quaternion rotOffset = Quaternion.identity;
+        if (_trauma > 0f)
+        {
+            _trauma = Mathf.Max(0f, _trauma - decay * Time.deltaTime);
+            float power = _trauma * _trauma; // squared: small hits barely move, big hits kick
+            float t = Time.time * frequency;
+            float nx = Mathf.PerlinNoise(_seed, t) * 2f - 1f;
+            float ny = Mathf.PerlinNoise(_seed + 11f, t) * 2f - 1f;
+            float nr = Mathf.PerlinNoise(_seed + 23f, t) * 2f - 1f;
+            // Offset in the camera's LOCAL frame so the kick always reads on-screen,
+            // then roll around the view (local forward).
+            posOffset = baseRot * new Vector3(nx, ny, 0f) * (maxOffset * power);
+            rotOffset = Quaternion.Euler(0f, 0f, nr * maxRoll * power);
+        }
+
+        transform.position = basePos + posOffset;
+        transform.rotation = baseRot * rotOffset;
+
+        _lastPosOffset = posOffset;
+        _lastRotOffset = rotOffset;
+        _expectedPos = transform.position;
+        _expectedRot = transform.rotation;
+        _primed = true;
+    }
+}

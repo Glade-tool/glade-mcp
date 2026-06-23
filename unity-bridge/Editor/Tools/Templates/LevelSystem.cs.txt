@@ -1,0 +1,189 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+// The PROGRESSION hub: tracks XP and LEVEL, levels the player up when XP fills, and
+// makes leveling MEANINGFUL by growing the player's max health (and healing to full)
+// on each level up. Builds + drives its own on-screen HUD (a "Lv N" readout and an XP
+// bar). The counterpart to GameManager's score/lives — this is the part that makes the
+// game worth continuing to play.
+//
+// Reach it from anywhere WITHOUT a hard reference, via the static Instance — the Unity
+// counterpart of a Godot autoload/group:
+//     LevelSystem.Instance?.AddXP(5);   // an enemy was defeated / loot was collected
+// The LootDrop template calls exactly this.
+//
+// Leveling model:
+//   - XP to reach the next level = baseXP + (level-1)*xpGrowth (a gentle ramp).
+//   - On level up: surplus XP carries over, the player's max health grows by
+//     healthPerLevel and the player is healed to full, and OnLevelUp(level) is
+//     broadcast to the player (SendMessage, DontRequireReceiver) so custom growth
+//     (damage, speed, …) can hook in without this script hard-coding it.
+[DisallowMultipleComponent]
+public class LevelSystem : MonoBehaviour
+{
+    // Single point of contact for gameplay code. Set in Awake; a second system
+    // destroys itself so two HUDs can never fight.
+    public static LevelSystem Instance { get; private set; }
+
+    [Tooltip("XP required to go from level 1 to level 2.")]
+    public int baseXP = 5;
+
+    [Tooltip("Extra XP each subsequent level needs over the previous one.")]
+    public int xpGrowth = 3;
+
+    [Tooltip("Max health added to the player on each level up (then healed to full). 0 disables the health growth.")]
+    public int healthPerLevel = 1;
+
+    public int Level { get; private set; }
+    public int XP { get; private set; }        // XP earned into the current level
+    public int XPToNext { get; private set; }
+
+    private Transform player;
+    private Health playerHealth;
+
+    private Text levelLabel;
+    private RectTransform xpFill;
+    private float xpBarWidth;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+        Level = 1;
+        XP = 0;
+        XPToNext = Mathf.Max(1, baseXP);
+        CapturePlayer();
+        BuildHud();
+        RefreshHud();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    // Grant XP. Rolls over as many levels as the amount covers (a big reward can
+    // level you up more than once).
+    public void AddXP(int amount)
+    {
+        if (amount <= 0) return;
+        XP += amount;
+        while (XP >= XPToNext)
+        {
+            XP -= XPToNext;
+            LevelUp();
+        }
+        RefreshHud();
+    }
+
+    private void LevelUp()
+    {
+        Level++;
+        XPToNext = Mathf.Max(1, baseXP + (Level - 1) * xpGrowth);
+
+        if (playerHealth == null) CapturePlayer();
+        if (playerHealth != null && healthPerLevel > 0)
+        {
+            playerHealth.maxHealth += healthPerLevel;
+            playerHealth.Heal(playerHealth.maxHealth); // top up to the new maximum
+        }
+
+        // Broadcast so a controller/shooter can grow its own stats if it wants to,
+        // without this script depending on those types.
+        if (player != null)
+            player.SendMessage("OnLevelUp", Level, SendMessageOptions.DontRequireReceiver);
+    }
+
+    private void CapturePlayer()
+    {
+        GameObject go = null;
+        try { go = GameObject.FindWithTag("Player"); }
+        catch { /* 'Player' tag not defined in this project */ }
+        if (go == null) go = GameObject.Find("Player");
+        if (go == null) return;
+
+        player = go.transform;
+        playerHealth = go.GetComponent<Health>();
+    }
+
+    private void RefreshHud()
+    {
+        if (levelLabel != null) levelLabel.text = "Lv " + Level;
+        if (xpFill != null)
+        {
+            float frac = XPToNext > 0 ? Mathf.Clamp01((float)XP / XPToNext) : 0f;
+            xpFill.sizeDelta = new Vector2(xpBarWidth * frac, xpFill.sizeDelta.y);
+        }
+    }
+
+    // ── HUD (built at runtime so the system is fully self-contained) ───────────
+
+    private void BuildHud()
+    {
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        var canvasGo = new GameObject("Level HUD Canvas");
+        canvasGo.transform.SetParent(transform, false);
+        var canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        var scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+        const float barW = 360f, barH = 20f;
+        xpBarWidth = barW;
+
+        // XP bar background, top-center. An Image with no sprite draws a solid color
+        // quad, so the bar needs no art and renders in any pipeline.
+        var bgGo = new GameObject("XP Bar");
+        bgGo.transform.SetParent(canvas.transform, false);
+        var bg = bgGo.AddComponent<Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.5f);
+        var bgRect = bg.rectTransform;
+        bgRect.anchorMin = new Vector2(0.5f, 1f);
+        bgRect.anchorMax = new Vector2(0.5f, 1f);
+        bgRect.pivot = new Vector2(0.5f, 1f);
+        bgRect.sizeDelta = new Vector2(barW, barH);
+        bgRect.anchoredPosition = new Vector2(0f, -18f);
+
+        // Fill — left-anchored child whose WIDTH tracks the XP fraction.
+        var fillGo = new GameObject("Fill");
+        fillGo.transform.SetParent(bgGo.transform, false);
+        var fill = fillGo.AddComponent<Image>();
+        fill.color = new Color(0.3f, 0.85f, 1f, 1f);
+        xpFill = fill.rectTransform;
+        xpFill.anchorMin = new Vector2(0f, 0.5f);
+        xpFill.anchorMax = new Vector2(0f, 0.5f);
+        xpFill.pivot = new Vector2(0f, 0.5f);
+        xpFill.sizeDelta = new Vector2(barW, barH);
+        xpFill.anchoredPosition = Vector2.zero;
+
+        levelLabel = MakeLabel(canvas.transform, font, "Lv 1",
+            new Vector2(0.5f, 1f), new Vector2(0f, -46f), TextAnchor.UpperCenter);
+        levelLabel.fontSize = 28;
+    }
+
+    private Text MakeLabel(Transform parent, Font font, string text, Vector2 anchor,
+                           Vector2 anchoredPos, TextAnchor align)
+    {
+        var go = new GameObject("Label");
+        go.transform.SetParent(parent, false);
+        var label = go.AddComponent<Text>();
+        label.font = font;
+        label.text = text;
+        label.fontSize = 32;
+        label.alignment = align;
+        label.color = Color.white;
+        label.horizontalOverflow = HorizontalWrapMode.Overflow;
+        label.verticalOverflow = VerticalWrapMode.Overflow;
+
+        var rect = label.rectTransform;
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = anchor;
+        rect.sizeDelta = new Vector2(400f, 60f);
+        rect.anchoredPosition = anchoredPos;
+        return label;
+    }
+}

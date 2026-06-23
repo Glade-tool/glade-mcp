@@ -1,0 +1,29 @@
+using UnityEngine;
+
+// Grants XP to the LevelSystem when the object this is on DIES — turning enemies (or
+// any Health-bearing destructible) into a source of progression, so killing things
+// actually levels the player up.
+//
+// It hooks the object's Health.onDeath, so the reward fires exactly once, right before
+// the object is destroyed — no Update polling, no double-counting. Loosely coupled: it
+// needs no reference INTO the killer or the LevelSystem beyond the static
+// LevelSystem.Instance (which the LootDrop quietly no-ops against if no LevelSystem is
+// in the scene).
+[RequireComponent(typeof(Health))]
+[DisallowMultipleComponent]
+public class LootDrop : MonoBehaviour
+{
+    [Tooltip("XP granted to the player's LevelSystem when this object dies.")]
+    public int xp = 3;
+
+    private void Awake()
+    {
+        var health = GetComponent<Health>();
+        if (health != null) health.onDeath.AddListener(GrantXP);
+    }
+
+    private void GrantXP()
+    {
+        if (LevelSystem.Instance != null) LevelSystem.Instance.AddXP(xp);
+    }
+}
