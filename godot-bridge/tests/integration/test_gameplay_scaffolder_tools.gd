@@ -171,3 +171,59 @@ func test_create_third_person_controller_reuses_existing_scripts() -> void:
 	assert_true(second.success, "with both scripts present, the tool must reuse them and rebuild the player, not refuse: %s" % second.get("message", ""))
 	assert_ne(str(second.get("error", "")).find("Refused to overwrite"), 0, "must not fail with a script-overwrite refusal")
 	assert_not_null(EditorInterface.get_edited_scene_root().find_child(PLAYER_3D, false, false), "player node should be rebuilt on the reuse path")
+
+
+# ── create_moving_platform — the carry invariant ──────────────────────────
+# The whole point of this tool is that the rider is an AnimatableBody (driven by
+# its OWN transform via the PathMover), NOT a StaticBody. A StaticBody — or a
+# body whose parent is moved instead of the body itself — does not report
+# platform velocity, so a CharacterBody player is left floating when the platform
+# reverses. These tests pin the AnimatableBody2D/3D rider + the correct
+# per-dimension mover script so a regression to "hand-rolled" geometry is caught.
+
+func test_create_moving_platform_3d_carry_uses_animatablebody3d() -> void:
+	var r := _run("create_moving_platform", {"space": "3d", "directory": TEST_DIR, "name": "_GKPlat3D"})
+	assert_true(r.success, "3D moving platform should build: %s" % r.get("message", ""))
+	assert_eq(r.get("space", ""), "3d", "response should report 3d space")
+	assert_eq(str(r.get("created_script", "")), TEST_DIR + "/path_mover_3d.gd", "3D uses the 3D mover script")
+	assert_true(FileAccess.file_exists(TEST_DIR + "/path_mover_3d.gd"), "path_mover_3d.gd should be written")
+
+	var root := EditorInterface.get_edited_scene_root()
+	var path := root.get_node_or_null("_GKPlat3D")
+	assert_true(path is Path3D, "the route node should be a Path3D")
+	var rider := root.get_node_or_null(str(r.get("rider", "")))
+	assert_true(rider is AnimatableBody3D, "rider MUST be an AnimatableBody3D (the carry invariant), not a StaticBody3D")
+	assert_true((rider as AnimatableBody3D).sync_to_physics, "sync_to_physics must be on so the player is carried")
+	# The mover drives the rider's OWN transform — it must NOT be parented under a
+	# separately-moved PathFollow node.
+	assert_true(rider.find_child("CollisionShape3D", false, false) is CollisionShape3D, "rider needs a CollisionShape3D")
+	var mover := root.get_node_or_null(str(r.get("mover", "")))
+	assert_not_null(mover, "PathMover node should exist")
+	assert_eq(str(mover.get("rider")), str(mover.get_path_to(rider)), "PathMover must drive the rider directly")
+
+
+func test_create_moving_platform_2d_carry_uses_animatablebody2d() -> void:
+	var r := _run("create_moving_platform", {"space": "2d", "directory": TEST_DIR, "name": "_GKPlat2D"})
+	assert_true(r.success, "2D moving platform should build: %s" % r.get("message", ""))
+	assert_eq(r.get("space", ""), "2d", "response should report 2d space")
+	assert_eq(str(r.get("created_script", "")), TEST_DIR + "/path_mover.gd", "2D uses the 2D mover script")
+
+	var root := EditorInterface.get_edited_scene_root()
+	assert_true(root.get_node_or_null("_GKPlat2D") is Path2D, "the route node should be a Path2D")
+	var rider := root.get_node_or_null(str(r.get("rider", "")))
+	assert_true(rider is AnimatableBody2D, "rider MUST be an AnimatableBody2D (the carry invariant), not a StaticBody2D")
+
+
+func test_create_moving_platform_3d_target_keeps_existing_node_script() -> void:
+	# A patrolling existing node: the tool drives its position, never its script.
+	var root := EditorInterface.get_edited_scene_root()
+	var enemy := CharacterBody3D.new()
+	enemy.name = "_GKPatrol3D"
+	root.add_child(enemy)
+	enemy.owner = root
+
+	var r := _run("create_moving_platform", {"space": "3d", "directory": TEST_DIR, "name": "_GKRoute3D", "target_path": "_GKPatrol3D"})
+	assert_true(r.success, "sending an existing Node3D along a route should succeed: %s" % r.get("message", ""))
+	var rider := root.get_node_or_null(str(r.get("rider", "")))
+	assert_eq(rider, enemy, "the existing node should be the rider")
+	assert_true(rider is CharacterBody3D, "the existing node's type is untouched (no AnimatableBody swap)")

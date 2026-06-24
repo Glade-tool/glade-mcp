@@ -518,25 +518,36 @@ TOOLS: List[Dict] = [
             "name": "create_moving_platform",
             "description": (
                 "Build a moving platform (or send an existing node patrolling a route) in one "
-                "call: a Path2D waypoint curve, a PathFollow2D that travels it at constant speed, "
-                "and a rider. The default rider is a scaffolded AnimatableBody2D platform that "
-                "CARRIES a CharacterBody2D player (a StaticBody2D would not); pass target_path to "
-                "send an existing node along instead, leaving its script intact. Writes a vetted "
-                "mover script once (reused across calls). 2D-only. loop_mode: loop / pingpong / once."
+                "call, in EITHER 2D or 3D: a Path waypoint curve, a vetted PathMover that drives "
+                "the rider along it at constant speed, and a rider. The default rider is a "
+                "scaffolded AnimatableBody (AnimatableBody2D/3D) platform that CARRIES a "
+                "CharacterBody player (a StaticBody would NOT — the player floats when the "
+                "platform reverses); pass target_path to send an existing node along instead, "
+                "leaving its script intact. Dimension is inferred from the open scene's root "
+                "(Node3D → 3D); pass space to override. ALWAYS use this for moving platforms — "
+                "do NOT hand-roll one with create_node + create_script + create_physics_body. "
+                "Writes a vetted mover script once (reused across calls). loop_mode: loop / "
+                "pingpong / once."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "space": {
+                        "type": "string",
+                        "enum": ["2d", "3d"],
+                        "description": "Dimension. Default: inferred from the open scene's root (Node3D → 3d, Node2D → 2d).",
+                    },
                     "points": {
                         "type": "string",
                         "description": (
-                            "Route waypoints relative to position, as a 'x,y;x,y;...' string or a JSON "
-                            "array like [[0,0],[200,0]]. First point is the start. Default '0,0;200,0'."
+                            "Route waypoints relative to position, as a 'x,y(,z);...' string or a JSON "
+                            "array like [[0,0],[200,0]] (2D) / [[0,0,0],[4,0,0]] (3D). First point is the "
+                            "start. Default: a short horizontal sweep (2D '0,0;200,0', 3D '0,0,0;4,0,0')."
                         ),
                     },
                     "speed": {
                         "type": "number",
-                        "description": "Pixels per second along the curve. Default 80.",
+                        "description": "Distance per second along the curve (pixels in 2D, metres in 3D). Default 80 (2D) / 3 (3D).",
                     },
                     "loop_mode": {
                         "type": "string",
@@ -549,11 +560,11 @@ TOOLS: List[Dict] = [
                     },
                     "size": {
                         "type": "string",
-                        "description": "Scaffolded platform size 'w,h' in pixels. Default '96,16'. Ignored when target_path is set.",
+                        "description": "Scaffolded platform size 'w,h' in pixels (2D, default '96,16') or 'w,h,d' in metres (3D, default '2,0.5,2'). Ignored when target_path is set.",
                     },
                     "one_way": {
                         "type": "boolean",
-                        "description": "Make the scaffolded platform one-way (land on top, jump up through from below). Default false. Ignored when target_path is set.",
+                        "description": "2D only — make the scaffolded platform one-way (land on top, jump up through from below). Default false. Ignored in 3D and when target_path is set.",
                     },
                     "color": {
                         "type": "string",
@@ -561,16 +572,16 @@ TOOLS: List[Dict] = [
                     },
                     "target_path": {
                         "type": "string",
-                        "description": "Scene-relative path to an existing Node2D to send along the route instead of scaffolding a platform.",
+                        "description": "Scene-relative path to an existing node (Node2D in 2D, Node3D in 3D) to send along the route instead of scaffolding a platform.",
                     },
-                    "name": {"type": "string", "description": "Path2D node name. Default 'MovingPlatform'."},
+                    "name": {"type": "string", "description": "Path node name. Default 'MovingPlatform'."},
                     "parent_path": {
                         "type": "string",
                         "description": "Scene-relative parent path. Defaults to scene root.",
                     },
                     "position": {
                         "type": "string",
-                        "description": "Path2D placement in pixels 'x,y' (waypoints are relative to it). Default '0,0'.",
+                        "description": "Path placement (waypoints are relative to it): 'x,y' in 2D, 'x,y,z' in 3D. Default 0.",
                     },
                     "directory": {
                         "type": "string",

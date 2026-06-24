@@ -99,6 +99,7 @@ const EngineMode        = preload("res://addons/com.gladekit.mcp-bridge/bridge/e
 const ReadOnlyGuard     = preload("res://addons/com.gladekit.mcp-bridge/services/read_only_guard.gd")
 const ErrorTracker      = preload("res://addons/com.gladekit.mcp-bridge/services/error_tracker.gd")
 const BackupManager     = preload("res://addons/com.gladekit.mcp-bridge/services/backup_manager.gd")
+const SessionTracker    = preload("res://addons/com.gladekit.mcp-bridge/bridge/session_tracker.gd")
 const RuntimeLogStream  = preload("res://addons/com.gladekit.mcp-bridge/services/runtime_log_stream.gd")
 const PlaySessionManager = preload("res://addons/com.gladekit.mcp-bridge/services/play_session_manager.gd")
 
@@ -385,6 +386,23 @@ func _main_dispatch_tool(request_id: String, request: Dictionary, peer: WebSocke
 	# collisions). See ToolUtils.normalize_args for the rationale.
 	args = ToolUtils.normalize_args(args)
 
+	# Scope the per-call "scripts written this call" buffer to THIS execute() so
+	# the dispatcher can report freshly-written scripts (incl. those template/
+	# scaffolder tools embed internally) back to the client for diff/revert.
+	SessionTracker.begin_call()
+
+	# Snapshot the edited scene's node set before the tool runs, so we can report
+	# which nodes it CREATED back to the client for revert — even template/
+	# scaffolder tools that build a whole subtree internally (their node paths
+	# never appear in the args, and they're not in the client's known-node-tool
+	# list). Only for mutating tools (requires_edit_mode) with an open scene;
+	# read tools and headless contexts skip the walk.
+	var scene_root_before: Node = ToolUtils.get_edited_scene_root_safe()
+	var track_nodes: bool = tool_instance.requires_edit_mode and scene_root_before != null
+	var nodes_before: Dictionary = {}
+	if track_nodes:
+		_collect_instance_ids(scene_root_before, nodes_before)
+
 	# GDScript has no try/catch, so we can't wrap execute() — but a runtime
 	# error inside a tool halts the call and returns null. The is-Dictionary
 	# check below catches that case (null is not Dictionary), plus the
@@ -414,6 +432,42 @@ func _main_dispatch_tool(request_id: String, request: Dictionary, peer: WebSocke
 		ErrorTracker.record(tool_name, shape_msg, args)
 		return _make_error(request_id, shape_msg)
 
+	# Attach the SCRIPTS this call freshly wrote (drained from the per-call
+	# buffer) so clients can show a script diff + revert them — even for
+	# template/scaffolder tools whose script body never appears in the args. A
+	# tool that already reports its own `written_scripts` is left untouched.
+	# Filtered to script files so the field stays honest: some scaffolders also
+	# mark a generated .tscn as created (e.g. a menu scene), which isn't a
+	# diffable script.
+	var recent_writes: Array = SessionTracker.take_recent_writes()
+	var written_scripts: Array = []
+	for w in recent_writes:
+		var lower := str(w).to_lower()
+		if lower.ends_with(".gd") or lower.ends_with(".cs"):
+			written_scripts.append(w)
+	if not written_scripts.is_empty() and not (result as Dictionary).has("written_scripts"):
+		(result as Dictionary)["written_scripts"] = written_scripts
+
+	# Attach the top-level NODES this call created (scene-tree diff against the
+	# pre-execute snapshot) so clients can revert them — even template/scaffolder
+	# tools that build a subtree internally. Only top-level new nodes are
+	# reported: deleting one removes its new descendants, so children are
+	# redundant. Skipped when the scene root was swapped (open_scene /
+	# create_scene), where "every node is new" would be a false positive. A tool
+	# that already reports its own `created_nodes` is left untouched.
+	if track_nodes and not (result as Dictionary).has("created_nodes"):
+		var scene_root_after: Node = ToolUtils.get_edited_scene_root_safe()
+		if scene_root_after != null and is_instance_valid(scene_root_before) and scene_root_after == scene_root_before:
+			var new_nodes: Array = []
+			_collect_new_top_level_nodes(scene_root_after, nodes_before, new_nodes)
+			var created_nodes: Array = []
+			for n in new_nodes:
+				var rel := ToolUtils.node_relative_path(n)
+				if rel != "":
+					created_nodes.append(rel)
+			if not created_nodes.is_empty():
+				(result as Dictionary)["created_nodes"] = created_nodes
+
 	# Async tools: execute() kicked off a worker thread and returned an
 	# "async_pending" marker rather than the final answer. Register the tool to
 	# be polled each tick (see _drain_async_dispatches) and return the empty
@@ -440,6 +494,31 @@ func _main_dispatch_tool(request_id: String, request: Dictionary, peer: WebSocke
 	for key in result:
 		response[key] = result[key]
 	return response
+
+
+# Recursively record every descendant's instance id into `out` (a set). Used to
+# snapshot the edited scene before a tool runs so post-run we can tell which
+# nodes are new. Instance ids (not paths) so a rename/move during the call
+# doesn't masquerade as a create.
+static func _collect_instance_ids(node: Node, out: Dictionary) -> void:
+	for child in node.get_children():
+		out[child.get_instance_id()] = true
+		_collect_instance_ids(child, out)
+
+
+# Walk the post-run tree and append every TOP-LEVEL new Node (one absent from
+# `before` whose parent was already present) to `out`. A new node nested under
+# another new node is skipped — reverting the top-level node deletes the whole
+# new subtree, so listing children would be redundant (and would make revert
+# try to delete already-deleted nodes). Collects Node refs (not paths) so the
+# diff logic is unit-testable without an editor; the caller maps to paths.
+static func _collect_new_top_level_nodes(node: Node, before: Dictionary, out: Array) -> void:
+	for child in node.get_children():
+		if not before.has(child.get_instance_id()):
+			out.append(child)
+			# Do NOT recurse: the entire subtree under a new node is new.
+		else:
+			_collect_new_top_level_nodes(child, before, out)
 
 
 # Aggregate the bridge's three first-turn signals (project metadata, scene

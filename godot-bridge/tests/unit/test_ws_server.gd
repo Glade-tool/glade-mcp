@@ -99,3 +99,83 @@ func test_empty_queue_returns_empty_split() -> void:
 	var split: Dictionary = WsServer._split_expired_dispatches([], 1_000, STALL_THRESHOLD_MSEC)
 	assert_eq(split["expired"].size(), 0)
 	assert_eq(split["remaining"].size(), 0)
+
+
+# ── created-node detection: _collect_instance_ids / _collect_new_top_level_nodes
+# Pure scene-tree diff helpers backing the dispatcher's `created_nodes` (node
+# revert for template/scaffolder tools). Editor-free: they operate on a plain
+# Node tree, so they're testable under GUT's headless runner.
+
+func test_collect_instance_ids_gathers_all_descendants() -> void:
+	var root := Node.new()
+	var a := Node.new()
+	var b := Node.new()
+	var a_child := Node.new()
+	root.add_child(a)
+	root.add_child(b)
+	a.add_child(a_child)
+
+	var ids: Dictionary = {}
+	WsServer._collect_instance_ids(root, ids)
+	# Descendants only (not the root itself).
+	assert_eq(ids.size(), 3)
+	assert_true(ids.has(a.get_instance_id()))
+	assert_true(ids.has(b.get_instance_id()))
+	assert_true(ids.has(a_child.get_instance_id()))
+	assert_false(ids.has(root.get_instance_id()))
+	root.free()
+
+
+func test_collect_new_top_level_nodes_reports_subtree_roots_only() -> void:
+	# Pre-existing tree: root > A, B.
+	var root := Node.new()
+	var a := Node.new()
+	a.name = "A"
+	var b := Node.new()
+	b.name = "B"
+	root.add_child(a)
+	root.add_child(b)
+
+	# Snapshot BEFORE the "tool" mutates the tree.
+	var before: Dictionary = {}
+	WsServer._collect_instance_ids(root, before)
+
+	# The "tool" adds: C under root, D under existing A, and a new subtree
+	# E > F under root.
+	var c := Node.new()
+	c.name = "C"
+	var d := Node.new()
+	d.name = "D"
+	var e := Node.new()
+	e.name = "E"
+	var f := Node.new()
+	f.name = "F"
+	root.add_child(c)
+	a.add_child(d)
+	root.add_child(e)
+	e.add_child(f)
+
+	var new_nodes: Array = []
+	WsServer._collect_new_top_level_nodes(root, before, new_nodes)
+
+	# C, D, E are top-level new. F is nested under the new E → excluded
+	# (deleting E removes F on revert).
+	assert_eq(new_nodes.size(), 3, "exactly the 3 subtree roots, not F")
+	assert_true(new_nodes.has(c))
+	assert_true(new_nodes.has(d), "a new node under a PRE-EXISTING parent is top-level")
+	assert_true(new_nodes.has(e))
+	assert_false(new_nodes.has(f), "a new node under a NEW parent is redundant")
+	root.free()
+
+
+func test_collect_new_top_level_nodes_empty_when_nothing_added() -> void:
+	var root := Node.new()
+	var a := Node.new()
+	root.add_child(a)
+	var before: Dictionary = {}
+	WsServer._collect_instance_ids(root, before)
+
+	var new_nodes: Array = []
+	WsServer._collect_new_top_level_nodes(root, before, new_nodes)
+	assert_eq(new_nodes.size(), 0, "no mutations → no created nodes")
+	root.free()
