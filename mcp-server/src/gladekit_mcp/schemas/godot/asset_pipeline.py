@@ -147,7 +147,7 @@ TOOLS: List[Dict] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "licenseFilter": {
+                    "license_filter": {
                         "type": "string",
                         "enum": ["CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "MIT", "any"],
                         "description": "Filter to a specific license, or 'any' (default).",

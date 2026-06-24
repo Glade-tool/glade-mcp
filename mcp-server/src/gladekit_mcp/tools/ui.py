@@ -92,7 +92,6 @@ TOOLS: List[Dict] = [
                     "parentPath": {"type": "string"},
                     "text": {"type": "string"},
                     "color": {"type": "string"},
-                    "useTMP": {"type": "boolean"},
                     "fontSize": {"type": "number"},
                     "alignment": {"type": "string"},
                     "size": {"type": "string"},
