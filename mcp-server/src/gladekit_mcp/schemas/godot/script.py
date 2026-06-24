@@ -1,5 +1,5 @@
 """
-Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (15 tools).
+Godot GDScript tools — file CRUD + node attachment + vetted scaffolders (16 tools).
 
 GDScript files are .gd resources living anywhere under res://. Each
 Godot node can have at most one attached script (vs Unity's many
@@ -342,6 +342,75 @@ TOOLS: List[Dict] = [
                         ),
                     },
                 },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_juice",
+            "description": (
+                "Attach a reusable 'juice' tween component to a Node2D/Control in ONE "
+                "atomic call — the PER-OBJECT companion to create_screen_shake (which "
+                "kicks the whole camera). PREFER THIS over hand-writing tweens for any "
+                "'make it feel good/pop/punchy' request: a scale pop when a coin is "
+                "collected, a hit flash when something takes damage, a fade on "
+                "spawn/despawn, or a gentle idle loop that makes a pickup catch the eye. "
+                "It writes a VETTED tween script and parents a 'Juice' node UNDER the "
+                "target, tweening the target's scale/modulate from the outside — so it "
+                "never clobbers the target's own script. The script caches the resting "
+                "scale/modulate, centers a Control's pivot, and uses BACK/ELASTIC easing "
+                "so a pop actually pops. Trigger the feel from the target's script (or "
+                "any reference): $Juice.pop() on a pickup/land/click, "
+                "$Juice.flash(Color.RED) on a hit, $Juice.fade_out(0.3) to despawn (it "
+                "emits faded_out so you can queue_free). The shared juice.gd is written "
+                "once and reused across many targets. 2D-only (needs a CanvasItem). "
+                "After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target_path": {
+                        "type": "string",
+                        "description": (
+                            "Scene-relative path of the Node2D or Control to juice (e.g. a "
+                            "Sprite2D, AnimatedSprite2D, a coin, the player)."
+                        ),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the Juice child node (how you address it: $Name.pop()). Default 'Juice'.",
+                    },
+                    "idle": {
+                        "type": "string",
+                        "description": (
+                            "Ambient loop that plays automatically at runtime: 'none' "
+                            "(default), 'pulse' (gentle scale breathe — great for pickups), "
+                            "or 'bob' (vertical hover, Node2D only)."
+                        ),
+                        "enum": ["none", "pulse", "bob"],
+                    },
+                    "spawn": {
+                        "type": "string",
+                        "description": (
+                            "On-ready effect: 'pop_in' (default — scales up from nothing "
+                            "when the node spawns) or 'none'."
+                        ),
+                        "enum": ["none", "pop_in"],
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "res:// folder for the generated juice.gd. Default 'res://scripts'.",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Rewrite juice.gd even if it exists. Default false (reuses the "
+                            "existing shared script — attach Juice to many nodes without rewriting)."
+                        ),
+                    },
+                },
+                "required": ["target_path"],
             },
         },
     },

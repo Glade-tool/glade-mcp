@@ -203,6 +203,10 @@ static func serialize_vector3(v: Vector3) -> String:
 	return "%s,%s,%s" % [v.x, v.y, v.z]
 
 
+static func serialize_vector2(v: Vector2) -> String:
+	return "%s,%s" % [v.x, v.y]
+
+
 # ── Color parsing ──────────────────────────────────────────────────────────
 # Tolerates four wire shapes:
 #   Color object        — passed through

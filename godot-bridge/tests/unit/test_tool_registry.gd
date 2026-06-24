@@ -50,7 +50,7 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# create_health_bar (1) = 91; create_moving_platform (1) = 92 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 92, "Catalog should register exactly 92 tools")
+	assert_eq(registry.get_tool_count(), 94, "Catalog should register exactly 94 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -65,7 +65,7 @@ func test_registry_contains_all_mvp_tools() -> void:
 		# Phase 2 — Script
 		"create_script", "modify_script", "get_script_content", "find_scripts",
 		"attach_script_to_node", "create_third_person_controller",
-		"create_2d_controller", "create_screen_shake",
+		"create_2d_controller", "create_screen_shake", "create_juice",
 		"create_game_manager", "create_collectible", "create_hazard", "create_enemy_2d",
 		# Camera / Light (create_camera is dimension-aware; create_camera_3d
 		# remains a registry alias, asserted separately below)
@@ -111,6 +111,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		# v0.6.8 — AnimationTree state machine (Animator-Controller analog)
 		"create_animation_tree", "add_state_machine_state",
 		"add_state_machine_transition", "get_animation_tree_info",
+		# v0.7.3 — AnimationTree 2D blend space (directional sprite animation)
+		"create_blend_space_2d",
 		# 3D enemy + navmesh pursuit
 		"create_enemy_3d", "add_navigation_agent", "bake_navigation_mesh",
 		# Particles / juice — 3D twin of create_particles_2d

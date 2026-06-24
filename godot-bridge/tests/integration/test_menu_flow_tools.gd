@@ -104,7 +104,7 @@ func test_create_main_menu_tree_has_title_and_buttons() -> void:
 	var packed = load(MENU_SCENE)
 	assert_true(packed is PackedScene, "saved menu must load as a PackedScene")
 	var inst = packed.instantiate()
-	var title := inst.find_child("TitleLabel", true, false)
+	var title = inst.find_child("TitleLabel", true, false)
 	assert_not_null(title, "menu should contain a TitleLabel")
 	assert_eq((title as Label).text, "Hello", "title text should be applied")
 	assert_not_null(inst.find_child("PlayButton", true, false), "menu should contain a PlayButton")

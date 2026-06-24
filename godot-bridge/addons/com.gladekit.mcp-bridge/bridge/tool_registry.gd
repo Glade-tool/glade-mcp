@@ -50,6 +50,11 @@ const Create2DControllerTool = preload("res://addons/com.gladekit.mcp-bridge/too
 # applied via offset so it composes with a following camera) and attaches it.
 const CreateScreenShakeTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_screen_shake.gd")
 
+# Per-object juice: a reusable tween component (scale pop / hit flash / fade /
+# idle loop) parented under any Node2D/Control. The per-object counterpart to
+# create_screen_shake's camera kick; composes with collectible/hazard/enemy.
+const CreateJuiceTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_juice.gd")
+
 # 2D gameplay-loop family: vetted scaffolders that turn a playable character into
 # a winnable/losable game. create_game_manager is the hub (score/lives/respawn/
 # win-lose + HUD, reached via the "game_manager" group); create_collectible and
@@ -183,6 +188,14 @@ const AddStateMachineStateTool        = preload("res://addons/com.gladekit.mcp-b
 const AddStateMachineTransitionTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/add_state_machine_transition.gd")
 const GetAnimationTreeInfoTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/get_animation_tree_info.gd")
 
+# ── AnimationTree blend-space tools (v0.7.3) ───────────────────────────────
+# AnimationNodeBlendSpace2D — directional sprite animation from a single 2D
+# vector. The blend-space twin of the state-machine tools above: where a state
+# machine wires distinct states by transitions, a blend space picks/blends one
+# action's per-facing clips by movement direction. Feed velocity.normalized()
+# into parameters/blend_position; auto-seeds from up/down/left/right clip names.
+const CreateBlendSpace2DTool          = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/create_blend_space_2d.gd")
+
 # ── Asset pipeline tools (v0.7.0) ──────────────────────────────────────────
 # Download + install external CC0 assets. import_asset is async (downloads on a
 # worker thread); see i_tool.gd's async protocol + ws_server._drain_async_dispatches.
@@ -270,6 +283,7 @@ func _register_all() -> void:
 	register_tool(CreateThirdPersonControllerTool.new())
 	register_tool(Create2DControllerTool.new())
 	register_tool(CreateScreenShakeTool.new())
+	register_tool(CreateJuiceTool.new())
 	register_tool(CreateGameManagerTool.new())
 	register_tool(CreateCollectibleTool.new())
 	register_tool(CreateHazardTool.new())
@@ -345,6 +359,9 @@ func _register_all() -> void:
 	register_tool(AddStateMachineStateTool.new())
 	register_tool(AddStateMachineTransitionTool.new())
 	register_tool(GetAnimationTreeInfoTool.new())
+	# AnimationTree blend space (1, v0.7.3) — directional sprite animation from a
+	# 2D vector via AnimationNodeBlendSpace2D.
+	register_tool(CreateBlendSpace2DTool.new())
 	# Asset pipeline (2, v0.7.0) — async external-asset download + install,
 	# plus a read-only license audit of what's been imported.
 	register_tool(ImportAssetTool.new())

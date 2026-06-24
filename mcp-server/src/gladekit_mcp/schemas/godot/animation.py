@@ -1,6 +1,6 @@
 """
-Godot animation tools (9 tools) — AnimationPlayer + Animation .tres
-scaffolding, plus AnimationTree state machines.
+Godot animation tools (10 tools) — AnimationPlayer + Animation .tres
+scaffolding, plus AnimationTree state machines and a 2D blend space.
 
 The AnimationPlayer node itself + the Animation .tres are created via
 existing tools — `create_node(type='AnimationPlayer', parent_path='...')`
@@ -32,6 +32,15 @@ idle/walk/run/jump driven by travel() or advance conditions.
                                 mode, cross-fade, advance condition).
   get_animation_tree_info       read-only: states + transitions +
                                 binding.
+
+create_blend_space_2d is the directional counterpart: an AnimationTree
+rooted in an AnimationNodeBlendSpace2D that picks/blends a character's
+per-facing clips from a single 2D vector (feed velocity.normalized()
+into parameters/blend_position).
+
+  create_blend_space_2d         AnimationTree + 2D blend space bound to a
+                                player (auto-seeds from up/down/left/right
+                                clip names).
 
 Composition flow for a typical scaffold (e.g., "add a 0.6s jump
 animation on Player"):
@@ -568,6 +577,100 @@ TOOLS: List[Dict] = [
                 "readOnlyHint": True,
                 "destructiveHint": False,
                 "idempotentHint": True,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_blend_space_2d",
+            "description": (
+                "Create an AnimationTree rooted in a 2D blend space — the standard "
+                "way to drive DIRECTIONAL sprite animation from a single 2D vector. "
+                "Use this (not create_animation_tree) when one action ('walk') has a "
+                "different clip per FACING (up/down/left/right) and you want the engine "
+                "to pick/blend between them by movement direction. At runtime set "
+                "parameters/blend_position to the character's velocity.normalized() and "
+                "the matching directional clip plays.\n\n"
+                "Bind it to an AnimationPlayer (player_path) whose registered clips "
+                "supply each blend point — create + populate the player FIRST "
+                "(create_node type='AnimationPlayer', then add_animation_to_player per "
+                "clip). Omit `points` to AUTO-SEED: the player's clips are scanned for "
+                "directional names (containing up/down/left/right) and each is placed "
+                "at its cardinal position — a one-call 'wrap my 4 walk clips in a blend "
+                "space' setup. The cardinal layout matches Godot 2D screen-space "
+                "velocity (+y is DOWN): up=(0,-1), down=(0,1), left=(-1,0), right=(1,0), "
+                "so velocity feeds in with no axis flipping. Pass `points` explicitly "
+                "when clip names don't follow the convention or you need non-cardinal "
+                "placement. A point whose clip isn't registered is still created but "
+                "flagged under animation_warnings.\n\n"
+                "Drive it at runtime from a script: "
+                "$AnimationTree.set('parameters/blend_position', velocity.normalized())."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "player_path": {
+                        "type": "string",
+                        "description": "Scene-relative NodePath of the AnimationPlayer supplying the clips.",
+                    },
+                    "points": {
+                        "type": "array",
+                        "description": (
+                            "Explicit blend points. Each is {'anim': clip play-name, "
+                            "'pos': 'x,y'}, e.g. [{'anim':'walk_up','pos':'0,-1'}, "
+                            "{'anim':'walk_down','pos':'0,1'}]. Omit to auto-seed from "
+                            "the player's directional clip names."
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "anim": {
+                                    "type": "string",
+                                    "description": "Clip play-name (default library: 'walk_up'; named: 'combat/walk_up').",
+                                },
+                                "pos": {
+                                    "type": "string",
+                                    "description": "Blend position 'x,y'. +y is down to match 2D velocity.",
+                                },
+                            },
+                            "required": ["anim", "pos"],
+                        },
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Default 'AnimationTree'.",
+                    },
+                    "parent_path": {
+                        "type": "string",
+                        "description": "Scene-relative parent NodePath. Default: scene root.",
+                    },
+                    "active": {
+                        "type": "boolean",
+                        "description": "Process the tree at runtime. Default true (an inactive tree is inert).",
+                    },
+                    "blend_mode": {
+                        "type": "string",
+                        "description": (
+                            "How points combine: 'interpolated' (default, smooth "
+                            "cross-blend), 'discrete' (snap to nearest), "
+                            "'discrete_carry' (snap but carry playback position across "
+                            "points)."
+                        ),
+                        "enum": ["interpolated", "discrete", "discrete_carry"],
+                    },
+                    "sync": {
+                        "type": "boolean",
+                        "description": ("Keep all points advancing in sync even when not selected. Default false."),
+                    },
+                },
+                "required": ["player_path"],
+            },
+            "annotations": {
+                "title": "Create 2D Blend Space",
+                "readOnlyHint": False,
+                "destructiveHint": False,
+                "idempotentHint": False,
             },
         },
     },
