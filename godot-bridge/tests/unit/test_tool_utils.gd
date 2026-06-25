@@ -318,3 +318,60 @@ func test_deselect_before_free_null_is_noop() -> void:
 	n.free()
 	ToolUtils.deselect_before_free(n)
 	pass_test("deselect_before_free tolerated null and freed nodes")
+
+
+# ── apply_script_properties (reused-existing-script collision guard) ───────
+
+# Build a Node carrying a tiny script that declares only the given `var` names —
+# stands in for a user's own same-named script the bridge reused instead of the
+# vetted template.
+func _node_with_vars(var_names: Array) -> Node:
+	var src := "extends Node\n"
+	for v in var_names:
+		src += "var %s = null\n" % v
+	var script := GDScript.new()
+	script.source_code = src
+	script.reload()
+	var node := Node.new()
+	node.set_script(script)
+	return node
+
+
+func test_apply_script_properties_sets_known_and_reports_missing() -> void:
+	# The script has `speed` but NOT `route`: the declared knob must land, the
+	# missing one must come back named — never silently dropped (the bug where a
+	# moving platform "did nothing" because route/speed had nowhere to go).
+	var node := _node_with_vars(["speed"])
+	var dropped := ToolUtils.apply_script_properties(node, {
+		"speed": 7.0,
+		"route": "0,0,0;4,0,0",
+	})
+	assert_eq(node.get("speed"), 7.0, "a declared property must be set")
+	assert_eq(Array(dropped), ["route"], "a missing property must be reported")
+	node.free()
+
+
+func test_apply_script_properties_empty_when_all_present() -> void:
+	# The common case: the vetted template WAS written, so every knob exists and
+	# nothing is reported — the collision signal stays quiet without a collision.
+	var node := _node_with_vars(["a", "b"])
+	var dropped := ToolUtils.apply_script_properties(node, {"a": 1, "b": 2})
+	assert_eq(node.get("a"), 1)
+	assert_eq(node.get("b"), 2)
+	assert_true(dropped.is_empty(), "no warning when every property exists")
+	node.free()
+
+
+func test_apply_script_properties_null_node_is_safe() -> void:
+	var dropped := ToolUtils.apply_script_properties(null, {"x": 1})
+	assert_true(dropped.is_empty(), "null node must not crash and reports nothing")
+
+
+func test_reused_script_warning_names_dropped_and_path() -> void:
+	var msg := ToolUtils.reused_script_warning(
+		PackedStringArray(["route", "speed"]), "res://scripts/moving_platform.gd"
+	)
+	assert_string_contains(msg, "route")
+	assert_string_contains(msg, "speed")
+	assert_string_contains(msg, "res://scripts/moving_platform.gd")
+	assert_string_contains(msg, "overwrite=true")

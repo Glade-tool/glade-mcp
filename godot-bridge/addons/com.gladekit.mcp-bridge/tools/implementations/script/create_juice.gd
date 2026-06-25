@@ -260,8 +260,11 @@ func execute(args: Dictionary) -> Dictionary:
 	target.add_child(juice_node)
 	juice_node.owner = root
 	juice_node.set_script(juice_script)
-	juice_node.set("idle", idle)
-	juice_node.set("spawn", spawn)
+	var dropped := ToolUtils.apply_script_properties(juice_node, {
+		"idle": idle,
+		"spawn": spawn,
+	})
+	var warning := "" if dropped.is_empty() else " " + ToolUtils.reused_script_warning(dropped, script_path)
 
 	var juice_rel := ToolUtils.node_relative_path(juice_node)
 	var triggers := [
@@ -279,7 +282,8 @@ func execute(args: Dictionary) -> Dictionary:
 		% triggers[0]
 		+ "pickup/land/click, flash(Color.RED) on a hit, fade_out(0.3) to despawn. "
 		+ ("(idle='%s' loop + " % idle if idle != "none" else "(")
-		+ "spawn='%s' both fire automatically at runtime.) Then call save_scene." % spawn,
+		+ "spawn='%s' both fire automatically at runtime.) Then call save_scene." % spawn
+		+ warning,
 		{
 			"created_script": script_path,
 			"reused_script": reused,
@@ -288,6 +292,7 @@ func execute(args: Dictionary) -> Dictionary:
 			"idle": idle,
 			"spawn": spawn,
 			"triggers": triggers,
+			"dropped_properties": dropped,
 		}
 	)
 

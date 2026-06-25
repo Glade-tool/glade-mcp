@@ -365,9 +365,12 @@ func execute(args: Dictionary) -> Dictionary:
 	if not (enemy_script is Script):
 		return ToolUtils.error("Wrote enemy script but could not load it from '%s'" % script_path)
 	enemy.set_script(enemy_script)
-	enemy.set("style", style)
-	enemy.set("speed", speed)
-	enemy.set("score_value", score_value)
+	var dropped := ToolUtils.apply_script_properties(enemy, {
+		"style": style,
+		"speed": speed,
+		"score_value": score_value,
+	})
+	var warning := "" if dropped.is_empty() else " " + ToolUtils.reused_script_warning(dropped, script_path)
 	if not enemy.is_in_group(_GROUP):
 		enemy.add_to_group(_GROUP, true)
 
@@ -388,12 +391,14 @@ func execute(args: Dictionary) -> Dictionary:
 		+ "kills it, adds score_value via the GameManager, and bounces the player; a SIDE touch calls lose_life — so "
 		+ "create_game_manager FIRST or contact does nothing. Place more by calling this again (the script is reused) "
 		+ "or by duplicate_node. Replace the Placeholder Polygon2D with a Sprite2D/AnimatedSprite2D for real art, and "
-		+ "pair it with create_screen_shake for a stomp that feels like one. Then call save_scene.",
+		+ "pair it with create_screen_shake for a stomp that feels like one. Then call save_scene."
+		+ warning,
 		{
 			"created_script": script_path,
 			"node": ToolUtils.node_relative_path(enemy),
 			"group": _GROUP,
 			"style": style,
+			"dropped_properties": dropped,
 		}
 	)
 

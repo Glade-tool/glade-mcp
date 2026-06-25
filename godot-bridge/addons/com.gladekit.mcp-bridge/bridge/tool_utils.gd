@@ -666,3 +666,43 @@ static func node_relative_path(node: Node) -> String:
 	if current != root:
 		return ""  # node is not a descendant of the edited scene root
 	return "/".join(parts)
+
+
+# Apply each name->value in `props` to `node`, returning the names of any the
+# node's script does NOT declare as a property — values that silently no-op'd.
+# An empty result means everything landed.
+#
+# This is the reused-existing-script trap: a vetted-template scaffolder writes its
+# script to a fixed path (e.g. res://scripts/health.gd) but reuses-don't-clobber
+# if a file is already there. When that existing script is the user's OWN (not the
+# template), the template's exported knobs (max_health, speed, …) have nowhere to
+# land, and a bare `node.set("knob", v)` on a missing property fails silently — the
+# tool looks like it did nothing. Routing the sets through here lets the caller
+# warn with the exact dropped names. A fresh template can't be missing its own
+# properties, so a non-empty result always signals a real collision.
+static func apply_script_properties(node: Object, props: Dictionary) -> PackedStringArray:
+	var dropped: PackedStringArray = []
+	if node == null:
+		return dropped
+	var declared: Dictionary = {}
+	for p in node.get_property_list():
+		declared[p["name"]] = true
+	for key in props:
+		if declared.has(key):
+			node.set(key, props[key])
+		else:
+			dropped.append(key)
+	return dropped
+
+
+# One-line, user-facing warning for a scaffolder whose vetted knobs didn't land
+# because a same-named script was reused in place of the template. `dropped` comes
+# straight from apply_script_properties.
+static func reused_script_warning(dropped: PackedStringArray, script_path: String) -> String:
+	return (
+		"Note: %d setting(s) did not apply (%s) because '%s' already existed and was reused instead of "
+		% [dropped.size(), ", ".join(dropped), script_path]
+		+ "GladeKit's template, and it has no such property — those values were skipped and the existing "
+		+ "script's defaults stand. Pass overwrite=true to regenerate the vetted script, or set those "
+		+ "properties on your own script."
+	)

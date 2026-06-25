@@ -444,9 +444,12 @@ func execute(args: Dictionary) -> Dictionary:
 	if not (enemy_script is Script):
 		return ToolUtils.error("Wrote enemy script but could not load it from '%s'" % script_path)
 	enemy.set_script(enemy_script)
-	enemy.set("style", style)
-	enemy.set("speed", speed)
-	enemy.set("score_value", score_value)
+	var dropped := ToolUtils.apply_script_properties(enemy, {
+		"style": style,
+		"speed": speed,
+		"score_value": score_value,
+	})
+	var warning := "" if dropped.is_empty() else " " + ToolUtils.reused_script_warning(dropped, script_path)
 	if not enemy.is_in_group(_GROUP):
 		enemy.add_to_group(_GROUP, true)
 
@@ -466,6 +469,7 @@ func execute(args: Dictionary) -> Dictionary:
 		"group": _GROUP,
 		"style": style,
 		"pathfinding": "navmesh" if use_navmesh else "direct",
+		"dropped_properties": dropped,
 	}
 
 	# Navmesh guidance: surface whether the runtime prerequisite (a baked region) is
@@ -495,7 +499,8 @@ func execute(args: Dictionary) -> Dictionary:
 		+ "NOTE: create_game_manager is 2D-only, so in a pure-3D scene scoring/lives stay inert until a node joins the "
 		+ "'game_manager' group exposing add_score/lose_life — the movement + stomp/contact logic works regardless. "
 		+ "Place more by calling this again (the script is reused) or by duplicate_node. Replace the Mesh with real "
-		+ "art, and ensure the player is in the 'player' group. Then call save_scene.",
+		+ "art, and ensure the player is in the 'player' group. Then call save_scene."
+		+ warning,
 		payload
 	)
 

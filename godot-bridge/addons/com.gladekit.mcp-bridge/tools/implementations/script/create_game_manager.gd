@@ -287,8 +287,11 @@ func execute(args: Dictionary) -> Dictionary:
 	if not (manager_script is Script):
 		return ToolUtils.error("Wrote manager but could not load it from '%s'" % script_path)
 	manager.set_script(manager_script)
-	manager.set("starting_lives", starting_lives)
-	manager.set("score_to_win", score_to_win)
+	var dropped := ToolUtils.apply_script_properties(manager, {
+		"starting_lives": starting_lives,
+		"score_to_win": score_to_win,
+	})
+	var warning := "" if dropped.is_empty() else " " + ToolUtils.reused_script_warning(dropped, script_path)
 	if not manager.is_in_group(_GROUP):
 		manager.add_to_group(_GROUP, true)
 
@@ -302,13 +305,15 @@ func execute(args: Dictionary) -> Dictionary:
 		+ "already handles HUD sync, respawn (zeroes player velocity), and locking the score after the game ends. "
 		+ "Lives=%d, %s. Gameplay code reaches it via the 'game_manager' group: " % [starting_lives, win_note]
 		+ "add_score(1) on a pickup, lose_life() on a hit, win() at a goal. Add pickups with create_collectible and "
-		+ "dangers with create_hazard (both already call this manager). Your remaining step is to call save_scene.",
+		+ "dangers with create_hazard (both already call this manager). Your remaining step is to call save_scene."
+		+ warning,
 		{
 			"created_script": script_path,
 			"manager": ToolUtils.node_relative_path(manager),
 			"group": _GROUP,
 			"starting_lives": starting_lives,
 			"score_to_win": score_to_win,
+			"dropped_properties": dropped,
 			"triggers": {
 				"add_score": "get_tree().get_first_node_in_group(\"game_manager\").add_score(1)",
 				"lose_life": "get_tree().get_first_node_in_group(\"game_manager\").lose_life()",

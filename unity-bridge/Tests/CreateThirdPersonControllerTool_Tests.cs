@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
 using GladeAgenticAI.Core.Tools;
 using GladeAgenticAI.Core.Tools.Implementations.Scripts;
 using GladeAgenticAI.Services;
@@ -347,6 +349,60 @@ namespace GladeAgenticAI.Tests
             {
                 Object.DestroyImmediate(go2);
             }
+        }
+
+        [Test]
+        public void ApplyFields_AppliesKnownFields_AndWarnsOnDroppedOnes()
+        {
+            // The reused-existing-class trap: a scaffolder queues its template's knobs
+            // (here a real one + one the resolved class doesn't have). The real field
+            // must still land, and the missing one must surface as a WARNING — not
+            // vanish silently the way a bare "the elevator didn't move" bug does.
+            PendingControllerWiring.Queue(new[]
+            {
+                new PendingControllerWiring.WiringRequest("WiringTarget", null, "Rigidbody",
+                    new List<PendingControllerWiring.FieldValue>
+                    {
+                        new PendingControllerWiring.FieldValue("mass", "float", "7"),         // Rigidbody has this
+                        new PendingControllerWiring.FieldValue("route", "string", "0,0,0;4,0,0"), // it does NOT
+                    }),
+            });
+
+            // The dropped knob must be named in a warning (the actionable signal the
+            // backend forwards). Match the field name to keep the assert robust to
+            // copy tweaks.
+            LogAssert.Expect(LogType.Warning, new Regex("route"));
+
+            PendingControllerWiring.TryComplete();
+
+            var rb = _go.GetComponent<Rigidbody>();
+            Assert.IsNotNull(rb, "the component must still attach");
+            Assert.AreEqual(7f, rb.mass,
+                "a valid queued field must still apply even when a sibling field is dropped");
+            Assert.IsFalse(PendingControllerWiring.HasPending, "the queue must clear");
+        }
+
+        [Test]
+        public void ApplyFields_NoWarning_WhenEveryFieldResolves()
+        {
+            // The common case: the vetted template WAS written, so every queued knob
+            // exists on the attached class. No warning should fire — the collision
+            // signal must stay quiet unless there's an actual collision.
+            PendingControllerWiring.Queue(new[]
+            {
+                new PendingControllerWiring.WiringRequest("WiringTarget", null, "Rigidbody",
+                    new List<PendingControllerWiring.FieldValue>
+                    {
+                        new PendingControllerWiring.FieldValue("mass", "float", "3"),
+                    }),
+            });
+
+            PendingControllerWiring.TryComplete();
+
+            // The happy path must wire cleanly: the field lands and nothing errors.
+            var rb = _go.GetComponent<Rigidbody>();
+            Assert.IsNotNull(rb);
+            Assert.AreEqual(3f, rb.mass);
         }
 
         [Test]

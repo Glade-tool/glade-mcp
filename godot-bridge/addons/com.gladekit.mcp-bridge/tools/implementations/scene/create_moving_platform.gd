@@ -326,11 +326,14 @@ func execute(args: Dictionary) -> Dictionary:
 	path.add_child(mover)
 	mover.owner = root
 	mover.set_script(mover_script)
-	mover.set("path_node", mover.get_path_to(path))
-	mover.set("rider", mover.get_path_to(rider))
-	mover.set("speed", max(1.0, ToolUtils.parse_float_arg(args, "speed", 80.0 if is_2d else 3.0)))
-	mover.set("loop_mode", loop_mode)
-	mover.set("wait_time", max(0.0, ToolUtils.parse_float_arg(args, "wait_time", 0.0)))
+	var dropped := ToolUtils.apply_script_properties(mover, {
+		"path_node": mover.get_path_to(path),
+		"rider": mover.get_path_to(rider),
+		"speed": max(1.0, ToolUtils.parse_float_arg(args, "speed", 80.0 if is_2d else 3.0)),
+		"loop_mode": loop_mode,
+		"wait_time": max(0.0, ToolUtils.parse_float_arg(args, "wait_time", 0.0)),
+	})
+	var warning := "" if dropped.is_empty() else " " + ToolUtils.reused_script_warning(dropped, script_path)
 
 	var carry_note: String
 	if target != null:
@@ -354,7 +357,8 @@ func execute(args: Dictionary) -> Dictionary:
 		)
 		+ "script and assembled Path + rider + PathMover. "
 		+ carry_note
-		+ " Edit the route by moving the Path's curve points; tune speed/loop_mode/wait_time on the PathMover. Then call save_scene.",
+		+ " Edit the route by moving the Path's curve points; tune speed/loop_mode/wait_time on the PathMover. Then call save_scene."
+		+ warning,
 		{
 			"created_script": script_path,
 			"path": ToolUtils.node_relative_path(path),
@@ -363,6 +367,7 @@ func execute(args: Dictionary) -> Dictionary:
 			"space": space,
 			"loop_mode": loop_mode,
 			"point_count": points.size(),
+			"dropped_properties": dropped,
 		}
 	)
 

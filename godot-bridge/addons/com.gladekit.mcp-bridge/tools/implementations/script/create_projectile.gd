@@ -469,15 +469,18 @@ func execute(args: Dictionary) -> Dictionary:
 	if not (shooter_script is Script):
 		return ToolUtils.error("Wrote shooter script but could not load it from '%s'" % shooter_script_path)
 	shooter.set_script(shooter_script)
-	shooter.set("input_action", input_action)
-	shooter.set("aim", aim)
-	shooter.set("speed", speed)
-	shooter.set("damage", damage)
-	shooter.set("lifetime", lifetime)
-	shooter.set("cooldown", cooldown)
-	shooter.set("projectile_radius", radius)
-	shooter.set("projectile_color", color)
-	shooter.set("target_group", target_group)
+	var dropped := ToolUtils.apply_script_properties(shooter, {
+		"input_action": input_action,
+		"aim": aim,
+		"speed": speed,
+		"damage": damage,
+		"lifetime": lifetime,
+		"cooldown": cooldown,
+		"projectile_radius": radius,
+		"projectile_color": color,
+		"target_group": target_group,
+	})
+	var warning := "" if dropped.is_empty() else " " + ToolUtils.reused_script_warning(dropped, shooter_script_path)
 
 	# ── Register the fire action ──
 	var action_added := _ensure_fire_action(input_action, key)
@@ -490,7 +493,8 @@ func execute(args: Dictionary) -> Dictionary:
 		+ "flies along its aim, damages the first '%s'-group node it overlaps (calling take_damage(amount) if present, " % target_group
 		+ "else freeing it), and self-frees on hit or after lifetime; and a Shooter child node that spawns one on the "
 		+ "'%s' action (bound to %s), aimed '%s'. Place more turrets by calling again or duplicate_node the Shooter. " % [input_action, key, aim]
-		+ "Pair with create_health on the targets for real HP, and create_particles_%s for an impact burst. Then call save_scene." % space,
+		+ "Pair with create_health on the targets for real HP, and create_particles_%s for an impact burst. Then call save_scene." % space
+		+ warning,
 		{
 			"created_scripts": [projectile_path, shooter_script_path],
 			"shooter": ToolUtils.node_relative_path(shooter),
@@ -499,6 +503,7 @@ func execute(args: Dictionary) -> Dictionary:
 			"space": space,
 			"aim": aim,
 			"group": _GROUP,
+			"dropped_properties": dropped,
 		}
 	)
 

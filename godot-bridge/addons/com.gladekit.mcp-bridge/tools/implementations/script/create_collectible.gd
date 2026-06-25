@@ -162,7 +162,10 @@ func execute(args: Dictionary) -> Dictionary:
 	if not (collectible_script is Script):
 		return ToolUtils.error("Wrote collectible script but could not load it from '%s'" % script_path)
 	area.set_script(collectible_script)
-	area.set("value", value)
+	var dropped := ToolUtils.apply_script_properties(area, {
+		"value": value,
+	})
+	var warning := "" if dropped.is_empty() else " " + ToolUtils.reused_script_warning(dropped, script_path)
 	if not area.is_in_group(_GROUP):
 		area.add_to_group(_GROUP, true)
 
@@ -172,12 +175,14 @@ func execute(args: Dictionary) -> Dictionary:
 		+ "built the node with a collision shape + a visible placeholder. It calls the GameManager's add_score on "
 		+ "player touch and frees itself — so create_game_manager FIRST or the pickup vanishes without scoring. "
 		+ "Place more by calling this again (the script is reused) or by duplicate_game_object. Replace the "
-		+ "Placeholder Polygon2D with a Sprite2D/AnimatedSprite2D for real art. Then call save_scene.",
+		+ "Placeholder Polygon2D with a Sprite2D/AnimatedSprite2D for real art. Then call save_scene."
+		+ warning,
 		{
 			"created_script": script_path,
 			"node": ToolUtils.node_relative_path(area),
 			"group": _GROUP,
 			"value": value,
+			"dropped_properties": dropped,
 		}
 	)
 

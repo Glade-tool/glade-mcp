@@ -202,9 +202,12 @@ func execute(args: Dictionary) -> Dictionary:
 	if not (health_script is Script):
 		return ToolUtils.error("Wrote health script but could not load it from '%s'" % script_path)
 	health.set_script(health_script)
-	health.set("max_health", max_health)
-	health.set("invuln_seconds", invuln_seconds)
-	health.set("free_owner_on_death", free_owner_on_death)
+	var dropped := ToolUtils.apply_script_properties(health, {
+		"max_health": max_health,
+		"invuln_seconds": invuln_seconds,
+		"free_owner_on_death": free_owner_on_death,
+	})
+	var warning := "" if dropped.is_empty() else " " + ToolUtils.reused_script_warning(dropped, script_path)
 
 	return ToolUtils.success(
 		"Added a Health component (%d HP) to '%s'. This tool is ATOMIC: it wrote (once) a VETTED, reusable "
@@ -214,13 +217,15 @@ func execute(args: Dictionary) -> Dictionary:
 		+ "dying in one. It emits 'damaged'/'healed'/'died' — connect 'died' to a death effect / score / game-over and "
 		+ "'damaged' to a health bar. free_owner_on_death=%s: " % str(free_owner_on_death)
 		+ ("the parent is freed at 0 HP (right for enemies/destructibles). " if free_owner_on_death else "the parent is NOT auto-freed; handle 'died' yourself (respawn / game over). ")
-		+ "For the PLAYER, pass free_owner_on_death=false and invuln_seconds (~0.5) for i-frames. Then call save_scene.",
+		+ "For the PLAYER, pass free_owner_on_death=false and invuln_seconds (~0.5) for i-frames. Then call save_scene."
+		+ warning,
 		{
 			"created_script": script_path,
 			"health_node": ToolUtils.node_relative_path(health),
 			"target": ToolUtils.node_relative_path(target),
 			"max_health": max_health,
 			"signals": ["damaged", "healed", "died"],
+			"dropped_properties": dropped,
 		}
 	)
 

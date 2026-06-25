@@ -167,9 +167,10 @@ namespace GladeAgenticAI.Services
                 if (target.GetComponent(type) == null)
                 {
                     var component = target.AddComponent(type);
-                    ApplyFields(component, req.fields);
+                    var dropped = ApplyFields(component, req.fields);
                     EditorUtility.SetDirty(target);
                     attached.Add($"{type.Name} → {target.name}");
+                    if (dropped.Count > 0) WarnDroppedFields(req, type, dropped);
                 }
             }
 
@@ -225,28 +226,68 @@ namespace GladeAgenticAI.Services
         /// runs — so it ships the values with the queued request and we apply them
         /// here, the moment the component exists. Only public fields/properties are
         /// touched, and only int / float / bool / string, which covers every
-        /// scaffolder knob (lives, score-to-win, pickup value, damage, …). A name
-        /// that doesn't resolve is skipped quietly: the script default stands.
+        /// scaffolder knob (lives, score-to-win, pickup value, damage, …).
+        ///
+        /// Returns the names of any requested knobs the attached type does NOT
+        /// declare as a public field or settable property — i.e. values that were
+        /// silently dropped. An empty list means everything the tool queued landed.
+        /// This is the signal for the reused-existing-class trap: when a project
+        /// already has a script of the same name (e.g. its own <c>MovingPlatform</c>),
+        /// the bridge reuses that class instead of the vetted template, and the
+        /// template's knobs (route/speed/…) have nowhere to go. Surfacing the names
+        /// here turns a "the tool did nothing" mystery into an actionable warning.
+        /// A member that exists but whose value won't convert is NOT reported — the
+        /// knob isn't missing, so it's a different (and rarer) problem.
         /// </summary>
-        private static void ApplyFields(Component component, List<FieldValue> fields)
+        private static List<string> ApplyFields(Component component, List<FieldValue> fields)
         {
-            if (component == null || fields == null || fields.Count == 0) return;
+            var dropped = new List<string>();
+            if (component == null || fields == null || fields.Count == 0) return dropped;
             Type t = component.GetType();
             foreach (var f in fields)
             {
                 if (string.IsNullOrEmpty(f.name)) continue;
-                try
+
+                var field = t.GetField(f.name);
+                if (field != null)
                 {
-                    var field = t.GetField(f.name);
-                    if (field != null) { field.SetValue(component, ConvertValue(f, field.FieldType)); continue; }
-                    var prop = t.GetProperty(f.name);
-                    if (prop != null && prop.CanWrite) prop.SetValue(component, ConvertValue(f, prop.PropertyType));
+                    try { field.SetValue(component, ConvertValue(f, field.FieldType)); }
+                    catch { /* member exists but the value didn't convert — not a collision */ }
+                    continue;
                 }
-                catch
+
+                var prop = t.GetProperty(f.name);
+                if (prop != null && prop.CanWrite)
                 {
-                    // Type mismatch or a setter that threw — leave the script default.
+                    try { prop.SetValue(component, ConvertValue(f, prop.PropertyType)); }
+                    catch { /* member exists but the setter threw — not a collision */ }
+                    continue;
                 }
+
+                // No public field or settable property by this name: the value was
+                // dropped. The script's own default stands.
+                dropped.Add(f.name);
             }
+            return dropped;
+        }
+
+        /// <summary>
+        /// Warn that a scaffolder's queued settings landed on a component that has no
+        /// such fields — the tell-tale of a same-named user script being reused in
+        /// place of the vetted template. Logged (not thrown) so the partial wiring
+        /// still stands and the rest of the queue completes; the backend surfaces
+        /// console warnings, so the agent and user learn why the knobs did nothing.
+        /// </summary>
+        private static void WarnDroppedFields(WiringRequest req, Type type, List<string> dropped)
+        {
+            Debug.LogWarning(
+                $"[GladeKit] Deferred wiring attached '{type.Name}' to '{req.objectName}', but " +
+                $"{dropped.Count} requested setting(s) did not apply — {string.Join(", ", dropped)} — " +
+                $"because the '{type.Name}' class in this project has no such field. This usually means a " +
+                $"script named '{type.Name}' already existed and was reused INSTEAD of the GladeKit template, " +
+                "so those settings were skipped and the existing script's behavior stands. To get the " +
+                $"template's behavior, rename or remove your '{type.Name}' script (or set those fields on " +
+                "your own class). The component is attached; only the listed settings were dropped.");
         }
 
         private static object ConvertValue(FieldValue f, Type target)
