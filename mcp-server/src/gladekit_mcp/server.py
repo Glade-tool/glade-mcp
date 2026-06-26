@@ -219,7 +219,7 @@ async def list_tools() -> list[types.Tool]:
 async def call_tool(
     name: str,
     arguments: dict,
-) -> list[types.TextContent]:
+) -> list[types.ContentBlock]:
     """Public entry — dispatches to _handle_tool_call and prepends a one-shot
     bridge-staleness warning to the first text content. Engine-aware: probes
     the active bridge kind and queries that engine's version-gate module.
@@ -242,7 +242,7 @@ async def call_tool(
 async def _handle_tool_call(
     name: str,
     arguments: dict,
-) -> list[types.TextContent]:
+) -> list[types.ContentBlock]:
     """Dispatch a tool call to the Unity bridge or handle meta-tools."""
     arguments = arguments or {}
 
@@ -382,7 +382,38 @@ async def _handle_tool_call(
     # batchable Unity calls.
     telemetry.record_single_call(_current_session_id(), name)
     result = await dispatch_tool_call(name, arguments)
+    image_blocks = _maybe_image_content(result)
+    if image_blocks is not None:
+        return image_blocks
     return [types.TextContent(type="text", text=result)]
+
+
+def _maybe_image_content(result: str):
+    """Turn a vision tool's result into native MCP image content.
+
+    Tools like ``look_at_game_view`` return a normal JSON result that also
+    carries an ``image_base64`` field. When present, return a
+    ``[TextContent, ImageContent]`` pair so MCP clients render the screenshot
+    instead of dumping a base64 wall of text. Returns ``None`` for ordinary
+    (text-only) results.
+    """
+    if not result or "image_base64" not in result:
+        return None
+    try:
+        parsed = json.loads(result)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    b64 = parsed.get("image_base64")
+    if not isinstance(b64, str) or not b64:
+        return None
+    mime = parsed.get("image_mime") or "image/png"
+    message = parsed.get("message") or "Captured the game view."
+    return [
+        types.TextContent(type="text", text=message),
+        types.ImageContent(type="image", data=b64, mimeType=mime),
+    ]
 
 
 # ── Resources ─────────────────────────────────────────────────────────────────

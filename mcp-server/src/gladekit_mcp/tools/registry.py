@@ -138,6 +138,8 @@ CORE_TOOLS: set[str] = {
     "add_animator_transition",
     # ── Console & diagnostics ─────────────────────────────────────────────────
     "get_unity_console_logs",
+    # ── Vision ────────────────────────────────────────────────────────────────
+    "look_at_game_view",
     # ── Runtime / Live Loop ───────────────────────────────────────────────────
     "start_runtime_observation",
     "stop_runtime_observation",

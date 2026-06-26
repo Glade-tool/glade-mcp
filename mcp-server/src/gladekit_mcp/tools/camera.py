@@ -25,6 +25,31 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "look_at_game_view",
+            "description": (
+                "Capture a screenshot of the rendered game view so you can SEE the current "
+                "scene and verify it visually. Use this to check your own work after building "
+                "or changing visuals — it catches problems node/component inspection cannot: "
+                "invisible or missing objects, wrong/pink materials, off-screen or clipped UI, "
+                "bad lighting (too dark/blown out), and poor framing. The image is returned to "
+                "you as a vision input. Renders the active game camera (works in edit mode). "
+                "Call it when the user asks you to 'look at', 'check how it looks', or to fix a "
+                "visual issue, and to confirm a visual change had the intended effect."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "maxWidth": {
+                        "type": "integer",
+                        "description": "Optional cap on the longest image edge in pixels (default 1280, max 2048).",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_camera",
             "description": "Create a Camera GameObject. For follow/third-person cameras, create a Camera + movement script. For advanced cinematic cameras with blending, use create_cinemachine_virtual_camera instead (requires Cinemachine package).",
             "parameters": {

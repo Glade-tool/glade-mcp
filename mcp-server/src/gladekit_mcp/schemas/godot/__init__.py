@@ -128,6 +128,8 @@ GODOT_READ_ONLY_TOOLS: frozenset = frozenset(
         # Lighting / Environment reads (v0.5.3)
         "get_light_info",
         "get_world_environment",
+        # Vision — renders the editor viewport to an image (mutates nothing)
+        "look_at_game_view",
         # Animation reads (v0.6.0)
         "get_animation_player_info",
         # AnimationTree state-machine read (v0.6.8)

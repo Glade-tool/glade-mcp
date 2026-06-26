@@ -24,6 +24,37 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "look_at_game_view",
+            "description": (
+                "Capture a screenshot of the rendered editor view so you can SEE the current "
+                "scene and verify it visually. Use this to check your own work after building "
+                "or changing visuals — it catches problems node inspection cannot: invisible or "
+                "missing nodes, wrong/missing materials, off-screen or clipped UI, bad lighting "
+                "(too dark/blown out), and poor framing. The image is returned to you as a "
+                "vision input. The `space` arg picks the view: omit to auto-detect from the "
+                "edited scene (a 2D scene grabs the 2D view, otherwise the 3D view), or set "
+                "'2d'/'3d' explicitly. Call it when the user asks you to 'look at', 'check how "
+                "it looks', or to fix a visual issue, and to confirm a visual change worked."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "space": {
+                        "type": "string",
+                        "enum": ["2d", "3d"],
+                        "description": "Which editor view to capture. Omit to auto-detect from the edited scene.",
+                    },
+                    "maxWidth": {
+                        "type": "integer",
+                        "description": "Optional cap on the longest image edge in pixels (default 1280, max 2048).",
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_camera",
             "description": (
                 "Create a camera node. The `space` arg picks the family: 'space=3d' "

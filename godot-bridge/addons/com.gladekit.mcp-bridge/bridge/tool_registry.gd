@@ -94,6 +94,7 @@ const SetLightPropertiesTool  = preload("res://addons/com.gladekit.mcp-bridge/to
 const GetLightInfoTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/get_light_info.gd")
 const SetWorldEnvironmentTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/set_world_environment.gd")
 const GetWorldEnvironmentTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/get_world_environment.gd")
+const LookAtGameViewTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/camera/look_at_game_view.gd")
 
 # ── Resource tools (Phase 3 + 7) ───────────────────────────────────────────
 const CreateMaterialTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/resource/create_material.gd")
@@ -305,6 +306,7 @@ func _register_all() -> void:
 	register_tool(GetLightInfoTool.new())
 	register_tool(SetWorldEnvironmentTool.new())
 	register_tool(GetWorldEnvironmentTool.new())
+	register_tool(LookAtGameViewTool.new())
 	# Resource (3) — Material has its own dedicated tool; create_resource
 	# handles every other built-in Resource subclass (Mesh, Shape3D, Curve, etc.)
 	register_tool(CreateMaterialTool.new())

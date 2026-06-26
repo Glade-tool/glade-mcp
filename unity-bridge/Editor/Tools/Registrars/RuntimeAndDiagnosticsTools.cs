@@ -1,3 +1,4 @@
+using GladeAgenticAI.Core.Tools.Implementations.Camera;
 using GladeAgenticAI.Core.Tools.Implementations.Diagnostics;
 using GladeAgenticAI.Core.Tools.Implementations.Profiler;
 using GladeAgenticAI.Core.Tools.Implementations.Runtime;
@@ -27,6 +28,10 @@ namespace GladeAgenticAI.Services
 
             // Diagnostics — eval/automation tooling
             Register(new ResetEvalStateTool());
+
+            // Vision — capture the rendered game view so the assistant can see
+            // what it built (read-only; edit-mode safe via camera render).
+            Register(new LookAtGameViewTool());
 
             // Playability probe — eval-only, two-phase arm+poll. Bridge-
             // registered but NOT in the agent schema (it enters Play mode;
