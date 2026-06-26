@@ -107,7 +107,7 @@ TOOLS: List[Dict] = [
                     "scene": {
                         "type": "string",
                         "description": (
-                            "Which scene to run. Use \"current\" to run the scene open in "
+                            'Which scene to run. Use "current" to run the scene open in '
                             "the editor — REQUIRED when verifying a change you just made, "
                             "because the project's main scene is often a menu that does not "
                             "include the node you edited (so it would run clean while your "

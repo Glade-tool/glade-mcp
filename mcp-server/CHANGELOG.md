@@ -4,6 +4,24 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.11] - 2026-06-26
+
+### Added
+
+- **Godot bridge addon v0.7.4 — moving platforms, directional blending, per-object juice, and live particle tuning (4 new tools, 91 → 95).** Schemas for these tools are now exposed to MCP clients.
+  - **`create_moving_platform`** — build a moving platform (or send an existing node patrolling a route) in one call, in **either 2D or 3D**: a waypoint curve, a vetted mover that drives the rider along it at constant speed, and a rider. The default rider is an `AnimatableBody2D` / `AnimatableBody3D` that genuinely **carries** a resting `CharacterBody` player (a `StaticBody` would let the player float when the platform reverses); pass `target_path` to send an existing node along instead, leaving its script intact. Dimension is inferred from the open scene's root. `loop_mode`: `loop` / `pingpong` / `once`.
+  - **`create_blend_space_2d`** — directional sprite animation from a single 2D vector (the canonical 8/4-way walk setup). Builds an `AnimationTree` rooted in an `AnimationNodeBlendSpace2D` over an existing `AnimationPlayer`; blend points are placed explicitly or auto-seeded from directional clip names (`up` / `down` / `left` / `right`). Cardinal layout matches Godot's screen-space convention (+y is down), so `velocity.normalized()` feeds straight into `blend_position` with no axis flip.
+  - **`create_juice`** — a reusable per-object "juice" node attached under a target `Node2D` / `Control` that tweens the target's scale and modulate from the outside, so it never clobbers the target's own script. Methods: `pop()` (overshoot-then-settle squash-stretch punch), `flash(color)`, `fade_in` / `fade_out`, `pop_in` (spawn scale-from-zero). Optional idle motion (`pulse` / `bob`) and spawn animation fire automatically. The per-object companion to `create_screen_shake`'s camera kick.
+  - **`set_particles_properties`** — re-tune an existing `GPUParticles2D` after creation: switch preset, or override amount / lifetime / emission / velocity / gravity / color without rebuilding the node, so an effect can be dialed in iteratively.
+
+- **One-way platforms (argument extensions, no new tools).** `set_tilemap_collision` gained `one_way` + `one_way_margin` (land on top of tiles, pass through from below), and `create_moving_platform` gained `one_way`. Discrete static platforms get one-way via the existing property setter.
+
+### Changed
+
+- **`run_project` self-healing verify mode.** `run_project` gained a `verify` flag for confirming a change you just made: it runs the project, captures output, and reports back so a mistake surfaces immediately instead of silently. Pass the edited scene explicitly when it isn't the project's main scene.
+
+- **Scaffolder safety: warn on reused same-named scripts.** When a vetted scaffolder reuses an existing script of the same name rather than writing its own, any settings it would have queued onto a fresh script are now reported as dropped, so a silent no-op becomes a visible warning.
+
 ## [0.7.10] - 2026-06-22
 
 ### Added
