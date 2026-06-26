@@ -417,6 +417,62 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "create_scene_transition",
+            "description": (
+                "Register a full-screen scene-transition overlay as an AUTOLOAD in ONE "
+                "atomic call — the piece that turns hard scene CUTS into smooth fades "
+                "(menu<->game, level<->level, on death/respawn). PREFER THIS over "
+                "hand-writing transitions: it writes a VETTED GDScript VERBATIM and "
+                "registers it as a project autoload (default name 'ScreenTransition'). It "
+                "MUST be a singleton to work — a per-scene node is freed by "
+                "change_scene_to_file mid-transition, so its fade-in never runs. Reach it "
+                "globally by name (no node/group lookup): "
+                "ScreenTransition.transition_to('res://scenes/level_2.tscn') fades out, "
+                "swaps the scene, fades back in (use this in place of a bare "
+                "get_tree().change_scene_to_file in menu/pause/win logic); "
+                "await ScreenTransition.fade_out() covers the screen; "
+                "ScreenTransition.flash(Color.RED) does a quick hit blink. The overlay is a "
+                "top-most CanvasLayer that clears a paused tree before swapping. It "
+                "activates on the next play — nothing is added to the current scene, so NO "
+                "save_scene is needed."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "singleton_name": {
+                        "type": "string",
+                        "description": (
+                            "Autoload (global) name you call it by. Must be a valid "
+                            "identifier. Default 'ScreenTransition'."
+                        ),
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Fade color, '#rrggbb[aa]' or 'r,g,b[,a]'. Default black.",
+                    },
+                    "duration": {
+                        "type": "number",
+                        "description": ("Default fade time in seconds for each half of a transition. Default 0.4."),
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "res:// folder for the generated screen_transition.gd. Default 'res://scripts'.",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Rewrite screen_transition.gd even if it exists. Default false "
+                            "(reuses the existing script; color/duration apply only with overwrite=true)."
+                        ),
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_game_manager",
             "description": (
                 "Drop the HUB of a simple 2D game into the scene in ONE atomic call — the "

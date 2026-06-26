@@ -55,6 +55,11 @@ const CreateScreenShakeTool = preload("res://addons/com.gladekit.mcp-bridge/tool
 # create_screen_shake's camera kick; composes with collectible/hazard/enemy.
 const CreateJuiceTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_juice.gd")
 
+# Vetted scene-transition overlay registered as an AUTOLOAD (must be a singleton
+# to survive change_scene_to_file): fade-out → swap → fade-in, plus fade/flash
+# helpers. Turns the menu/win/death hard scene CUTS into smooth fades.
+const CreateSceneTransitionTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_scene_transition.gd")
+
 # 2D gameplay-loop family: vetted scaffolders that turn a playable character into
 # a winnable/losable game. create_game_manager is the hub (score/lives/respawn/
 # win-lose + HUD, reached via the "game_manager" group); create_collectible and
@@ -285,6 +290,7 @@ func _register_all() -> void:
 	register_tool(Create2DControllerTool.new())
 	register_tool(CreateScreenShakeTool.new())
 	register_tool(CreateJuiceTool.new())
+	register_tool(CreateSceneTransitionTool.new())
 	register_tool(CreateGameManagerTool.new())
 	register_tool(CreateCollectibleTool.new())
 	register_tool(CreateHazardTool.new())
