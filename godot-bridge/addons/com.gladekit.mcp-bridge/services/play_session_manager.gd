@@ -33,6 +33,13 @@ const RuntimeLogStream = preload("res://addons/com.gladekit.mcp-bridge/services/
 # so the project's filesystem scanner doesn't try to import it.
 const SESSIONS_PERSIST_PATH := "user://gladekit-godot-bridge/sessions.json"
 
+# Watchdog: a play session that outlives this is treated as abandoned (the
+# agent forgot stop_project) and is killed on the next reap so it can't block
+# future run_project calls forever. Generous enough that a normal interactive
+# playtest finishes well within it; short enough that a leaked verification
+# run doesn't linger for the rest of the editor session.
+const MAX_SESSION_LIFETIME_SEC := 300.0
+
 # Maps session_id (auto-incrementing int as string) → session dict.
 # Session dict shape:
 #   { "pid": int,
@@ -160,6 +167,7 @@ static func _drain_pipe(s: Dictionary, pipe_key: String, buf_key: String) -> Str
 # per-session buffer for get_debug_output to consume on its next call,
 # AND into RuntimeLogStream for structured parsing).
 static func tick_all_sessions() -> void:
+	reap()
 	for sid in _sessions.keys():
 		var s: Dictionary = _sessions[sid]
 		_drain_pipe(s, "stdio", "stdout_buffer")
@@ -199,7 +207,38 @@ static func stop(session_id: String) -> Dictionary:
 	}
 
 
+# Watchdog reaper. Drops sessions whose process has exited (zombie cleanup)
+# and kills+drops sessions that have outlived MAX_SESSION_LIFETIME_SEC (the
+# agent forgot stop_project). Cheap and idempotent — safe to call before any
+# operation that reads or contends on the live session set. Returns a list of
+# {pid, reason} for the sessions it removed, for diagnostics.
+static func reap() -> Array:
+	var reaped: Array = []
+	var now := Time.get_unix_time_from_system()
+	var changed := false
+	for sid in _sessions.keys().duplicate():  # duplicate: we erase while iterating
+		var s: Dictionary = _sessions[sid]
+		var pid: int = int(s.get("pid", 0))
+		var running := OS.is_process_running(pid)
+		if not running:
+			_sessions.erase(sid)
+			reaped.append({"pid": pid, "reason": "exited"})
+			changed = true
+			continue
+		var age := now - float(s.get("started_unix", now))
+		if age > MAX_SESSION_LIFETIME_SEC:
+			OS.kill(pid)
+			RuntimeLogStream.flush_session(sid)
+			_sessions.erase(sid)
+			reaped.append({"pid": pid, "reason": "max_lifetime_exceeded", "age_sec": age})
+			changed = true
+	if changed:
+		_persist_sessions()
+	return reaped
+
+
 static func list_sessions() -> Array:
+	reap()
 	var out: Array = []
 	for sid in _sessions.keys():
 		var s: Dictionary = _sessions[sid]

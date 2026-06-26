@@ -19,8 +19,20 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #     "two PIE windows opened" footgun when an agent retries.
 #
 # Args:
-#   scene:           String — optional scene path (.tscn) to launch. Default:
-#                             project's main scene.
+#   scene:           String — scene to launch. A res:// (or project-relative)
+#                             path runs that scene. The special value "current"
+#                             (or "edited") runs the scene currently open in the
+#                             editor — use this to verify a change you just made,
+#                             since the project's main scene may be a menu that
+#                             does not include the node you edited. Empty (the
+#                             default) runs the project's main scene (F5 behavior).
+#   verify:          bool   — run a bounded headless pass for error capture.
+#                             Adds --headless --quit-after so the process exits
+#                             on its own and flushes its output, making
+#                             get_debug_output a reliable "did it run clean?"
+#                             check. Use this (with scene="current") to verify a
+#                             gameplay change. Default false (long-lived run for
+#                             interactive playtesting).
 #   extra_args:      Array  — additional CLI args to pass through to godot.
 #   auto_save:       bool   — save the edited scene before spawn. Default true.
 #                             Set false for "run the version on disk as-is" flows.
@@ -30,6 +42,8 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #   session_id:       String — use this with get_debug_output / stop_project
 #   pid:              int
 #   command:          String — the spawned commandline (for diagnostics)
+#   ran_scene:        String — the scene path actually launched, or "" when the
+#                              project's main scene was used.
 #   auto_saved_scene: String — res:// path of the saved scene, or "" when no
 #                              save occurred (auto_save=false, no scene open,
 #                              or unsaved untitled scene).
@@ -90,15 +104,51 @@ func execute(args: Dictionary) -> Dictionary:
 				auto_saved_scene = scene_path
 
 	var scene: String = ToolUtils.parse_string_arg(args, "scene")
-	# Allow either a res:// path or a project-relative path.
-	if not scene.is_empty() and scene.begins_with("res://"):
-		scene = scene  # godot CLI accepts res:// paths
+	# "current"/"edited" resolves to the scene open in the editor. This is what
+	# an agent wants when verifying a change: the project main scene is often a
+	# menu that doesn't instantiate the node just edited, so it would run clean
+	# while the real edit went untested.
+	if scene == "current" or scene == "edited":
+		var edited_root: Node = EditorInterface.get_edited_scene_root()
+		var edited_path: String = "" if edited_root == null else edited_root.scene_file_path
+		if edited_path.is_empty():
+			return ToolUtils.error_with_solutions(
+				"scene='current' requested but no saved scene is open in the editor",
+				[
+					"Open (and save) the scene you want to run, then retry",
+					"Or pass scene as an explicit res:// path",
+				]
+			)
+		scene = edited_path
+	# Allow either a res:// path or a project-relative path (godot CLI accepts both).
 
 	var extra: Array = []
 	if args.has("extra_args"):
 		var ea = args["extra_args"]
 		if ea is Array:
 			extra = ea
+
+	# verify=true: a bounded headless run for error capture. --headless avoids a
+	# window flash; --quit-after makes the process exit on its own after a few
+	# hundred frames so its buffered stdout/stderr flushes and get_debug_output
+	# can read the result reliably. A long-lived windowed run may never flush a
+	# small runtime error, and killing it does not flush the child's libc
+	# buffers — so an indefinite run is unreliable for "did it run clean?".
+	var verify: bool = ToolUtils.parse_bool_arg(args, "verify", false)
+	if verify:
+		var has_headless := false
+		var has_quit := false
+		for a in extra:
+			var sa := str(a)
+			if sa == "--headless":
+				has_headless = true
+			if sa.begins_with("--quit-after"):
+				has_quit = true
+		if not has_headless:
+			extra.append("--headless")
+		if not has_quit:
+			extra.append("--quit-after")
+			extra.append("300")
 
 	var spawn := PlaySessionManager.start(project_path, scene, extra)
 	if spawn.has("error"):
@@ -117,5 +167,6 @@ func execute(args: Dictionary) -> Dictionary:
 		"session_id": spawn["session_id"],
 		"pid": int(spawn["pid"]),
 		"command": spawn["command"],
+		"ran_scene": scene,
 		"auto_saved_scene": auto_saved_scene,
 	})

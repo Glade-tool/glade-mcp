@@ -107,8 +107,23 @@ TOOLS: List[Dict] = [
                     "scene": {
                         "type": "string",
                         "description": (
-                            "Optional res:// path to a .tscn to launch. Defaults to the "
-                            "project's main scene from project.godot."
+                            "Which scene to run. Use \"current\" to run the scene open in "
+                            "the editor — REQUIRED when verifying a change you just made, "
+                            "because the project's main scene is often a menu that does not "
+                            "include the node you edited (so it would run clean while your "
+                            "edit went untested). A res:// path runs that specific scene. "
+                            "Omit to run the project's main scene from project.godot."
+                        ),
+                    },
+                    "verify": {
+                        "type": "boolean",
+                        "description": (
+                            "Run a bounded headless pass for error capture (adds "
+                            "--headless --quit-after so the process exits on its own and "
+                            "flushes its output). Set true when verifying a gameplay "
+                            "change — it makes get_debug_output a reliable clean/dirty "
+                            "check, where a long indefinite run may never surface a small "
+                            "runtime error. Default false (interactive playtest)."
                         ),
                     },
                     "extra_args": {
