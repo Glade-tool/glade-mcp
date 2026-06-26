@@ -18,7 +18,7 @@ Categories follow the Godot bridge's own directory layout under
     resource  — Material creation, generic Resource creation,
                 property updates                                ( 3 tools)
     physics   — PhysicsBody (2D/3D) + auto-collision-shape      ( 1 tool)
-    particles — preset-driven GPUParticles2D ("juice")          ( 1 tool)
+    particles — GPUParticles2D/3D presets + property tuning     ( 3 tools)
     scene_io  — .tscn create/open/save/instantiate              ( 4 tools)
     runtime   — Play-mode + selection + console + play session
                 + structured runtime-event observation          (10 tools)

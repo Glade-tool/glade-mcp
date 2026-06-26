@@ -1,5 +1,5 @@
 """
-Godot particle / juice tools (2 tools).
+Godot particle / juice tools (3 tools).
 
 Preset-driven GPUParticles2D / GPUParticles3D scaffolding. Particles are the
 cheapest, highest-impact way to make a game feel alive (impacts, pickups, fire,
@@ -157,6 +157,91 @@ TOOLS: List[Dict] = [
                         ),
                     },
                 },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_particles_properties",
+            "description": (
+                "Tune an EXISTING GPUParticles2D or GPUParticles3D after it was created. "
+                "USE THIS instead of deleting and recreating when the user wants to adjust "
+                "an effect already in the scene — 'make the explosion bigger', 'fewer "
+                "sparkles', 'turn the fire red', 'let it fall faster', 'make it a one-shot "
+                "burst'. Partial update: only the properties you pass change; everything "
+                "omitted is left as-is. Works on both 2D and 3D particle nodes (same "
+                "property names). Material knobs (velocity/scale/spread/gravity/color) on a "
+                "node with a custom ShaderMaterial are reported in ignored_properties and "
+                "the rest still apply. After it runs, call save_scene."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_path": {
+                        "type": "string",
+                        "description": "Scene-relative path to the GPUParticles2D/3D to tune.",
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "description": "Particle count.",
+                    },
+                    "lifetime": {
+                        "type": "number",
+                        "description": "Seconds each particle lives.",
+                    },
+                    "one_shot": {
+                        "type": "boolean",
+                        "description": "Emit a single burst then stop (vs. a continuous stream).",
+                    },
+                    "emitting": {
+                        "type": "boolean",
+                        "description": "Whether it is currently emitting. Set true to (re)fire.",
+                    },
+                    "explosiveness": {
+                        "type": "number",
+                        "description": "0 = a steady stream, 1 = all particles at once (a burst).",
+                    },
+                    "speed_scale": {
+                        "type": "number",
+                        "description": "Time multiplier for the whole simulation (2 = double speed).",
+                    },
+                    "velocity_min": {
+                        "type": "number",
+                        "description": "Minimum initial particle speed.",
+                    },
+                    "velocity_max": {
+                        "type": "number",
+                        "description": "Maximum initial particle speed.",
+                    },
+                    "scale_min": {
+                        "type": "number",
+                        "description": "Minimum particle size.",
+                    },
+                    "scale_max": {
+                        "type": "number",
+                        "description": "Maximum particle size.",
+                    },
+                    "spread": {
+                        "type": "number",
+                        "description": "Emission cone half-angle in degrees (180 = all directions).",
+                    },
+                    "gravity": {
+                        "type": "string",
+                        "description": (
+                            "Per-frame force as 'x,y,z'. 2D is screen-space (+Y is DOWN, so "
+                            "'0,-200,0' makes particles rise); 3D is world meters."
+                        ),
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": (
+                            "Recolor as '#rrggbb[aa]' or 'r,g,b[,a]'. The color ramp is rebuilt "
+                            "as this color fading to transparent (same as create_particles_*)."
+                        ),
+                    },
+                },
+                "required": ["node_path"],
             },
         },
     },

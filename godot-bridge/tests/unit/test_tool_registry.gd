@@ -47,10 +47,12 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# create_enemy_3d (1) = 85; 3D navigation add_navigation_agent +
 	# bake_navigation_mesh (2) = 87; create_particles_3d (1) = 88;
 	# create_projectile (1) = 89; create_health (1) = 90;
-	# create_health_bar (1) = 91; create_moving_platform (1) = 92 total.
+	# create_health_bar (1) = 91; create_moving_platform (1) = 92;
+	# create_blend_space_2d (1) = 93; create_juice (1) = 94;
+	# set_particles_properties (1) = 95 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 94, "Catalog should register exactly 94 tools")
+	assert_eq(registry.get_tool_count(), 95, "Catalog should register exactly 95 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -117,6 +119,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"create_enemy_3d", "add_navigation_agent", "bake_navigation_mesh",
 		# Particles / juice — 3D twin of create_particles_2d
 		"create_particles_3d",
+		# Particle tuning — adjust an existing GPUParticles2D/3D after create
+		"set_particles_properties",
 		# Combat — the shoot verb (projectile + shooter, 2D/3D)
 		"create_projectile",
 		# Combat — reusable HP component (completes shoot -> damage -> death)
