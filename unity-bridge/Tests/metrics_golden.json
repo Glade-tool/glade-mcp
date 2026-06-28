@@ -1,0 +1,92 @@
+{
+  "_README": [
+    "Golden vectors for the playability metrics — the shared spec that any",
+    "implementation of PlayabilityMetrics (Editor/Services/PlayabilityMetrics.cs)",
+    "must reproduce. PlayabilityMetrics_Tests.cs pins the C# implementation to",
+    "these values; a port in any other language is expected to pin to the same",
+    "file so the implementations cannot drift apart.",
+    "",
+    "Every 'expected' value was computed BY HAND from the metric definitions",
+    "(see the 'arithmetic' field per entry) — do NOT regenerate them from an",
+    "implementation, that would make the spec circular and unable to catch a bug.",
+    "",
+    "Sample convention: [x, y, z]. Planar travel is the XZ plane; Y is up.",
+    "  pathLength   = sum of XZ distances between consecutive samples",
+    "  straightness = (XZ distance first->last) / pathLength, clamped [0,1],",
+    "                 but 0.0 when pathLength < 1e-4 (stuck != straight)",
+    "  jumpDy       = max(sample.y - samples[jumpStartIndex].y) for i >=",
+    "                 jumpStartIndex, never negative"
+  ],
+  "vectors": [
+    {
+      "name": "straight_line",
+      "samples": [[0, 0, 0], [0, 0, 1], [0, 0, 2], [0, 0, 3]],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 1.0, "pathLength": 3.0, "jumpDy": 0.0},
+      "arithmetic": "XZ steps 1+1+1 = pathLength 3. Net first->last (0,0)->(0,3) = 3. straightness 3/3 = 1.0. Y is flat so jumpDy = 0."
+    },
+    {
+      "name": "square_loop_returns_to_start",
+      "samples": [[0, 0, 0], [2, 0, 0], [2, 0, 2], [0, 0, 2], [0, 0, 0]],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 0.0, "pathLength": 8.0, "jumpDy": 0.0},
+      "arithmetic": "Four sides of length 2: pathLength 2+2+2+2 = 8. Net first->last = (0,0)->(0,0) = 0. straightness 0/8 = 0.0 (the circles bug). Y flat so jumpDy 0."
+    },
+    {
+      "name": "stuck_no_movement",
+      "samples": [[1, 0, 1], [1, 0, 1], [1, 0, 1]],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 0.0, "pathLength": 0.0, "jumpDy": 0.0},
+      "arithmetic": "All samples identical: pathLength 0. 0 < 1e-4 epsilon so straightness short-circuits to 0.0 (stuck is not straight). Y flat so jumpDy 0."
+    },
+    {
+      "name": "l_shaped_path",
+      "samples": [[0, 0, 0], [3, 0, 0], [3, 0, 4]],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 0.7142857142857143, "pathLength": 7.0, "jumpDy": 0.0},
+      "arithmetic": "Leg 1 (0,0)->(3,0) = 3, leg 2 (3,0)->(3,4) = 4, pathLength 7. Net first->last (0,0)->(3,4) = sqrt(3^2+4^2) = sqrt(25) = 5. straightness 5/7 = 0.714285714285... Y flat so jumpDy 0."
+    },
+    {
+      "name": "clean_jump",
+      "samples": [[0, 0, 0], [0, 0.5, 1], [0, 0.9, 2], [0, 0.4, 3], [0, 0, 4]],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 1.0, "pathLength": 4.0, "jumpDy": 0.9},
+      "arithmetic": "XZ steps each 1 (Y ignored): pathLength 4. Net (0,0)->(0,4) = 4, straightness 4/4 = 1.0. jumpDy = max(y - y[0]=0) over arc 0,0.5,0.9,0.4,0 = 0.9."
+    },
+    {
+      "name": "dead_jump",
+      "samples": [[0, 0, 0], [0, 0, 1], [0, 0, 2]],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 1.0, "pathLength": 2.0, "jumpDy": 0.0},
+      "arithmetic": "XZ steps 1+1 = pathLength 2. Net (0,0)->(0,2) = 2, straightness 1.0. Y never rises above start 0 so jumpDy = 0 (the dead-jump bug)."
+    },
+    {
+      "name": "jump_measured_from_start_index",
+      "samples": [[0, 0, 0], [0, 0, 0], [0, 1.5, 0]],
+      "jumpStartIndex": 1,
+      "expected": {"straightness": 0.0, "pathLength": 0.0, "jumpDy": 1.5},
+      "arithmetic": "All XZ identical so pathLength 0 -> straightness 0.0 (epsilon guard). jumpDy is relative to samples[1].y=0, peak 1.5 -> rise 1.5 (NOT relative to sample 0)."
+    },
+    {
+      "name": "only_falling_no_rise",
+      "samples": [[0, 5, 0], [0, 3, 0], [0, 1, 0]],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 0.0, "pathLength": 0.0, "jumpDy": 0.0},
+      "arithmetic": "All XZ identical so pathLength 0 -> straightness 0.0. Y only decreases (5->3->1); rise never positive so jumpDy clamps to 0 (not -4)."
+    },
+    {
+      "name": "single_sample",
+      "samples": [[5, 1, 5]],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 0.0, "pathLength": 0.0, "jumpDy": 0.0},
+      "arithmetic": "Fewer than 2 samples: pathLength 0 and straightness 0.0. jumpDy: only sample is the start sample, rise 0."
+    },
+    {
+      "name": "empty",
+      "samples": [],
+      "jumpStartIndex": 0,
+      "expected": {"straightness": 0.0, "pathLength": 0.0, "jumpDy": 0.0},
+      "arithmetic": "No samples: all three metrics defined to return 0."
+    }
+  ]
+}
