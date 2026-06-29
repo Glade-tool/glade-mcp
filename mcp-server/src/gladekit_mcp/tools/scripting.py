@@ -682,6 +682,52 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "find_references",
+            "description": "Find every script that references a symbol (a class, method, or field name), with per-file line context. Matches whole identifiers only (so 'Player' does NOT match 'PlayerController'), unlike the raw substring search_scripts. ALWAYS call this BEFORE renaming, changing the signature of, or refactoring a public class/method/field — it reveals the dependent scripts a change would break so you can update them too. Returns files ordered by reference count (heaviest dependents first).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "The identifier to find references to — a class, method, or field name (e.g. 'PlayerController', 'TakeDamage', 'maxHealth').",
+                    },
+                    "maxFiles": {
+                        "type": "integer",
+                        "description": "Max distinct files to return (1-100). Default: 40",
+                    },
+                    "maxMatchesPerFile": {
+                        "type": "integer",
+                        "description": "Max line snippets returned per file (1-50). Default: 5. The per-file count is always exact even when snippets are capped.",
+                    },
+                },
+                "required": ["symbol"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_component_usages",
+            "description": "Find every prefab asset and open-scene GameObject that has a component of a given type — the Inspector-WIRING counterpart to find_references (which covers code). Use it to see the blast radius BEFORE removing/renaming a MonoBehaviour or changing a component: the scenes/prefabs where it's attached are invisible in the source because that wiring lives in scene/prefab data, not scripts. Accepts a script class name ('PlayerController') or a built-in component ('Rigidbody', 'BoxCollider'). Returns each usage as {location: 'scene'|'prefab', container, gameObject, componentType}.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "componentType": {
+                        "type": "string",
+                        "description": "The component or MonoBehaviour script type name to locate (simple name, e.g. 'PlayerController', 'Rigidbody'). Case-insensitive.",
+                    },
+                    "maxResults": {
+                        "type": "integer",
+                        "description": "Max usages to return (1-200). Default: 60",
+                    },
+                },
+                "required": ["componentType"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "compile_scripts",
             "description": "Check Unity script compilation status. Call this after create_script or modify_script. Returns isCompiling (bool) and status ('compiling' or 'idle'). If still compiling, call again. When compilation finishes with errors, returns hasErrors=true plus each error's file path, line number, and ±10 lines of source context — use that context to fix the script before retrying.",
             "parameters": {

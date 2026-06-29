@@ -87,6 +87,8 @@ CORE_TOOLS: set[str] = {
     "modify_script",
     "get_script_content",
     "find_scripts",
+    "find_references",
+    "find_component_usages",
     "compile_scripts",
     # ── Assets & folders ─────────────────────────────────────────────────────
     "list_assets",

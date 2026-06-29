@@ -35,6 +35,8 @@ const READ_ONLY_TOOLS: Array[String] = [
 	# Script reads
 	"get_script_content",
 	"find_scripts",
+	"find_references",
+	"find_scene_usages",
 	# Runtime/observability reads
 	"get_godot_console_logs",
 	"get_play_mode_state",

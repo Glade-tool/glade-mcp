@@ -56,6 +56,8 @@ namespace GladeAgenticAI.Services
             Register(new GetScriptContentTool());
             Register(new FindScriptsTool());
             Register(new SearchScriptsTool());
+            Register(new FindReferencesTool());
+            Register(new FindComponentUsagesTool());
             Register(new CompileScriptsTool());
             Register(new GetUnityConsoleLogsTool());
             Register(new CreateScriptTool());

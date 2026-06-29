@@ -156,6 +156,67 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "find_references",
+            "description": (
+                "Find every .gd script that references a symbol (a class_name, func, "
+                "or var name), with per-file line context. Matches whole identifiers "
+                "only (so 'Player' does NOT match 'PlayerController'), unlike a raw "
+                "substring search. Call this BEFORE renaming or changing a symbol other "
+                "scripts may use — it reveals the dependent scripts a change would break "
+                "so you can update them too. Returns files ordered by reference count."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "The identifier to find references to — a class_name, func, or var name (e.g. 'PlayerController', 'take_damage', 'max_health').",
+                    },
+                    "max_files": {
+                        "type": "integer",
+                        "description": "Max distinct files to return (1-100). Default 40.",
+                    },
+                    "max_matches_per_file": {
+                        "type": "integer",
+                        "description": "Max line snippets per file (1-50). Default 5. The per-file count is always exact even when snippets are capped.",
+                    },
+                },
+                "required": ["symbol"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_scene_usages",
+            "description": (
+                "Find every .tscn scene that references a resource (a .gd script or a "
+                ".tscn scene) via an [ext_resource] entry — the scene-wiring counterpart "
+                "to find_references (which covers code). Use it to see the blast radius "
+                "BEFORE renaming, moving, or deleting a script or scene: which scenes "
+                "attach the script to a node, or instance the scene as a sub-scene. That "
+                "wiring lives in scene data, not code, so find_references won't show it. "
+                "Each usage reports ref_type ('Script', 'PackedScene', ...)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "resource_path": {
+                        "type": "string",
+                        "description": "res:// path to the .gd script or .tscn scene whose scene references you want (e.g. 'res://scripts/player.gd').",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Max referencing scenes to return (1-200). Default 60.",
+                    },
+                },
+                "required": ["resource_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "attach_script_to_node",
             "description": (
                 "Attach an existing GDScript to a node in the edited scene. Each Godot "

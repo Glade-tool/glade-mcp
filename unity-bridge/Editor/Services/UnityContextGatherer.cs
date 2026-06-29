@@ -8,6 +8,7 @@ using UnityEngine;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
 
@@ -464,6 +465,195 @@ namespace GladeAgenticAI.Services
             catch { }
 
             return results.ToArray();
+        }
+
+        /// <summary>
+        /// Finds every script that references an identifier (class, method, or field name),
+        /// using whole-word matching on C# identifier boundaries so "Player" does not match
+        /// "PlayerController" or a substring inside another word. This is the dependency-edge
+        /// primitive: before refactoring a symbol, find the scripts that would break.
+        ///
+        /// Returns one entry per matching file: { path, count, matches:[{ line, text }] }.
+        /// Results are ordered by match count (descending) so the heaviest dependents surface
+        /// first. The walk stops after maxFiles distinct files match to bound cost on large
+        /// projects (same early-out as SearchScriptsContent). Editor and Packages scripts are
+        /// excluded to match the other script-search tools.
+        /// </summary>
+        public static List<Dictionary<string, object>> FindReferences(
+            string symbol, int maxFiles = 40, int maxMatchesPerFile = 5)
+        {
+            var results = new List<Dictionary<string, object>>();
+            if (string.IsNullOrEmpty(symbol))
+                return results;
+
+            // Identifier-boundary match: C# identifiers are [A-Za-z0-9_]. Escape the symbol so
+            // a caller passing a value with regex metacharacters can't break or widen the match.
+            Regex pattern;
+            try
+            {
+                pattern = new Regex(@"(?<![A-Za-z0-9_])" + Regex.Escape(symbol) + @"(?![A-Za-z0-9_])");
+            }
+            catch
+            {
+                return results;
+            }
+
+            try
+            {
+                var scriptGuids = AssetDatabase.FindAssets("t:MonoScript");
+                foreach (var guid in scriptGuids)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrEmpty(path) || !path.EndsWith(".cs"))
+                        continue;
+                    if (path.Contains("/Editor/") || path.StartsWith("Packages/"))
+                        continue;
+
+                    string fullPath = Path.Combine(Application.dataPath, path.Replace("Assets/", ""));
+                    if (!File.Exists(fullPath))
+                        continue;
+
+                    string[] lines;
+                    try { lines = File.ReadAllLines(fullPath); }
+                    catch { continue; }
+
+                    var matches = new List<Dictionary<string, object>>();
+                    int fileMatchCount = 0;
+                    for (int li = 0; li < lines.Length; li++)
+                    {
+                        if (!pattern.IsMatch(lines[li]))
+                            continue;
+                        fileMatchCount++;
+                        if (matches.Count < maxMatchesPerFile)
+                        {
+                            string text = lines[li].Trim();
+                            if (text.Length > 200)
+                                text = text.Substring(0, 200);
+                            matches.Add(new Dictionary<string, object>
+                            {
+                                { "line", li + 1 },
+                                { "text", text }
+                            });
+                        }
+                    }
+
+                    if (fileMatchCount > 0)
+                    {
+                        results.Add(new Dictionary<string, object>
+                        {
+                            { "path", path },
+                            { "count", fileMatchCount },
+                            { "matches", matches }
+                        });
+                        if (results.Count >= maxFiles)
+                            break;
+                    }
+                }
+            }
+            catch { }
+
+            results.Sort((a, b) => Convert.ToInt32(b["count"]).CompareTo(Convert.ToInt32(a["count"])));
+            return results;
+        }
+
+        /// <summary>
+        /// Finds every prefab asset and open-scene GameObject that has a component of
+        /// the given type — the Inspector-wiring analog of FindReferences. Where
+        /// FindReferences answers "what code references this symbol", this answers
+        /// "what is this script/component actually attached to" — the blast radius of
+        /// changing or removing a component, which is invisible in the source because
+        /// the wiring lives in scene/prefab data, not code.
+        ///
+        /// Matches by simple type name (case-insensitive), so it accepts a MonoBehaviour
+        /// script class ("PlayerController") or a built-in component ("Rigidbody",
+        /// "BoxCollider"). Returns one entry per match: { location:"scene"|"prefab",
+        /// container (scene name or prefab path), gameObject (hierarchy path), componentType }.
+        /// Open scenes are scanned first, then prefab assets (Packages/ excluded). The
+        /// prefab load is bounded by maxPrefabScan to stay responsive on large projects.
+        /// </summary>
+        public static Dictionary<string, object> FindComponentUsages(
+            string componentType, int maxResults = 60, int maxPrefabScan = 2000)
+        {
+            var usages = new List<Dictionary<string, object>>();
+            bool truncated = false;
+            if (string.IsNullOrEmpty(componentType))
+                return new Dictionary<string, object> { { "usages", usages }, { "truncated", false } };
+
+            bool Matches(Component c) =>
+                c != null && string.Equals(c.GetType().Name, componentType, StringComparison.OrdinalIgnoreCase);
+
+            // 1. Open scene(s) — additively-loaded scenes included.
+            try
+            {
+                for (int si = 0; si < SceneManager.sceneCount; si++)
+                {
+                    var scene = SceneManager.GetSceneAt(si);
+                    if (!scene.isLoaded)
+                        continue;
+                    foreach (var root in scene.GetRootGameObjects())
+                    {
+                        foreach (var c in root.GetComponentsInChildren<Component>(true))
+                        {
+                            if (!Matches(c))
+                                continue;
+                            usages.Add(new Dictionary<string, object>
+                            {
+                                { "location", "scene" },
+                                { "container", string.IsNullOrEmpty(scene.name) ? "(untitled scene)" : scene.name },
+                                { "gameObject", GetGameObjectPath(c.gameObject) },
+                                { "componentType", c.GetType().Name },
+                            });
+                            if (usages.Count >= maxResults)
+                                return new Dictionary<string, object> { { "usages", usages }, { "truncated", true } };
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // 2. Prefab assets.
+            try
+            {
+                var prefabGuids = AssetDatabase.FindAssets("t:Prefab");
+                int scanned = 0;
+                foreach (var guid in prefabGuids)
+                {
+                    if (scanned >= maxPrefabScan)
+                    {
+                        truncated = true;
+                        break;
+                    }
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrEmpty(path) || path.StartsWith("Packages/"))
+                        continue;
+                    // Skip GladeKit's own per-turn prefab backups — they're internal
+                    // undo artifacts, not the user's project wiring, and would falsely
+                    // inflate the blast radius (e.g. "used in 5 backup prefabs").
+                    if (path.Contains("/GladeKitBackups/"))
+                        continue;
+                    var root = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                    if (root == null)
+                        continue;
+                    scanned++;
+                    foreach (var c in root.GetComponentsInChildren<Component>(true))
+                    {
+                        if (!Matches(c))
+                            continue;
+                        usages.Add(new Dictionary<string, object>
+                        {
+                            { "location", "prefab" },
+                            { "container", path },
+                            { "gameObject", GetGameObjectPath(c.gameObject) },
+                            { "componentType", c.GetType().Name },
+                        });
+                        if (usages.Count >= maxResults)
+                            return new Dictionary<string, object> { { "usages", usages }, { "truncated", true } };
+                    }
+                }
+            }
+            catch { }
+
+            return new Dictionary<string, object> { { "usages", usages }, { "truncated", truncated } };
         }
 
         /// <summary>

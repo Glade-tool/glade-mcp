@@ -50,10 +50,11 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# create_health_bar (1) = 91; create_moving_platform (1) = 92;
 	# create_blend_space_2d (1) = 93; create_juice (1) = 94;
 	# set_particles_properties (1) = 95; create_scene_transition (1) = 96;
-	# look_at_game_view (1) = 97 total.
+	# look_at_game_view (1) = 97;
+	# find_references (1) = 98; find_scene_usages (1) = 99 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 97, "Catalog should register exactly 97 tools")
+	assert_eq(registry.get_tool_count(), 99, "Catalog should register exactly 99 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -67,6 +68,7 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"set_node_parent", "set_node_transform", "set_node_resource",
 		# Phase 2 — Script
 		"create_script", "modify_script", "get_script_content", "find_scripts",
+		"find_references", "find_scene_usages",
 		"attach_script_to_node", "create_third_person_controller",
 		"create_2d_controller", "create_screen_shake", "create_juice", "create_scene_transition",
 		"create_game_manager", "create_collectible", "create_hazard", "create_enemy_2d",
