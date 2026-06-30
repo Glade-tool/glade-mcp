@@ -4,6 +4,22 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.12] - 2026-06-30
+
+### Added
+
+- **Godot bridge addon v0.7.5 — spatial queries, locomotion blending, batch layout, and scene-flow (95 → 104 tools).** Schemas for these tools are now exposed to MCP clients.
+  - **Spatial query trio (`raycast`, `overlap_shape`, `shape_cast`).** Query the scene's physics space directly at edit time — no play session needed — to reason about geometry while building. `raycast` reports the first collider along a ray (what's under a point, is there a wall between A and B). `overlap_shape` returns every collider inside a sphere/box at a point (who's within blast radius, is this spot clear). `shape_cast` sweeps a shape along a motion vector and reports how far it travels before first contact (how far can this body fall before it lands, would this character fit through here). All three are dimension-aware (2D/3D) with `collision_mask` and `exclude` support.
+  - **`create_blend_space_1d`** — locomotion animation from a single scalar (the canonical idle → walk → run setup). Builds an `AnimationTree` rooted in an `AnimationNodeBlendSpace1D` over an existing `AnimationPlayer`; blend points are placed explicitly or auto-seeded from locomotion-tier clip names. Drive `blend_position` with a speed value (e.g. `velocity.length() / max_speed`). The 1D sibling of `create_blend_space_2d`.
+  - **`arrange_nodes`** — position many nodes into a row, column, or grid in one call. Does the spacing math and sets global positions from a single anchor instead of computing each position by hand and moving nodes one at a time. Dimension is read from each node; 3D layouts lie on the X/Z ground plane.
+  - **`create_scene_transition`** — register a full-screen scene-transition overlay as an autoload in one atomic call, turning hard scene cuts into smooth fades (menu ↔ game, level ↔ level, death/respawn).
+  - **`look_at_game_view`** — capture a screenshot of the rendered editor view so the model can see the current scene and verify visuals — catching invisible/missing/mispositioned nodes that inspection alone cannot.
+  - **`find_references`** — find every `.gd` script that references a symbol (a `class_name`, func, or var), matching whole identifiers only. **`find_scene_usages`** — the scene-wiring counterpart: find every `.tscn` that references a resource via `[ext_resource]`. Use both to see the blast radius before renaming or moving things.
+
+### Changed
+
+- **`get_animation_tree_info` now reads back blend spaces.** Previously it returned only the root type for any non-state-machine tree; it now describes `AnimationNodeBlendSpace1D` / `2D` roots in full (blend points, bounds, mode, labels, and the `blend_position` parameter) — the read-back counterpart of `create_blend_space_1d` / `create_blend_space_2d`.
+
 ## [0.7.11] - 2026-06-26
 
 ### Added
