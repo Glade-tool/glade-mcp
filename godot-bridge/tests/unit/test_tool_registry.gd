@@ -51,10 +51,12 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# create_blend_space_2d (1) = 93; create_juice (1) = 94;
 	# set_particles_properties (1) = 95; create_scene_transition (1) = 96;
 	# look_at_game_view (1) = 97;
-	# find_references (1) = 98; find_scene_usages (1) = 99 total.
+	# find_references (1) = 98; find_scene_usages (1) = 99;
+	# create_blend_space_1d (1) = 100; arrange_nodes (1) = 101;
+	# raycast (1) = 102 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 99, "Catalog should register exactly 99 tools")
+	assert_eq(registry.get_tool_count(), 102, "Catalog should register exactly 102 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -65,7 +67,7 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"create_tilemap_layer", "set_tilemap_cells", "set_tilemap_collision",
 		"create_parallax_2d", "create_moving_platform",
 		"delete_node", "rename_node", "duplicate_node",
-		"set_node_parent", "set_node_transform", "set_node_resource",
+		"set_node_parent", "set_node_transform", "arrange_nodes", "set_node_resource",
 		# Phase 2 — Script
 		"create_script", "modify_script", "get_script_content", "find_scripts",
 		"find_references", "find_scene_usages",
@@ -78,7 +80,7 @@ func test_registry_contains_all_mvp_tools() -> void:
 		# Phase 3 — Resource
 		"create_material", "set_material_property", "create_resource",
 		# Phase 3 — Physics
-		"create_physics_body",
+		"create_physics_body", "raycast",
 		# Particles / juice
 		"create_particles_2d",
 		# Phase 3 — Scene I/O
@@ -118,6 +120,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		"add_state_machine_transition", "get_animation_tree_info",
 		# v0.7.3 — AnimationTree 2D blend space (directional sprite animation)
 		"create_blend_space_2d",
+		# v0.7.5 — AnimationTree 1D blend space (speed-based locomotion)
+		"create_blend_space_1d",
 		# 3D enemy + navmesh pursuit
 		"create_enemy_3d", "add_navigation_agent", "bake_navigation_mesh",
 		# Particles / juice — 3D twin of create_particles_2d

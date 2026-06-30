@@ -1,6 +1,6 @@
 """
-Godot animation tools (10 tools) — AnimationPlayer + Animation .tres
-scaffolding, plus AnimationTree state machines and a 2D blend space.
+Godot animation tools (11 tools) — AnimationPlayer + Animation .tres
+scaffolding, plus AnimationTree state machines and 1D/2D blend spaces.
 
 The AnimationPlayer node itself + the Animation .tres are created via
 existing tools — `create_node(type='AnimationPlayer', parent_path='...')`
@@ -30,8 +30,8 @@ idle/walk/run/jump driven by travel() or advance conditions.
   add_state_machine_state       add a state that plays one clip.
   add_state_machine_transition  connect two states (Start/End, switch
                                 mode, cross-fade, advance condition).
-  get_animation_tree_info       read-only: states + transitions +
-                                binding.
+  get_animation_tree_info       read-only: states + transitions, OR
+                                blend-space points + bounds, + binding.
 
 create_blend_space_2d is the directional counterpart: an AnimationTree
 rooted in an AnimationNodeBlendSpace2D that picks/blends a character's
@@ -41,6 +41,9 @@ into parameters/blend_position).
   create_blend_space_2d         AnimationTree + 2D blend space bound to a
                                 player (auto-seeds from up/down/left/right
                                 clip names).
+  create_blend_space_1d         AnimationTree + 1D blend space bound to a
+                                player (auto-seeds idle/walk/run by a single
+                                speed scalar).
 
 Composition flow for a typical scaffold (e.g., "add a 0.6s jump
 animation on Player"):
@@ -553,14 +556,17 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "get_animation_tree_info",
             "description": (
-                "Read an AnimationTree's state machine — its bound AnimationPlayer, "
-                "active flag, the states (with the clip each plays and whether that "
-                "clip is registered on the player), and the transitions between them. "
-                "Start here before extending a machine: it returns the exact state "
+                "Read an AnimationTree's contents — its bound AnimationPlayer and "
+                "active flag, plus the root node's detail. A state-machine root "
+                "returns its states (with the clip each plays and whether that clip "
+                "is registered on the player) and the transitions between them — "
+                "start here before extending a machine: it returns the exact state "
                 "names to pass as from_state / to_state and surfaces clips that "
-                "reference a missing animation. A blend-tree-rooted tree reports its "
-                "type but not states/transitions (those tools are state-machine only). "
-                "Read-only: safe in play mode."
+                "reference a missing animation. A blend-space root (1D/2D) returns "
+                "blend_points (the clip at each position), min/max space bounds, "
+                "blend_mode, and the parameters/blend_position param you drive at "
+                "runtime — the read-back twin of create_blend_space_1d / _2d. Any "
+                "other root reports its type only. Read-only: safe in play mode."
             ),
             "parameters": {
                 "type": "object",
@@ -668,6 +674,105 @@ TOOLS: List[Dict] = [
             },
             "annotations": {
                 "title": "Create 2D Blend Space",
+                "readOnlyHint": False,
+                "destructiveHint": False,
+                "idempotentHint": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_blend_space_1d",
+            "description": (
+                "Create an AnimationTree rooted in a 1D blend space — the standard "
+                "way to drive LOCOMOTION animation from a single scalar (typically "
+                "speed). Use this (not create_blend_space_2d) when one set of clips "
+                "blends along ONE axis: the canonical setup is idle -> walk -> run "
+                "picked by the character's speed. At runtime set "
+                "parameters/blend_position to a single float (e.g. "
+                "velocity.length() / max_speed) and the matching tier plays / "
+                "cross-blends.\n\n"
+                "Bind it to an AnimationPlayer (player_path) whose registered clips "
+                "supply each blend point — create + populate the player FIRST "
+                "(create_node type='AnimationPlayer', then add_animation_to_player per "
+                "clip). Omit `points` to AUTO-SEED: the player's clips are scanned for "
+                "locomotion-tier names and placed at idle/stand/still=0.0, walk=0.5, "
+                "run/sprint=1.0 — a one-call 'wrap my idle/walk/run clips in a speed "
+                "blend space' setup. The default range is 0..1, auto-expanded to "
+                "enclose any supplied point (e.g. a symmetric strafe point at -1 grows "
+                "min_space to -1). Pass `points` explicitly when clip names don't "
+                "follow the convention or you need non-default placement. A point "
+                "whose clip isn't registered is still created but flagged under "
+                "animation_warnings.\n\n"
+                "Drive it at runtime from a script: "
+                "$AnimationTree.set('parameters/blend_position', velocity.length() / SPEED)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "player_path": {
+                        "type": "string",
+                        "description": "Scene-relative NodePath of the AnimationPlayer supplying the clips.",
+                    },
+                    "points": {
+                        "type": "array",
+                        "description": (
+                            "Explicit blend points. Each is {'anim': clip play-name, "
+                            "'pos': number}, e.g. [{'anim':'idle','pos':0}, "
+                            "{'anim':'walk','pos':0.5}, {'anim':'run','pos':1}]. Omit "
+                            "to auto-seed from the player's locomotion-tier clip names."
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "anim": {
+                                    "type": "string",
+                                    "description": "Clip play-name (default library: 'walk'; named: 'locomotion/walk').",
+                                },
+                                "pos": {
+                                    "type": "number",
+                                    "description": "Blend position along the axis (e.g. 0=idle, 0.5=walk, 1=run).",
+                                },
+                            },
+                            "required": ["anim", "pos"],
+                        },
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Node name. Default 'AnimationTree'.",
+                    },
+                    "parent_path": {
+                        "type": "string",
+                        "description": "Scene-relative parent NodePath. Default: scene root.",
+                    },
+                    "active": {
+                        "type": "boolean",
+                        "description": "Process the tree at runtime. Default true (an inactive tree is inert).",
+                    },
+                    "blend_mode": {
+                        "type": "string",
+                        "description": (
+                            "How points combine: 'interpolated' (default, smooth "
+                            "cross-blend), 'discrete' (snap to nearest), "
+                            "'discrete_carry' (snap but carry playback position across "
+                            "points)."
+                        ),
+                        "enum": ["interpolated", "discrete", "discrete_carry"],
+                    },
+                    "sync": {
+                        "type": "boolean",
+                        "description": ("Keep all points advancing in sync even when not selected. Default false."),
+                    },
+                    "value_label": {
+                        "type": "string",
+                        "description": "Editor axis label for the blend value. Default 'speed'.",
+                    },
+                },
+                "required": ["player_path"],
+            },
+            "annotations": {
+                "title": "Create 1D Blend Space",
                 "readOnlyHint": False,
                 "destructiveHint": False,
                 "idempotentHint": False,

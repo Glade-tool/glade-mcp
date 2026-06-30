@@ -26,6 +26,9 @@ const RenameNodeTool        = preload("res://addons/com.gladekit.mcp-bridge/tool
 const DuplicateNodeTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/duplicate_node.gd")
 const SetNodeParentTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_parent.gd")
 const SetNodeTransformTool  = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_transform.gd")
+# Layout primitive: position many nodes into a row/column/grid in one call
+# (the batch counterpart of set_node_transform for level building).
+const ArrangeNodesTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/arrange_nodes.gd")
 const SetNodeResourceTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_resource.gd")
 const SetNodePropertyTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_property.gd")
 
@@ -105,6 +108,9 @@ const CreateResourceTool      = preload("res://addons/com.gladekit.mcp-bridge/to
 
 # ── Physics tools (Phase 3) ────────────────────────────────────────────────
 const CreatePhysicsBodyTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/create_physics_body.gd")
+# Spatial query: cast a ray through the edited scene's physics space and report
+# the first collider hit. Works at edit time (no play session needed).
+const RaycastTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/raycast.gd")
 
 # ── Particles / juice ──────────────────────────────────────────────────────
 # Preset-driven GPUParticles2D/3D + ParticleProcessMaterial scaffolder (explosion /
@@ -204,6 +210,11 @@ const GetAnimationTreeInfoTool        = preload("res://addons/com.gladekit.mcp-b
 # action's per-facing clips by movement direction. Feed velocity.normalized()
 # into parameters/blend_position; auto-seeds from up/down/left/right clip names.
 const CreateBlendSpace2DTool          = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/create_blend_space_2d.gd")
+# AnimationNodeBlendSpace1D — locomotion animation (idle/walk/run) from a single
+# scalar. The 1D sibling of the 2D blend space above: blend along ONE axis
+# (typically speed) instead of a facing vector. Auto-seeds from idle/walk/run
+# clip names; feed velocity.length()/max_speed into parameters/blend_position.
+const CreateBlendSpace1DTool          = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/animation/create_blend_space_1d.gd")
 
 # ── Asset pipeline tools (v0.7.0) ──────────────────────────────────────────
 # Download + install external CC0 assets. import_asset is async (downloads on a
@@ -281,6 +292,7 @@ func _register_all() -> void:
 	register_tool(DuplicateNodeTool.new())
 	register_tool(SetNodeParentTool.new())
 	register_tool(SetNodeTransformTool.new())
+	register_tool(ArrangeNodesTool.new())
 	register_tool(SetNodeResourceTool.new())
 	register_tool(SetNodePropertyTool.new())
 	# Script (14)
@@ -316,8 +328,9 @@ func _register_all() -> void:
 	register_tool(CreateMaterialTool.new())
 	register_tool(SetMaterialPropertyTool.new())
 	register_tool(CreateResourceTool.new())
-	# Physics (1)
+	# Physics (2)
 	register_tool(CreatePhysicsBodyTool.new())
+	register_tool(RaycastTool.new())
 	# Particles / juice (1)
 	register_tool(CreateParticles2DTool.new())
 	register_tool(CreateParticles3DTool.new())
@@ -373,9 +386,11 @@ func _register_all() -> void:
 	register_tool(AddStateMachineStateTool.new())
 	register_tool(AddStateMachineTransitionTool.new())
 	register_tool(GetAnimationTreeInfoTool.new())
-	# AnimationTree blend space (1, v0.7.3) — directional sprite animation from a
-	# 2D vector via AnimationNodeBlendSpace2D.
+	# AnimationTree blend space (2) — directional sprite animation from a 2D
+	# vector via AnimationNodeBlendSpace2D (v0.7.3), plus locomotion (idle/walk/
+	# run) from a single speed scalar via AnimationNodeBlendSpace1D (v0.7.5).
 	register_tool(CreateBlendSpace2DTool.new())
+	register_tool(CreateBlendSpace1DTool.new())
 	# Asset pipeline (2, v0.7.0) — async external-asset download + install,
 	# plus a read-only license audit of what's been imported.
 	register_tool(ImportAssetTool.new())

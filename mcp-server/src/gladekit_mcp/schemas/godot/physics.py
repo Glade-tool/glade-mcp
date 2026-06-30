@@ -1,5 +1,5 @@
 """
-Godot physics tools (1 tool).
+Godot physics tools (2 tools).
 
 Godot's physics body classes are nodes: StaticBody{3D,2D}, RigidBody{3D,2D},
 CharacterBody{3D,2D}. A body without a CollisionShape child does nothing,
@@ -9,6 +9,12 @@ folded into this — Godot devs almost always want a body with a shape,
 and forcing two calls is friction. The `space` arg ("3d" default / "2d")
 picks the dimension, so the same tool builds 3D props and 2D platformer
 bodies alike.
+
+`raycast` is the spatial-query counterpart: cast a ray through the scene's
+physics space and report the first collider hit. It runs against the open
+scene at edit time (no play session needed), so an agent can answer "what's
+under this point", "is there a wall between A and B", or "what would a shot
+from here hit" while building the scene.
 """
 
 from typing import Dict, List
@@ -85,6 +91,68 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["body_type"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "raycast",
+            "description": (
+                "Cast a ray through the scene's physics space and return the FIRST "
+                "collider it hits — the spatial-query primitive for 'what's under this "
+                "point', 'is there a wall between A and B', 'what would a shot from here "
+                "hit'. Runs at EDIT time against the open scene (no play session): the "
+                "scene's collision bodies are live in the editor's physics space. "
+                "Dimension is inferred from the open scene (2D vs 3D). Aim the ray with "
+                "from+to, or from+direction(+distance, default 1000). Only colliders "
+                "whose layer intersects collision_mask are hit (default: all layers). "
+                "Pass exclude (node paths) to ignore colliders — e.g. the caster itself "
+                "so it doesn't self-hit. Returns hit (bool) and, when hit, the collider "
+                "node path/name/class, world position, surface normal, and distance."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "description": "Ray origin — 'x,y,z' (3D) or 'x,y' (2D).",
+                    },
+                    "to": {
+                        "type": "string",
+                        "description": "Ray end point. Omit to use direction + distance.",
+                    },
+                    "direction": {
+                        "type": "string",
+                        "description": "Ray direction (normalized internally). Used when `to` is omitted.",
+                    },
+                    "distance": {
+                        "type": "number",
+                        "description": "Ray length when using direction. Default 1000.",
+                    },
+                    "collision_mask": {
+                        "type": "integer",
+                        "description": "Layer bitmask to test against. Default all layers.",
+                    },
+                    "collide_with_bodies": {
+                        "type": "boolean",
+                        "description": "Hit PhysicsBodies. Default true.",
+                    },
+                    "collide_with_areas": {
+                        "type": "boolean",
+                        "description": "Hit Areas (triggers). Default false.",
+                    },
+                    "hit_from_inside": {
+                        "type": "boolean",
+                        "description": "Register a hit when `from` starts inside a shape. Default false.",
+                    },
+                    "exclude": {
+                        "type": "array",
+                        "description": "Node paths whose colliders are ignored (e.g. the caster).",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": ["from"],
             },
         },
     },

@@ -1,5 +1,5 @@
 """
-Godot scene/hierarchy tools — Node creation, lookup, transforms (18 tools).
+Godot scene/hierarchy tools — Node creation, lookup, transforms (19 tools).
 
 Godot's scene model differs from Unity's GameObject+Component model:
 each scene is a tree of Nodes (Node3D, CharacterBody3D, Sprite2D, ...);
@@ -729,6 +729,64 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["node_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "arrange_nodes",
+            "description": (
+                "Position MANY nodes into a layout pattern in ONE call — the level-"
+                "building primitive for 'lay out a row of platforms', 'make a 3x3 grid "
+                "of coins', 'line these enemies up'. Does the spacing math for you and "
+                "sets every node's GLOBAL position from one anchor, instead of computing "
+                "each position by hand and calling set_node_transform N times. Patterns: "
+                "'row' (along +X), 'column' (2D: down +Y; 3D: along +Z), 'grid' (fills "
+                "row-major across `columns`, wrapping to the next line). Dimension is "
+                "taken from each node (Node2D vs Node3D); 3D layouts lie on the X/Z "
+                "ground plane (Y held at the anchor height). node_paths order drives "
+                "placement (index 0 first). Default anchor is the FIRST node's current "
+                "position, so the first node stays put and the rest line up after it — "
+                "pass `origin` to anchor elsewhere. Control (UI) nodes are skipped (use "
+                "set_control_anchors / set_control_size for UI). Returns `arranged` "
+                "[{node_path, position}] plus `not_found` / `skipped` paths."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_paths": {
+                        "type": "array",
+                        "description": (
+                            "Scene-relative NodePaths to arrange, IN ORDER (index 0 is placed at the anchor)."
+                        ),
+                        "items": {"type": "string"},
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "description": "Layout shape. Default 'row'.",
+                        "enum": ["row", "column", "grid"],
+                    },
+                    "spacing": {
+                        "type": "number",
+                        "description": (
+                            "Gap between adjacent node origins. Default 64 (2D) / 2.0 "
+                            "(3D). Negative reverses direction."
+                        ),
+                    },
+                    "columns": {
+                        "type": "integer",
+                        "description": "Grid only: nodes per line. Default ceil(sqrt(count)).",
+                    },
+                    "origin": {
+                        "type": "string",
+                        "description": (
+                            "Anchor for index 0 as 'x,y' (2D) or 'x,y,z' (3D). Default: "
+                            "first node's current global position."
+                        ),
+                    },
+                },
+                "required": ["node_paths"],
             },
         },
     },
