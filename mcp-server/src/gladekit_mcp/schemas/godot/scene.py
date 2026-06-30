@@ -1,5 +1,5 @@
 """
-Godot scene/hierarchy tools — Node creation, lookup, transforms (19 tools).
+Godot scene/hierarchy tools — Node creation, lookup, transforms (20 tools).
 
 Godot's scene model differs from Unity's GameObject+Component model:
 each scene is a tree of Nodes (Node3D, CharacterBody3D, Sprite2D, ...);
@@ -784,6 +784,52 @@ TOOLS: List[Dict] = [
                             "Anchor for index 0 as 'x,y' (2D) or 'x,y,z' (3D). Default: "
                             "first node's current global position."
                         ),
+                    },
+                },
+                "required": ["node_paths"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "snap_to_ground",
+            "description": (
+                "Drop nodes straight down onto the first surface below them — the level-"
+                "dressing primitive for 'rest these crates on the terrain', 'put the "
+                "enemies on the floor', 'snap the props down after laying them out'. "
+                "Pairs with arrange_nodes: arrange a grid in the air, then snap_to_ground "
+                "to seat each one on whatever it's over. Casts a ray downward from each "
+                "node (its OWN colliders excluded so it can't hit itself) and moves the "
+                "node to the hit point. Runs at EDIT time against the open scene (no play "
+                "session). Dimension is taken from each node (3D snaps along -Y, 2D along "
+                "+Y screen-down). The node's ORIGIN lands on the surface — pass `offset` "
+                "to lift it by the pivot-to-bottom distance so a centre-pivot body rests "
+                "ON the ground instead of half-sunk. Returns snapped [{node_path, "
+                "position, surface, distance}] plus missed (no ground below) / not_found."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_paths": {
+                        "type": "array",
+                        "description": "Scene-relative NodePaths to drop onto the ground.",
+                        "items": {"type": "string"},
+                    },
+                    "offset": {
+                        "type": "number",
+                        "description": (
+                            "Distance to raise the node above the hit surface (account "
+                            "for pivot-to-bottom). Default 0 (origin sits on the surface)."
+                        ),
+                    },
+                    "max_distance": {
+                        "type": "number",
+                        "description": "How far down to search for ground. Default 1000.",
+                    },
+                    "collision_mask": {
+                        "type": "integer",
+                        "description": "Layers that count as ground. Default all layers.",
                     },
                 },
                 "required": ["node_paths"],

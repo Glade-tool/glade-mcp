@@ -29,6 +29,9 @@ const SetNodeTransformTool  = preload("res://addons/com.gladekit.mcp-bridge/tool
 # Layout primitive: position many nodes into a row/column/grid in one call
 # (the batch counterpart of set_node_transform for level building).
 const ArrangeNodesTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/arrange_nodes.gd")
+# Layout: drop nodes onto the surface below them (raycast-down). Pairs with
+# arrange_nodes — lay out a grid, then seat each node on the terrain.
+const SnapToGroundTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/snap_to_ground.gd")
 const SetNodeResourceTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_resource.gd")
 const SetNodePropertyTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/scene/set_node_property.gd")
 
@@ -300,6 +303,7 @@ func _register_all() -> void:
 	register_tool(SetNodeParentTool.new())
 	register_tool(SetNodeTransformTool.new())
 	register_tool(ArrangeNodesTool.new())
+	register_tool(SnapToGroundTool.new())
 	register_tool(SetNodeResourceTool.new())
 	register_tool(SetNodePropertyTool.new())
 	# Script (14)
