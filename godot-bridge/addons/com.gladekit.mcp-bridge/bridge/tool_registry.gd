@@ -114,6 +114,10 @@ const RaycastTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implemen
 # Spatial query: find every collider overlapping a sphere/box at a point — the
 # volume counterpart of raycast. Also edit-time (no play session needed).
 const OverlapShapeTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/overlap_shape.gd")
+# Spatial query: sweep a shape along a motion vector and report how far it
+# travels before first contact — the motion query (raycast=line, overlap=static
+# volume, shape_cast=moving volume). Also edit-time (no play session needed).
+const ShapeCastTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/shape_cast.gd")
 
 # ── Particles / juice ──────────────────────────────────────────────────────
 # Preset-driven GPUParticles2D/3D + ParticleProcessMaterial scaffolder (explosion /
@@ -331,10 +335,11 @@ func _register_all() -> void:
 	register_tool(CreateMaterialTool.new())
 	register_tool(SetMaterialPropertyTool.new())
 	register_tool(CreateResourceTool.new())
-	# Physics (3)
+	# Physics (4)
 	register_tool(CreatePhysicsBodyTool.new())
 	register_tool(RaycastTool.new())
 	register_tool(OverlapShapeTool.new())
+	register_tool(ShapeCastTool.new())
 	# Particles / juice (1)
 	register_tool(CreateParticles2DTool.new())
 	register_tool(CreateParticles3DTool.new())

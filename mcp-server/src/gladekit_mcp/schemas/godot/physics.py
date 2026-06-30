@@ -1,5 +1,5 @@
 """
-Godot physics tools (3 tools).
+Godot physics tools (4 tools).
 
 Godot's physics body classes are nodes: StaticBody{3D,2D}, RigidBody{3D,2D},
 CharacterBody{3D,2D}. A body without a CollisionShape child does nothing,
@@ -20,6 +20,12 @@ from here hit" while building the scene.
 find every collider overlapping a sphere/box at a point — "which enemies
 are within blast radius", "is this spot clear before placing something",
 "what's inside this zone". Also edit-time.
+
+`shape_cast` is the motion query (a moving volume): sweep a shape along a
+vector and report how far it travels before first contact — "how far can
+this body fall before it lands", "would this character fit through here",
+"where does a thrown box stop". Completes the trio with raycast (line) and
+overlap_shape (static volume). Also edit-time.
 """
 
 from typing import Dict, List
@@ -218,6 +224,77 @@ TOOLS: List[Dict] = [
                     "max_results": {
                         "type": "integer",
                         "description": "Cap on colliders returned. Default 32 (clamped 1..1024).",
+                    },
+                },
+                "required": ["position"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "shape_cast",
+            "description": (
+                "Sweep a shape along a motion vector and report how far it travels "
+                "before first contact — the motion query that completes the trio with "
+                "raycast (a line) and overlap_shape (a static volume). Use for 'how far "
+                "can this body fall before it lands', 'would this character fit through "
+                "here', 'where does a thrown box stop'. Runs at EDIT time against the "
+                "open scene (no play session). Dimension inferred from the scene. The "
+                "shape (sphere/box in 3D, circle/box in 2D; radius or size) starts at "
+                "`position` and sweeps along `motion`, or `direction`*`distance`. "
+                "Returns safe_fraction (0..1 of the motion travelled before contact), "
+                "travel + stop_position, and — when it hits — the collider plus contact "
+                "point and normal. A clear path returns hit=false, safe_fraction=1."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "position": {
+                        "type": "string",
+                        "description": "Start centre of the shape — 'x,y,z' (3D) or 'x,y' (2D).",
+                    },
+                    "motion": {
+                        "type": "string",
+                        "description": "Sweep vector (direction AND length). Omit to use direction + distance.",
+                    },
+                    "direction": {
+                        "type": "string",
+                        "description": "Sweep direction (normalized). Used when `motion` is omitted.",
+                    },
+                    "distance": {
+                        "type": "number",
+                        "description": "Sweep length when using direction. Default 1000.",
+                    },
+                    "shape": {
+                        "type": "string",
+                        "description": "Swept shape. Default sphere (3D) / circle (2D).",
+                        "enum": ["sphere", "circle", "box"],
+                    },
+                    "radius": {
+                        "type": "number",
+                        "description": "Sphere/circle radius. Default 1.0 (3D) / 32 (2D).",
+                    },
+                    "size": {
+                        "type": "string",
+                        "description": "Box full size — 'x,y,z' (3D) or 'x,y' (2D). Default 1,1,1 / 32,32.",
+                    },
+                    "collision_mask": {
+                        "type": "integer",
+                        "description": "Layer bitmask to test against. Default all layers.",
+                    },
+                    "collide_with_bodies": {
+                        "type": "boolean",
+                        "description": "Hit PhysicsBodies. Default true.",
+                    },
+                    "collide_with_areas": {
+                        "type": "boolean",
+                        "description": "Hit Areas (triggers). Default false.",
+                    },
+                    "exclude": {
+                        "type": "array",
+                        "description": "Node paths whose colliders are ignored.",
+                        "items": {"type": "string"},
                     },
                 },
                 "required": ["position"],
