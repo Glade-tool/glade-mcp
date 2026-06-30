@@ -1,5 +1,5 @@
 """
-Godot physics tools (2 tools).
+Godot physics tools (3 tools).
 
 Godot's physics body classes are nodes: StaticBody{3D,2D}, RigidBody{3D,2D},
 CharacterBody{3D,2D}. A body without a CollisionShape child does nothing,
@@ -15,6 +15,11 @@ physics space and report the first collider hit. It runs against the open
 scene at edit time (no play session needed), so an agent can answer "what's
 under this point", "is there a wall between A and B", or "what would a shot
 from here hit" while building the scene.
+
+`overlap_shape` is the volume query (a ray is a line; this is a region):
+find every collider overlapping a sphere/box at a point — "which enemies
+are within blast radius", "is this spot clear before placing something",
+"what's inside this zone". Also edit-time.
 """
 
 from typing import Dict, List
@@ -153,6 +158,69 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["from"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "overlap_shape",
+            "description": (
+                "Find EVERY collider overlapping a shape placed at a point — the volume "
+                "counterpart of raycast (a ray is a line; this is a region). Use for "
+                "'which enemies are within blast radius', 'is this spot clear before I "
+                "place something', 'what's inside this zone'. Runs at EDIT time against "
+                "the open scene (no play session). Dimension is inferred from the open "
+                "scene (2D vs 3D). shape is 'sphere'/'box' (3D) or 'circle'/'box' (2D); "
+                "sphere/circle uses `radius`, box uses `size` (full extents). Only "
+                "colliders whose layer intersects collision_mask match (default: all). "
+                "Pass exclude (node paths) to skip colliders — e.g. the node the query "
+                "is centred on. Returns count + colliders (each node once, de-duplicated) "
+                "with path/name/class, and a truncated flag if max_results was hit."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "position": {
+                        "type": "string",
+                        "description": "Query centre — 'x,y,z' (3D) or 'x,y' (2D).",
+                    },
+                    "shape": {
+                        "type": "string",
+                        "description": "Query shape. Default sphere (3D) / circle (2D).",
+                        "enum": ["sphere", "circle", "box"],
+                    },
+                    "radius": {
+                        "type": "number",
+                        "description": "Sphere/circle radius. Default 1.0 (3D) / 32 (2D).",
+                    },
+                    "size": {
+                        "type": "string",
+                        "description": "Box full size — 'x,y,z' (3D) or 'x,y' (2D). Default 1,1,1 / 32,32.",
+                    },
+                    "collision_mask": {
+                        "type": "integer",
+                        "description": "Layer bitmask to test against. Default all layers.",
+                    },
+                    "collide_with_bodies": {
+                        "type": "boolean",
+                        "description": "Match PhysicsBodies. Default true.",
+                    },
+                    "collide_with_areas": {
+                        "type": "boolean",
+                        "description": "Match Areas (triggers). Default false.",
+                    },
+                    "exclude": {
+                        "type": "array",
+                        "description": "Node paths whose colliders are ignored.",
+                        "items": {"type": "string"},
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Cap on colliders returned. Default 32 (clamped 1..1024).",
+                    },
+                },
+                "required": ["position"],
             },
         },
     },

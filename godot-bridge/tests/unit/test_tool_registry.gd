@@ -53,10 +53,10 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# look_at_game_view (1) = 97;
 	# find_references (1) = 98; find_scene_usages (1) = 99;
 	# create_blend_space_1d (1) = 100; arrange_nodes (1) = 101;
-	# raycast (1) = 102 total.
+	# raycast (1) = 102; overlap_shape (1) = 103 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 102, "Catalog should register exactly 102 tools")
+	assert_eq(registry.get_tool_count(), 103, "Catalog should register exactly 103 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -80,7 +80,7 @@ func test_registry_contains_all_mvp_tools() -> void:
 		# Phase 3 — Resource
 		"create_material", "set_material_property", "create_resource",
 		# Phase 3 — Physics
-		"create_physics_body", "raycast",
+		"create_physics_body", "raycast", "overlap_shape",
 		# Particles / juice
 		"create_particles_2d",
 		# Phase 3 — Scene I/O
