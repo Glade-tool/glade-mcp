@@ -581,7 +581,12 @@ TOOLS: List[Dict] = [
                     },
                     "position": {
                         "type": "string",
-                        "description": "Path placement (waypoints are relative to it): 'x,y' in 2D, 'x,y,z' in 3D. Default 0.",
+                        "description": (
+                            "Path placement (waypoints are relative to it): 'x,y' in 2D, 'x,y,z' in 3D. "
+                            "A platform is usually something the player JUMPS ONTO, so it must sit ABOVE "
+                            "the floor. In 3D the default lifts to y=2 (clears a y=0 floor); set position "
+                            "Y explicitly above your floor if it is elsewhere. 2D default is origin."
+                        ),
                     },
                     "directory": {
                         "type": "string",

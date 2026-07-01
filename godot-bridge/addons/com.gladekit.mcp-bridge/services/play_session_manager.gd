@@ -54,6 +54,16 @@ const MAX_SESSION_LIFETIME_SEC := 300.0
 static var _sessions: Dictionary = {}
 static var _next_id: int = 1
 
+# Graveyard of recently-exited sessions, newest last. A `verify=true` run adds
+# `--quit-after`, so the play process terminates ON ITS OWN after a few seconds;
+# reap() then drops it from `_sessions`. Without this, a `stop_project` /
+# `get_debug_output` that arrives right after that self-exit can't find the
+# session and returns a scary hard error — even though "already stopped" is the
+# exact end state the caller wanted. We keep the last few exited sessions (with
+# their final captured output) so those calls resolve idempotently instead.
+const RECENT_EXIT_CAP := 8
+static var _recently_exited: Array = []
+
 
 # Spawn `godot` as a subprocess. Returns:
 #   { "session_id": String, "pid": int, "command": String } on success
@@ -103,6 +113,23 @@ static func start(project_path: String, scene: String = "", extra_args: Array = 
 # Returns: { "stdout": String, "stderr": String, "running": bool, "exit_code": int|null }
 static func drain(session_id: String) -> Dictionary:
 	if not _sessions.has(session_id):
+		# Session already reaped after a natural / --quit-after exit. Return the
+		# captured final output ONCE (then clear it) so a get_debug_output that
+		# lands right after the process self-exits still reads its last words,
+		# rather than erroring on a session that did exactly what verify asked.
+		for rec in _recently_exited:
+			if String(rec.get("session_id", "")) == session_id:
+				var out_s := String(rec.get("stdout", ""))
+				var err_s := String(rec.get("stderr", ""))
+				rec["stdout"] = ""
+				rec["stderr"] = ""
+				return {
+					"stdout": out_s,
+					"stderr": err_s,
+					"running": false,
+					"exit_code": rec.get("exit_code"),
+					"pid": int(rec.get("pid", 0)),
+				}
 		return {"error": "no session with id '%s'" % session_id}
 	var s: Dictionary = _sessions[session_id]
 	_drain_pipe(s, "stdio", "stdout_buffer")
@@ -179,6 +206,22 @@ static func tick_all_sessions() -> void:
 # Kill a running session. Returns the final drained output + exit info.
 static func stop(session_id: String) -> Dictionary:
 	if not _sessions.has(session_id):
+		# Not live — but it may have already exited (e.g. a verify run that
+		# self-terminated via --quit-after and was reaped). Stopping something
+		# already stopped is idempotent success, not an error: hand back the
+		# final captured output with was_running=false so the caller sees the
+		# session is down and gets any last-second stderr for verification.
+		var ghost := _take_recently_exited(session_id)
+		if not ghost.is_empty():
+			return {
+				"pid": int(ghost.get("pid", 0)),
+				"stdout": String(ghost.get("stdout", "")),
+				"stderr": String(ghost.get("stderr", "")),
+				"was_running": false,
+				"exit_code": ghost.get("exit_code"),
+				"already_exited": true,
+				"reason": String(ghost.get("reason", "exited")),
+			}
 		return {"error": "no session with id '%s'" % session_id}
 	var s: Dictionary = _sessions[session_id]
 	var pid: int = int(s["pid"])
@@ -221,6 +264,11 @@ static func reap() -> Array:
 		var pid: int = int(s.get("pid", 0))
 		var running := OS.is_process_running(pid)
 		if not running:
+			# Self-exited (e.g. a --quit-after verify run). Bury it with its
+			# final output so a trailing stop_project / get_debug_output can
+			# still resolve it instead of erroring.
+			s["exit_code"] = -1
+			_bury(String(sid), s, "exited")
 			_sessions.erase(sid)
 			reaped.append({"pid": pid, "reason": "exited"})
 			changed = true
@@ -228,13 +276,66 @@ static func reap() -> Array:
 		var age := now - float(s.get("started_unix", now))
 		if age > MAX_SESSION_LIFETIME_SEC:
 			OS.kill(pid)
-			RuntimeLogStream.flush_session(sid)
+			s["exit_code"] = -2  # -2 = killed by us
+			_bury(String(sid), s, "max_lifetime_exceeded")
 			_sessions.erase(sid)
 			reaped.append({"pid": pid, "reason": "max_lifetime_exceeded", "age_sec": age})
 			changed = true
 	if changed:
 		_persist_sessions()
 	return reaped
+
+
+# Move an about-to-be-dropped session into the recently-exited graveyard,
+# capturing any last buffered output first. Keeps stop_project /
+# get_debug_output resolvable for a short window after the process is gone.
+static func _bury(session_id: String, s: Dictionary, reason: String) -> void:
+	# Final drain so the ghost carries the process's last words (a runtime
+	# error printed just before --quit-after fires often lands here).
+	_drain_pipe(s, "stdio", "stdout_buffer")
+	var stderr_chunk: String = _drain_pipe(s, "stderr", "stderr_buffer")
+	if not stderr_chunk.is_empty():
+		RuntimeLogStream.ingest_chunk(session_id, stderr_chunk)
+	RuntimeLogStream.flush_session(session_id)
+	_recently_exited.append({
+		"session_id": session_id,
+		"pid": int(s.get("pid", 0)),
+		"command": String(s.get("command", "")),
+		"started_unix": float(s.get("started_unix", 0.0)),
+		"stdout": String(s.get("stdout_buffer", "")),
+		"stderr": String(s.get("stderr_buffer", "")),
+		"exit_code": s.get("exit_code"),
+		"reason": reason,
+	})
+	while _recently_exited.size() > RECENT_EXIT_CAP:
+		_recently_exited.pop_front()
+
+
+# Pop the graveyard record for a session id (consumed by stop_project), or {}
+# if none. Removing on stop means a second stop of the same id reports "unknown"
+# rather than silently succeeding forever.
+static func _take_recently_exited(session_id: String) -> Dictionary:
+	for i in range(_recently_exited.size()):
+		if String(_recently_exited[i].get("session_id", "")) == session_id:
+			var rec: Dictionary = _recently_exited[i]
+			_recently_exited.remove_at(i)
+			return rec
+	return {}
+
+
+# Read-only view of the graveyard for identifier resolution (stop_project maps a
+# session_id/pid to a canonical id across BOTH live and recently-exited sets).
+static func list_recently_exited() -> Array:
+	var out: Array = []
+	for r in _recently_exited:
+		out.append({
+			"session_id": String(r.get("session_id", "")),
+			"pid": int(r.get("pid", 0)),
+			"running": false,
+			"exit_code": r.get("exit_code"),
+			"reason": String(r.get("reason", "exited")),
+		})
+	return out
 
 
 static func list_sessions() -> Array:

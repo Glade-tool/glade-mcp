@@ -36,7 +36,9 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #   name:        Path node name. Default "MovingPlatform".
 #   parent_path: scene-relative parent. Default: the scene root.
 #   position:    placement of the Path node (waypoints are relative to it).
-#                "x,y" in 2D, "x,y,z" in 3D. Default 0.
+#                "x,y" in 2D, "x,y,z" in 3D. Default: 2D origin; 3D lifts to
+#                y=2 so a bare "jump onto" platform clears a y=0 floor instead
+#                of spawning inside it. Pass an explicit position to override.
 #   points:      the route, as waypoints relative to `position`. Accepts
 #                [[x,y(,z)], ...], ["x,y(,z)", ...], or a single
 #                "x,y(,z);x,y(,z)" string. The first point is the start.
@@ -69,6 +71,15 @@ const SessionTracker = preload("res://addons/com.gladekit.mcp-bridge/bridge/sess
 
 const _DEFAULT_COLOR := Color(0.55, 0.58, 0.65)  # neutral platform grey
 const _VALID_MODES := ["loop", "pingpong", "once"]
+
+# Default vertical lift for a 3D platform when the caller gives no `position`.
+# A moving platform is almost always something the player JUMPS ONTO, and a 3D
+# floor typically sits at y=0 — so an un-lifted platform spawns embedded in the
+# ground (the model has no floor-height sense and the old default was origin).
+# ~2 m clears a standard floor and sits within a typical CharacterBody3D jump.
+# 2D is unaffected: there the model places platforms against existing geometry
+# and the y-down origin is a sane default.
+const _DEFAULT_3D_LIFT := 2.0
 
 # ── Vetted script: PathMover (2D) ──────────────────────────────────────────
 # A plain Node that drives a rider along a Path2D's curve by setting the rider's
@@ -307,7 +318,10 @@ func execute(args: Dictionary) -> Dictionary:
 	if is_2d:
 		path.position = ToolUtils.parse_vector2_arg(args, "position", Vector2.ZERO)
 	else:
-		path.position = ToolUtils.parse_vector3_arg(args, "position", Vector3.ZERO)
+		# Lift the default 3D placement above a y=0 floor so a bare "add a moving
+		# platform (to jump onto)" call doesn't bury it in the ground. An explicit
+		# position always wins.
+		path.position = ToolUtils.parse_vector3_arg(args, "position", Vector3(0, _DEFAULT_3D_LIFT, 0))
 
 	# ── Rider: an existing node, or a scaffolded platform ──
 	# Untyped for the same reason as `path`: `.global_position` lives on Node2D/

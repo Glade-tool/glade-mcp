@@ -46,13 +46,25 @@ func execute(args: Dictionary) -> Dictionary:
 			result["error"],
 			["Confirm the session is still active via the active session list above", _active_sessions_summary()]
 		)
-	return ToolUtils.success("Stopped session %s (pid %d)" % [resolved_id, int(result["pid"])], {
+	# A verify run (--quit-after) self-terminates before the model gets here, so
+	# "already exited" is the normal, successful outcome — not a failure. Report
+	# it as success with the captured output rather than a scary error card.
+	var already_exited: bool = bool(result.get("already_exited", false))
+	var msg: String
+	if already_exited:
+		msg = "Session %s had already exited (%s); returning its final captured output." % [
+			resolved_id, String(result.get("reason", "exited"))
+		]
+	else:
+		msg = "Stopped session %s (pid %d)" % [resolved_id, int(result["pid"])]
+	return ToolUtils.success(msg, {
 		"session_id": resolved_id,
 		"pid": int(result["pid"]),
 		"stdout": result["stdout"],
 		"stderr": result["stderr"],
 		"was_running": result["was_running"],
 		"exit_code": result["exit_code"],
+		"already_exited": already_exited,
 	})
 
 
@@ -60,19 +72,25 @@ func execute(args: Dictionary) -> Dictionary:
 # session_id matching either the provided session_id or pid. Returns "" if
 # no match — the caller surfaces a helpful error with the actual active set.
 func _resolve_session_id(args: Dictionary) -> String:
+	# Match across BOTH live sessions and recently-exited ones. A verify run
+	# self-terminates via --quit-after, so by the time stop_project is called
+	# the session is often already reaped — but stopping it is still the right
+	# (idempotent) outcome, so it must remain resolvable. list_sessions() reaps
+	# first, populating the graveyard, so the two lists together are current.
 	var sessions: Array = PlaySessionManager.list_sessions()
+	var sessions_and_ghosts: Array = sessions + PlaySessionManager.list_recently_exited()
 
 	# First try the obvious session_id arg, exact match.
 	var sid_arg: String = ToolUtils.parse_string_arg(args, "session_id")
 	if not sid_arg.is_empty():
-		for s in sessions:
+		for s in sessions_and_ghosts:
 			if String(s.get("session_id", "")) == sid_arg:
 				return sid_arg
 		# Maybe the agent passed a pid in the session_id slot. Extract the
 		# first integer ("pid 23696" → 23696) and try matching it as pid.
 		var extracted: int = _first_int(sid_arg)
 		if extracted > 0:
-			for s in sessions:
+			for s in sessions_and_ghosts:
 				if int(s.get("pid", 0)) == extracted:
 					return String(s.get("session_id", ""))
 
@@ -80,7 +98,7 @@ func _resolve_session_id(args: Dictionary) -> String:
 	if args.has("pid"):
 		var pid_int: int = ToolUtils.parse_int_arg(args, "pid", 0)
 		if pid_int > 0:
-			for s in sessions:
+			for s in sessions_and_ghosts:
 				if int(s.get("pid", 0)) == pid_int:
 					return String(s.get("session_id", ""))
 
