@@ -9,6 +9,7 @@ using GladeAgenticAI.Core.Tools.Implementations.Selection;
 using GladeAgenticAI.Core.Tools.Implementations.Transform;
 using GladeAgenticAI.Core.Tools.Implementations.Utility;
 using GameObjImpl = GladeAgenticAI.Core.Tools.Implementations.GameObject;
+using Tilemap2D = GladeAgenticAI.Core.Tools.Implementations.Tilemap2D;
 
 namespace GladeAgenticAI.Services
 {
@@ -79,7 +80,14 @@ namespace GladeAgenticAI.Services
             Register(new CreateMainMenuTool());
             Register(new CreateSoundEffectsTool());
             Register(new CreateHitVfxTool());
+            Register(new CreateParallaxLayerTool());
             Register(new ModifyScriptTool());
+
+            // Tilemap (2D levels)
+            Register(new Tilemap2D.CreateTilemapTool());
+            Register(new Tilemap2D.SetTilemapTilesTool());
+            Register(new Tilemap2D.AddTilemapCollider2DTool());
+            Register(new Tilemap2D.GetTilemapInfoTool());
 
             // Assets
             Register(new CheckAssetExistsTool());

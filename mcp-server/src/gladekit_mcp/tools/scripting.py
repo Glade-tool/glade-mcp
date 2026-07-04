@@ -910,4 +910,59 @@ TOOLS: List[Dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_parallax_layer",
+            "description": "Use this — not create_script — to add one PARALLAX LAYER (distant mountains, drifting clouds, foreground bushes): a sprite under a shared 'ParallaxBackground' root that shifts with the camera to fake depth in 2D games. scrollFactor is the layer's distance: 1 = foreground (moves with the world), 0 = infinitely far (moves with the camera); call once per depth band, e.g. sky 0.1, mountains 0.3, trees 0.6, with sortingOrder rising toward the front. repeatX tiles the sprite sideways forever without a seam. ATOMIC: it writes the vetted ParallaxLayer2D script, builds the sprite layer (a tinted placeholder square when no spritePath is given), and attaches the component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Layer GameObject name. Defaults to 'ParallaxLayer'. A numeric suffix is added if the name is taken.",
+                    },
+                    "spritePath": {
+                        "type": "string",
+                        "description": "Sprite asset for the layer. Omit for a tinted placeholder square you can replace later.",
+                    },
+                    "spriteName": {
+                        "type": "string",
+                        "description": "Sprite name inside a sliced spritesheet at spritePath",
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Tint as 'r,g,b' or 'r,g,b,a' (0-1 floats). Useful to shade placeholder or distance-fade layers.",
+                    },
+                    "scrollFactor": {
+                        "type": "number",
+                        "description": "Depth: 1 = foreground (moves with world), 0 = infinitely far (moves with camera). Defaults to 0.5.",
+                    },
+                    "autoScrollSpeed": {
+                        "type": "number",
+                        "description": "Constant horizontal drift in units/second (clouds). Defaults to 0.",
+                    },
+                    "repeatX": {
+                        "type": "boolean",
+                        "description": "Tile the sprite horizontally forever (self-clones and wraps). Defaults to true.",
+                    },
+                    "sortingOrder": {
+                        "type": "integer",
+                        "description": "Render order — lower is further back. Defaults to -10.",
+                    },
+                    "position": {"type": "string", "description": "Layer position as 'x,y'. Defaults to '0,0'."},
+                    "scale": {"type": "number", "description": "Uniform sprite scale. Defaults to 1."},
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder for the shared ParallaxLayer2D.cs script. Defaults to 'Assets/Scripts'.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY to force-regenerate the shared ParallaxLayer2D.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
 ]

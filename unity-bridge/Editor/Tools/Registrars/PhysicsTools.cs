@@ -1,4 +1,5 @@
 using GladeAgenticAI.Core.Tools.Implementations.Physics;
+using GladeAgenticAI.Core.Tools.Implementations.Physics2D;
 
 namespace GladeAgenticAI.Services
 {
@@ -18,6 +19,13 @@ namespace GladeAgenticAI.Services
             Register(new SetRigidbodyPropertiesTool());
             Register(new CreatePhysicsMaterialTool());
             Register(new AssignPhysicsMaterialTool());
+
+            // 2D physics (separate simulation — Rigidbody2D/Collider2D)
+            Register(new AddRigidbody2DTool());
+            Register(new SetRigidbody2DPropertiesTool());
+            Register(new CreateCollider2DTool());
+            Register(new SetCollider2DPropertiesTool());
+            Register(new CreatePhysicsMaterial2DTool());
 
             // Physics queries (raycast/overlap/sweep)
             Register(new RaycastTool());

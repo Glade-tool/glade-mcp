@@ -27,6 +27,12 @@ CATEGORY = {
         "box cast",
         "collision matrix",
         "layer collision",
+        "2d",
+        "rigidbody2d",
+        "collider2d",
+        "platformer",
+        "gravity scale",
+        "side-scroller",
     ],
 }
 
@@ -122,7 +128,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "get_collider_properties",
-            "description": "Get detailed information about a Collider component including type-specific properties (size, radius, center, direction, convex, terrainDataPath, wheel properties, etc.). Use to inspect collider settings before modifying them.",
+            "description": "Get detailed information about a Collider component including type-specific properties (size, radius, center, direction, convex, terrainDataPath, wheel properties, etc.). Use to inspect collider settings before modifying them. On 2D objects it falls back to Collider2D components (response carries is2D=true and a colliders2D list).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -361,7 +367,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "get_rigidbody_properties",
-            "description": "Get detailed information about a Rigidbody component including mass, drag, gravity, kinematic state, velocity, and other properties. Use to inspect rigidbody settings before modifying them.",
+            "description": "Get detailed information about a Rigidbody component including mass, drag, gravity, kinematic state, velocity, and other properties. Use to inspect rigidbody settings before modifying them. On 2D objects it falls back to Rigidbody2D (response carries is2D=true with bodyType/gravityScale).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -689,6 +695,191 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["layer1", "layer2"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_rigidbody_2d",
+            "description": "Add a Rigidbody2D — the 2D physics body for platformer characters, falling crates, projectiles. 2D and 3D physics are SEPARATE simulations: a Rigidbody2D never collides with 3D colliders, so pair it with create_collider_2d shapes. bodyType: 'dynamic' (gravity + forces), 'kinematic' (script-driven motion), 'static' (immovable). Set freezeRotation=true for characters so they don't tip over — the #1 2D beginner surprise. Warns when 3D physics components are mixed on the same GameObject.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "gameObjectPath": {"type": "string", "description": "Path to the GameObject"},
+                    "bodyType": {
+                        "type": "string",
+                        "enum": ["dynamic", "kinematic", "static"],
+                        "description": "Body simulation mode. Defaults to dynamic (full physics).",
+                    },
+                    "mass": {"type": "number", "description": "Mass in kg (default: 1)"},
+                    "gravityScale": {
+                        "type": "number",
+                        "description": "Gravity multiplier (default: 1). 0 = no gravity (top-down games), >1 = snappier platformer falls.",
+                    },
+                    "linearDrag": {"type": "number", "description": "Linear damping slowing movement (default: 0)"},
+                    "angularDrag": {
+                        "type": "number",
+                        "description": "Angular damping slowing rotation (default: 0.05)",
+                    },
+                    "freezeRotation": {
+                        "type": "boolean",
+                        "description": "Freeze Z rotation so the body never tips over. Recommended true for characters.",
+                    },
+                    "freezePositionX": {"type": "boolean", "description": "Lock movement on X"},
+                    "freezePositionY": {"type": "boolean", "description": "Lock movement on Y"},
+                    "collisionDetection": {
+                        "type": "string",
+                        "enum": ["discrete", "continuous"],
+                        "description": "Use continuous for fast movers (bullets) that tunnel through thin colliders.",
+                    },
+                    "interpolation": {
+                        "type": "string",
+                        "enum": ["none", "interpolate", "extrapolate"],
+                        "description": "Smooths rendered motion between physics steps. Use interpolate for the player/camera target.",
+                    },
+                },
+                "required": ["gameObjectPath"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_rigidbody_2d_properties",
+            "description": "Update an existing Rigidbody2D (same knobs as add_rigidbody_2d). Use e.g. gravityScale=0 for top-down movement, bodyType='kinematic' for script-driven motion, or freezeRotation=true to stop a character tipping over.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "gameObjectPath": {"type": "string", "description": "Path to the GameObject with the Rigidbody2D"},
+                    "bodyType": {
+                        "type": "string",
+                        "enum": ["dynamic", "kinematic", "static"],
+                        "description": "Body simulation mode",
+                    },
+                    "mass": {"type": "number", "description": "Mass in kg"},
+                    "gravityScale": {
+                        "type": "number",
+                        "description": "Gravity multiplier. 0 = no gravity (top-down games).",
+                    },
+                    "linearDrag": {"type": "number", "description": "Linear damping slowing movement"},
+                    "angularDrag": {"type": "number", "description": "Angular damping slowing rotation"},
+                    "freezeRotation": {
+                        "type": "boolean",
+                        "description": "Freeze Z rotation so the body never tips over",
+                    },
+                    "freezePositionX": {"type": "boolean", "description": "Lock movement on X"},
+                    "freezePositionY": {"type": "boolean", "description": "Lock movement on Y"},
+                    "collisionDetection": {
+                        "type": "string",
+                        "enum": ["discrete", "continuous"],
+                        "description": "Use continuous for fast movers that tunnel through thin colliders",
+                    },
+                    "interpolation": {
+                        "type": "string",
+                        "enum": ["none", "interpolate", "extrapolate"],
+                        "description": "Smooths rendered motion between physics steps",
+                    },
+                },
+                "required": ["gameObjectPath"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_collider_2d",
+            "description": "Add a Collider2D. Types: Box (crates/platforms), Circle (balls/coins), Capsule (characters — slides smoothly over steps), Polygon (traces the sprite's outline), Edge (thin ground line from a point list). Box/Circle/Capsule auto-fit the attached sprite's bounds unless size/radius is given. 2D colliders only interact with 2D physics — pair with add_rigidbody_2d for moving bodies; static level geometry needs no Rigidbody2D. Warns when 3D physics components are mixed on the same GameObject.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "gameObjectPath": {"type": "string", "description": "Path to the GameObject"},
+                    "colliderType": {
+                        "type": "string",
+                        "enum": ["Box", "Circle", "Capsule", "Polygon", "Edge"],
+                        "description": "Collider shape. Defaults to Box.",
+                    },
+                    "isTrigger": {
+                        "type": "boolean",
+                        "description": "Trigger colliders report overlaps but don't block movement (coins, damage zones)",
+                    },
+                    "offset": {"type": "string", "description": "Local offset as 'x,y'"},
+                    "size": {
+                        "type": "string",
+                        "description": "Size as 'x,y' for Box/Capsule (overrides sprite auto-fit)",
+                    },
+                    "radius": {"type": "number", "description": "Radius for Circle (overrides sprite auto-fit)"},
+                    "direction": {
+                        "type": "string",
+                        "enum": ["vertical", "horizontal"],
+                        "description": "Capsule axis. Defaults to vertical.",
+                    },
+                    "points": {
+                        "type": "string",
+                        "description": "Point list 'x,y;x,y;...' for Edge (min 2) or Polygon (min 3, replaces the sprite-traced outline). Local units.",
+                    },
+                },
+                "required": ["gameObjectPath"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_collider_2d_properties",
+            "description": "Update an existing Collider2D. When the GameObject has several (body box + attack trigger is a common pair), pass colliderType to pick one; otherwise the first is edited and the response lists the others.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "gameObjectPath": {"type": "string", "description": "Path to the GameObject with the Collider2D"},
+                    "colliderType": {
+                        "type": "string",
+                        "enum": ["Box", "Circle", "Capsule", "Polygon", "Edge"],
+                        "description": "Which collider to edit when several are present",
+                    },
+                    "isTrigger": {
+                        "type": "boolean",
+                        "description": "Trigger colliders report overlaps but don't block movement",
+                    },
+                    "offset": {"type": "string", "description": "Local offset as 'x,y'"},
+                    "size": {"type": "string", "description": "Size as 'x,y' for Box/Capsule"},
+                    "radius": {"type": "number", "description": "Radius for Circle"},
+                    "direction": {"type": "string", "enum": ["vertical", "horizontal"], "description": "Capsule axis"},
+                    "points": {
+                        "type": "string",
+                        "description": "Point list 'x,y;x,y;...' for Edge/Polygon. Local units.",
+                    },
+                },
+                "required": ["gameObjectPath"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_physics_material_2d",
+            "description": "Create a PhysicsMaterial2D asset controlling friction and bounciness (2D has no combine modes). friction=0 makes walls non-sticky — essential for platformer wall-slides; bounciness=1 is a perfect bouncing ball. Pass assignTo to also assign it to every Collider2D on a GameObject in the same call.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "materialPath": {
+                        "type": "string",
+                        "description": "Asset path, e.g. 'Assets/Physics/Ice'. The .physicsMaterial2D extension is added automatically.",
+                    },
+                    "friction": {
+                        "type": "number",
+                        "description": "Surface friction (default: 0.4). 0 = frictionless ice.",
+                    },
+                    "bounciness": {
+                        "type": "number",
+                        "description": "Bounce energy kept on impact, 0-1 (default: 0). 1 = perfect bounce.",
+                    },
+                    "assignTo": {
+                        "type": "string",
+                        "description": "Optional GameObject path — assigns the new material to every Collider2D on it",
+                    },
+                },
+                "required": ["materialPath"],
             },
         },
     },

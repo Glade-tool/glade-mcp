@@ -64,7 +64,7 @@ namespace GladeAgenticAI.Services
             "get_animator_state_info", "get_animator_transition_info", "get_blend_tree_info",
             "get_ik_target_info", "get_ik_weight", "get_sprite_animation_info",
             "get_unity_console_logs", "get_render_settings", "get_rigidbody_properties",
-            "get_collider_properties", "get_character_controller_properties",
+            "get_collider_properties", "get_character_controller_properties", "get_tilemap_info",
             "get_collision_matrix", "get_input_system_info", "get_texture_import_settings",
             "get_model_import_settings", "get_audio_import_settings", "get_sprite_import_settings",
             "raycast", "raycast_all", "linecast", "overlap_sphere", "overlap_box",

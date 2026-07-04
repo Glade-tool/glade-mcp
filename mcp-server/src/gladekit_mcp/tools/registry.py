@@ -118,6 +118,12 @@ CORE_TOOLS: set[str] = {
     "set_collider_properties",
     "create_character_controller",
     "create_physics_material",
+    # ── 2D (physics + tilemap essentials) ────────────────────────────────────
+    "add_rigidbody_2d",
+    "create_collider_2d",
+    "create_tilemap",
+    "set_tilemap_tiles",
+    "add_tilemap_collider_2d",
     # ── Camera ────────────────────────────────────────────────────────────────
     "create_camera",
     "set_camera_properties",

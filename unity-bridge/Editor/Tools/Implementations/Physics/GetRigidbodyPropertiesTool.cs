@@ -30,7 +30,11 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Physics
             Rigidbody rb = obj.GetComponent<Rigidbody>();
             if (rb == null)
             {
-                return ToolUtils.CreateErrorResponse($"GameObject '{gameObjectPath}' does not have a Rigidbody component");
+                // 2D fallback — same tool name serves both simulations for reads.
+                Rigidbody2D rb2d = obj.GetComponent<Rigidbody2D>();
+                if (rb2d != null)
+                    return Describe2D(gameObjectPath, obj, rb2d);
+                return ToolUtils.CreateErrorResponse($"GameObject '{gameObjectPath}' has neither a Rigidbody nor a Rigidbody2D component");
             }
             
             // READ ONLY - No Undo needed
@@ -67,8 +71,28 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Physics
             }
             
             string message = $"Retrieved rigidbody properties for '{gameObjectPath}': Mass={rb.mass}, UseGravity={rb.useGravity}, IsKinematic={rb.isKinematic}";
-            
+
             return ToolUtils.CreateSuccessResponse(message, properties);
+        }
+
+        private static string Describe2D(string gameObjectPath, UnityEngine.GameObject obj, Rigidbody2D rb2d)
+        {
+            var properties = Physics2D.Physics2DUtils.DescribeRigidbody2D(rb2d);
+            properties["gameObjectPath"] = gameObjectPath;
+            properties["is2D"] = true;
+
+            Collider2D[] colliders = obj.GetComponents<Collider2D>();
+            properties["hasColliders2D"] = colliders.Length > 0;
+            if (colliders.Length > 0)
+            {
+                var types = new List<string>();
+                foreach (var col in colliders) types.Add(col.GetType().Name);
+                properties["colliderTypes"] = types;
+            }
+
+            return ToolUtils.CreateSuccessResponse(
+                $"Retrieved Rigidbody2D properties for '{gameObjectPath}': BodyType={rb2d.bodyType}, GravityScale={rb2d.gravityScale}",
+                properties);
         }
     }
 }

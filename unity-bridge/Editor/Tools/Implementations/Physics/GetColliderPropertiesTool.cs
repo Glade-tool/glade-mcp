@@ -25,7 +25,13 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Physics
 
             Collider collider = obj.GetComponent<Collider>();
             if (collider == null)
-                return ToolUtils.CreateErrorResponse($"GameObject '{gameObjectPath}' does not have a Collider component");
+            {
+                // 2D fallback — same tool name serves both simulations for reads.
+                Collider2D[] colliders2D = obj.GetComponents<Collider2D>();
+                if (colliders2D.Length > 0)
+                    return Describe2D(gameObjectPath, colliders2D);
+                return ToolUtils.CreateErrorResponse($"GameObject '{gameObjectPath}' has neither a Collider nor a Collider2D component");
+            }
 
             // Base properties common to all colliders
             var properties = new Dictionary<string, object>
@@ -63,6 +69,26 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Physics
 
             return ToolUtils.CreateSuccessResponse(
                 $"Retrieved collider properties for '{gameObjectPath}': Type={collider.GetType().Name}, IsTrigger={collider.isTrigger}",
+                properties);
+        }
+
+        private static string Describe2D(string gameObjectPath, Collider2D[] colliders2D)
+        {
+            var described = new List<object>();
+            foreach (var col in colliders2D)
+                described.Add(Physics2D.Physics2DUtils.DescribeCollider2D(col));
+
+            var properties = new Dictionary<string, object>
+            {
+                ["gameObjectPath"] = gameObjectPath,
+                ["is2D"] = true,
+                ["count"] = colliders2D.Length,
+                ["colliders2D"] = described,
+            };
+
+            return ToolUtils.CreateSuccessResponse(
+                $"Retrieved {colliders2D.Length} Collider2D component(s) for '{gameObjectPath}': " +
+                $"{string.Join(", ", System.Array.ConvertAll(colliders2D, c => c.GetType().Name))}",
                 properties);
         }
     }

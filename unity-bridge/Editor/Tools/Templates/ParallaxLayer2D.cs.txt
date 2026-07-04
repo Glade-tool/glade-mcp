@@ -1,0 +1,120 @@
+using UnityEngine;
+
+// A PARALLAX LAYER for 2D side-scrollers: the layer shifts as the camera moves so
+// distant backgrounds appear to drift slower than the foreground — the standard
+// depth illusion of every 2D platformer.
+//
+// scrollFactor is the layer's "distance": 1 = locked to the world (foreground),
+// 0 = locked to the camera (an infinitely-far sky), 0.5 = halfway. Internally the
+// layer follows the camera by (1 - scrollFactor) of its travel, which reads the
+// same as Godot/Unity-tutorial parallax conventions.
+//
+// Two details hand-written parallax scripts reliably get wrong, both handled here:
+//
+//   1. TIMING. The layer moves in LateUpdate from the camera's actual frame
+//      delta, so it works with any camera controller (follow scripts, Cinemachine,
+//      teleports) instead of assuming a constant scroll speed.
+//
+//   2. TILING. With repeatX enabled the script spawns two side-by-side clones of
+//      its own sprite at Start and wraps the trio as the camera passes, so the
+//      background scrolls forever without a visible seam or an army of
+//      hand-placed copies.
+//
+// autoScrollSpeed adds constant drift in world units/second (clouds, fog) on top
+// of the camera-driven motion.
+[DisallowMultipleComponent]
+public class ParallaxLayer2D : MonoBehaviour
+{
+    [Tooltip("1 = moves with the world (foreground), 0 = moves with the camera (infinitely far away).")]
+    public float scrollFactor = 0.5f;
+
+    [Tooltip("Constant horizontal drift in world units/second (clouds). 0 = camera-driven only.")]
+    public float autoScrollSpeed = 0f;
+
+    [Tooltip("Clone the sprite left/right and wrap so the layer tiles horizontally forever.")]
+    public bool repeatX = false;
+
+    private Camera _cam;
+    private Vector3 _lastCamPos;
+    private bool _tracking;
+    private float _tileWidth;
+
+    private void Start()
+    {
+        if (repeatX)
+            SetUpTiling();
+    }
+
+    private void LateUpdate()
+    {
+        if (_cam == null)
+        {
+            _cam = Camera.main;
+            if (_cam == null) return; // no camera yet — try again next frame
+            _lastCamPos = _cam.transform.position;
+            _tracking = true;
+            return;
+        }
+
+        if (!_tracking)
+        {
+            _lastCamPos = _cam.transform.position;
+            _tracking = true;
+            return;
+        }
+
+        Vector3 camPos = _cam.transform.position;
+        Vector3 camDelta = camPos - _lastCamPos;
+        _lastCamPos = camPos;
+
+        // Follow the camera by the "missing" fraction of its travel: a factor of
+        // 1 leaves the layer in the world, a factor of 0 rides the camera.
+        Vector3 pos = transform.position;
+        pos.x += camDelta.x * (1f - scrollFactor);
+        pos.y += camDelta.y * (1f - scrollFactor);
+        pos.x += autoScrollSpeed * Time.deltaTime;
+
+        // Wrap once the camera is more than one tile away so the trio of sprites
+        // always brackets the view.
+        if (repeatX && _tileWidth > 0.001f)
+        {
+            float offset = camPos.x - pos.x;
+            if (offset > _tileWidth) pos.x += _tileWidth;
+            else if (offset < -_tileWidth) pos.x -= _tileWidth;
+        }
+
+        transform.position = pos;
+    }
+
+    private void SetUpTiling()
+    {
+        var renderer = GetComponent<SpriteRenderer>();
+        if (renderer == null || renderer.sprite == null)
+        {
+            repeatX = false;
+            return;
+        }
+
+        _tileWidth = renderer.bounds.size.x;
+        if (_tileWidth < 0.001f)
+        {
+            repeatX = false;
+            return;
+        }
+
+        for (int side = -1; side <= 1; side += 2)
+        {
+            var clone = new GameObject(name + (side < 0 ? "_L" : "_R"));
+            clone.transform.SetParent(transform, false);
+            clone.transform.localPosition = new Vector3(side * _tileWidth / transform.lossyScale.x, 0f, 0f);
+            var cloneRenderer = clone.AddComponent<SpriteRenderer>();
+            cloneRenderer.sprite = renderer.sprite;
+            cloneRenderer.color = renderer.color;
+            cloneRenderer.sortingLayerID = renderer.sortingLayerID;
+            cloneRenderer.sortingOrder = renderer.sortingOrder;
+            cloneRenderer.drawMode = renderer.drawMode;
+            cloneRenderer.flipX = renderer.flipX;
+            cloneRenderer.flipY = renderer.flipY;
+        }
+    }
+}

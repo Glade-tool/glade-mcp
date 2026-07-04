@@ -31,6 +31,13 @@ CATEGORY = {
         "align",
         "snap",
         "component",
+        "tilemap",
+        "tile",
+        "grid",
+        "2d level",
+        "parallax",
+        "background",
+        "platformer",
     ],
 }
 
@@ -759,6 +766,122 @@ TOOLS: List[Dict] = [
                     "fieldName",
                     "sourceGameObject",
                 ],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_tilemap",
+            "description": "Create a Grid + Tilemap + TilemapRenderer — the foundation for tile-based 2D levels (platformers, top-down RPGs). Returns gridPath and tilemapPath. Call again with gridPath to stack more layers (background / foreground / hazards) on the same grid. Paint it with set_tilemap_tiles, then make it solid with add_tilemap_collider_2d.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Tilemap layer name. Defaults to 'Tilemap'. A numeric suffix is added if the name is taken.",
+                    },
+                    "gridPath": {
+                        "type": "string",
+                        "description": "Existing Grid to attach this layer to (from a previous create_tilemap call). Omit to create a new Grid.",
+                    },
+                    "layout": {
+                        "type": "string",
+                        "enum": ["rectangular", "isometric", "hexagonal"],
+                        "description": "Cell layout of a NEW grid. Defaults to rectangular. Ignored with gridPath.",
+                    },
+                    "cellSize": {
+                        "type": "string",
+                        "description": "Cell size in world units as 'x,y' for a NEW grid. Defaults to '1,1'.",
+                    },
+                    "sortingOrder": {
+                        "type": "integer",
+                        "description": "Render order of this layer (higher draws on top). Defaults to 0.",
+                    },
+                    "position": {
+                        "type": "string",
+                        "description": "World position of a NEW grid as 'x,y'. Defaults to '0,0'.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_tilemap_tiles",
+            "description": "Paint or erase tiles on a Tilemap (pairs with create_tilemap). Cells are TILE units, not world units: list them as 'x,y;x,y;...' and/or fill a rectangle with fillRect 'x,y,w,h'. Pass a Tile asset (tilePath) or just a sprite (spritePath, plus spriteName for a sliced sheet) — a reusable Tile asset is created next to the sprite automatically. Set erase=true to clear the listed cells instead.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tilemapPath": {
+                        "type": "string",
+                        "description": "Path to the Tilemap (returned by create_tilemap)",
+                    },
+                    "tilePath": {"type": "string", "description": "A ready Tile .asset to stamp"},
+                    "spritePath": {
+                        "type": "string",
+                        "description": "A sprite to stamp — a Tile asset wrapping it is find-or-created next to it",
+                    },
+                    "spriteName": {
+                        "type": "string",
+                        "description": "Sprite name inside a sliced spritesheet at spritePath",
+                    },
+                    "cells": {
+                        "type": "string",
+                        "description": "Individual cells as 'x,y;x,y;...' (tile units, integers)",
+                    },
+                    "fillRect": {
+                        "type": "string",
+                        "description": "Fill a w×h block as 'x,y,w,h' (tile units, integers). E.g. '-10,0,20,1' paints a 20-tile floor.",
+                    },
+                    "erase": {
+                        "type": "boolean",
+                        "description": "Clear the listed cells/rect instead of painting. Defaults to false.",
+                    },
+                },
+                "required": ["tilemapPath"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_tilemap_collider_2d",
+            "description": "Make a painted Tilemap SOLID so 2D physics bodies can stand on it. A tilemap is purely visual until this runs — a Rigidbody2D player falls straight through the floor. composite=true merges per-tile boxes into clean outlines (prevents ghost-collision seams between tiles; recommended for level geometry). oneWay=true makes platforms the player can jump up through and land on.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tilemapPath": {"type": "string", "description": "Path to the painted Tilemap"},
+                    "composite": {
+                        "type": "boolean",
+                        "description": "Merge per-tile colliders into clean outlines via CompositeCollider2D + static Rigidbody2D. Defaults to false.",
+                    },
+                    "isTrigger": {
+                        "type": "boolean",
+                        "description": "Make the tiles a trigger zone (reports overlaps, doesn't block). Defaults to false.",
+                    },
+                    "oneWay": {
+                        "type": "boolean",
+                        "description": "One-way platforms via PlatformEffector2D: jump up through, land on top. Defaults to false.",
+                    },
+                },
+                "required": ["tilemapPath"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_tilemap_info",
+            "description": "Read-only snapshot of a tile level: grid layout and cell size plus, per layer, the painted bounds (tile units), tile count, sorting order, and whether it has a collider yet. Accepts a Grid path (describes every layer under it) or a single Tilemap path.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tilemapPath": {"type": "string", "description": "Path to a Grid or Tilemap GameObject"}
+                },
+                "required": ["tilemapPath"],
             },
         },
     },
