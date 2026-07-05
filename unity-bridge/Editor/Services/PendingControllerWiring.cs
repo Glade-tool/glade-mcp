@@ -96,6 +96,14 @@ namespace GladeAgenticAI.Services
             var wrapper = new WiringRequestList { items = merged };
             SessionState.SetString(KeyJson, JsonUtility.ToJson(wrapper));
             SessionState.SetInt(KeyAttempts, 0);
+
+            // The declaring type may ALREADY be compiled — every scaffolder call
+            // after the first reuses its vetted script, so no compile and no
+            // domain reload is coming to fire the attach hooks (and delayCall is
+            // unreliable in an unfocused editor). We're on the main thread here:
+            // attach synchronously. TryComplete is idempotent and keeps queued
+            // anything whose type genuinely still needs the upcoming reload.
+            TryComplete();
         }
 
         /// <summary>Reads the currently-queued requests (empty list if none or if

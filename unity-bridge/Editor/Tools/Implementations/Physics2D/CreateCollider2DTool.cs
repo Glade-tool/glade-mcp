@@ -28,6 +28,15 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Physics2D
 
             string colliderType = ToolUtils.GetStringArg(args, "colliderType", "Box").Trim().ToLowerInvariant();
 
+            // Unity hard-blocks 2D physics components on objects with 3D
+            // physics — refuse up front with the reason instead of letting
+            // AddComponent return null.
+            string blocker = Physics2DUtils.Describe3DPhysicsBlocker(obj);
+            if (blocker != null)
+                return ToolUtils.CreateErrorResponse(
+                    $"Could not add a {colliderType} Collider2D to '{gameObjectPath}' — it has {blocker}, and Unity blocks mixing 2D and 3D physics on one GameObject. " +
+                    "Remove the 3D component with remove_component, or put the 2D collider on a separate GameObject (the two simulations never interact).");
+
             Collider2D collider;
             switch (colliderType)
             {
@@ -60,22 +69,21 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Physics2D
                     return ToolUtils.CreateErrorResponse($"Unknown colliderType '{colliderType}'. Supported: Box, Circle, Capsule, Polygon, Edge.");
             }
 
+            if (collider == null)
+                return ToolUtils.CreateErrorResponse($"Could not add a {colliderType} Collider2D to '{gameObjectPath}' — Unity rejected the component (check the Console for details).");
+
             ApplyCollider2DArgs(collider, args, out string applyError);
             if (!string.IsNullOrEmpty(applyError))
                 return ToolUtils.CreateErrorResponse(applyError);
 
-            var warnings = Physics2DUtils.CollectMixedPhysicsWarnings(obj);
             var extras = Physics2DUtils.DescribeCollider2D(collider);
-            extras["hasRigidbody2D"] = obj.GetComponent<Rigidbody2D>() != null;
-            if (warnings.Count > 0)
-                extras["warnings"] = warnings;
+            bool hasRigidbody2D = obj.GetComponent<Rigidbody2D>() != null;
+            extras["hasRigidbody2D"] = hasRigidbody2D;
 
             string message = $"Added {collider.GetType().Name} to '{gameObjectPath}'";
             var sr = obj.GetComponent<SpriteRenderer>();
             if (sr != null && sr.sprite != null && !args.ContainsKey("size") && !args.ContainsKey("radius") && !args.ContainsKey("points"))
                 message += " (auto-fitted to the sprite)";
-            if (warnings.Count > 0)
-                message += ". See warnings in response.";
 
             return ToolUtils.CreateSuccessResponse(message, extras);
         }

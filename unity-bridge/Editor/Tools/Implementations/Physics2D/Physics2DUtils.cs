@@ -124,18 +124,18 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Physics2D
             return props;
         }
 
-        /// <summary>Warnings for 2D/3D physics mixing on one GameObject.</summary>
-        public static List<string> CollectMixedPhysicsWarnings(UnityEngine.GameObject obj)
+        /// <summary>
+        /// Names the 3D physics component that makes Unity REFUSE a 2D physics
+        /// add on this GameObject (AddComponent returns null), or null when the
+        /// object is clean. Unity hard-blocks mixing 2D and 3D physics on one
+        /// GameObject, so this feeds the blocked-add error message.
+        /// </summary>
+        public static string Describe3DPhysicsBlocker(UnityEngine.GameObject obj)
         {
-            var warnings = new List<string>();
-            if (obj.GetComponent<Rigidbody>() != null)
-                warnings.Add("WARNING: GameObject also has a 3D Rigidbody. 2D and 3D physics are separate simulations and never interact — remove one of them.");
-            if (obj.GetComponent<Collider>() != null)
-                warnings.Add("WARNING: GameObject also has 3D colliders. 2D and 3D physics are separate simulations and never interact — a Rigidbody2D will fall straight through a 3D collider.");
-            var charController = obj.GetComponent<CharacterController>();
-            if (charController != null && charController.enabled)
-                warnings.Add("WARNING: GameObject has a CharacterController (3D). It does not collide with 2D physics — use a Rigidbody2D-based controller for 2D movement.");
-            return warnings;
+            if (obj.GetComponent<Rigidbody>() != null) return "a 3D Rigidbody";
+            var collider3D = obj.GetComponent<Collider>();
+            if (collider3D != null) return $"a 3D {collider3D.GetType().Name}";
+            return null;
         }
 
         /// <summary>

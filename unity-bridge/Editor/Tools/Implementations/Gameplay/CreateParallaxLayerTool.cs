@@ -158,36 +158,41 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Gameplay
         }
 
         /// <summary>A shared 64x64 white sprite asset so spriteless layers are
-        /// still visible (tinted) instead of silently invisible.</summary>
+        /// still visible (tinted) instead of silently invisible. Self-healing:
+        /// if the PNG exists but is mis-imported (e.g. a project preset forced
+        /// spriteMode=Multiple, which yields zero sprite sub-assets), the
+        /// importer is corrected and the asset reimported.</summary>
         private static Sprite GetOrCreatePlaceholderSprite(out string error, out bool created)
         {
             error = "";
-            created = false;
+            created = true; // always a placeholder from the caller's perspective
 
             var existing = AssetDatabase.LoadAssetAtPath<Sprite>(PlaceholderPath);
             if (existing != null)
-            {
-                created = true; // still a placeholder from the caller's perspective
                 return existing;
+
+            if (!System.IO.File.Exists(PlaceholderPath))
+            {
+                string dir = System.IO.Path.GetDirectoryName(PlaceholderPath).Replace('\\', '/');
+                ToolUtils.EnsureAssetFolder(dir);
+
+                var tex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+                var pixels = new Color32[64 * 64];
+                for (int i = 0; i < pixels.Length; i++) pixels[i] = new Color32(255, 255, 255, 255);
+                tex.SetPixels32(pixels);
+                tex.Apply();
+                byte[] png = tex.EncodeToPNG();
+                Object.DestroyImmediate(tex);
+                System.IO.File.WriteAllBytes(PlaceholderPath, png);
+                AssetDatabase.ImportAsset(PlaceholderPath, ImportAssetOptions.ForceSynchronousImport);
             }
 
-            string dir = System.IO.Path.GetDirectoryName(PlaceholderPath).Replace('\\', '/');
-            ToolUtils.EnsureAssetFolder(dir);
-
-            var tex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
-            var pixels = new Color32[64 * 64];
-            for (int i = 0; i < pixels.Length; i++) pixels[i] = new Color32(255, 255, 255, 255);
-            tex.SetPixels32(pixels);
-            tex.Apply();
-            byte[] png = tex.EncodeToPNG();
-            Object.DestroyImmediate(tex);
-
-            System.IO.File.WriteAllBytes(PlaceholderPath, png);
-            AssetDatabase.ImportAsset(PlaceholderPath);
-
+            // Force the exact import shape we need — a project-wide importer
+            // preset can otherwise leave the texture unloadable as a Sprite.
             if (AssetImporter.GetAtPath(PlaceholderPath) is TextureImporter importer)
             {
                 importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
                 importer.spritePixelsPerUnit = 16f; // 64px square = 4 world units — a usable backdrop slab
                 importer.SaveAndReimport();
             }
@@ -196,9 +201,9 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Gameplay
             if (sprite == null)
             {
                 error = $"Failed to generate placeholder sprite at '{PlaceholderPath}'.";
+                created = false;
                 return null;
             }
-            created = true;
             return sprite;
         }
     }

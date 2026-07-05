@@ -41,7 +41,17 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Tilemap2D
             var warnings = new List<string>();
             var addedComponents = new List<string> { "TilemapCollider2D" };
 
+            // Unity hard-blocks 2D physics components on objects with 3D
+            // physics — refuse up front with the reason instead of letting
+            // AddComponent return null.
+            string blocker = Physics2D.Physics2DUtils.Describe3DPhysicsBlocker(obj);
+            if (blocker != null)
+                return ToolUtils.CreateErrorResponse(
+                    $"Could not add a TilemapCollider2D to '{tilemapPath}' — it has {blocker}, and Unity blocks mixing 2D and 3D physics on one GameObject. Remove the 3D component with remove_component.");
+
             TilemapCollider2D tmCollider = Undo.AddComponent<TilemapCollider2D>(obj);
+            if (tmCollider == null)
+                return ToolUtils.CreateErrorResponse($"Could not add a TilemapCollider2D to '{tilemapPath}' — Unity rejected the component (check the Console for details).");
             Collider2D effectiveCollider = tmCollider;
 
             if (composite)

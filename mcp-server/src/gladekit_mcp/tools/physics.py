@@ -702,7 +702,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "add_rigidbody_2d",
-            "description": "Add a Rigidbody2D — the 2D physics body for platformer characters, falling crates, projectiles. 2D and 3D physics are SEPARATE simulations: a Rigidbody2D never collides with 3D colliders, so pair it with create_collider_2d shapes. bodyType: 'dynamic' (gravity + forces), 'kinematic' (script-driven motion), 'static' (immovable). Set freezeRotation=true for characters so they don't tip over — the #1 2D beginner surprise. Warns when 3D physics components are mixed on the same GameObject.",
+            "description": "Add a Rigidbody2D — the 2D physics body for platformer characters, falling crates, projectiles. 2D and 3D physics are SEPARATE simulations: a Rigidbody2D never collides with 3D colliders, so pair it with create_collider_2d shapes. bodyType: 'dynamic' (gravity + forces), 'kinematic' (script-driven motion), 'static' (immovable). Set freezeRotation=true for characters so they don't tip over — the #1 2D beginner surprise. Unity blocks 2D physics on objects carrying 3D physics components; the tool refuses with the blocker named.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -789,7 +789,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_collider_2d",
-            "description": "Add a Collider2D. Types: Box (crates/platforms), Circle (balls/coins), Capsule (characters — slides smoothly over steps), Polygon (traces the sprite's outline), Edge (thin ground line from a point list). Box/Circle/Capsule auto-fit the attached sprite's bounds unless size/radius is given. 2D colliders only interact with 2D physics — pair with add_rigidbody_2d for moving bodies; static level geometry needs no Rigidbody2D. Warns when 3D physics components are mixed on the same GameObject.",
+            "description": "Add a Collider2D. Types: Box (crates/platforms), Circle (balls/coins), Capsule (characters — slides smoothly over steps), Polygon (traces the sprite's outline), Edge (thin ground line from a point list). Box/Circle/Capsule auto-fit the attached sprite's bounds unless size/radius is given. 2D colliders only interact with 2D physics — pair with add_rigidbody_2d for moving bodies; static level geometry needs no Rigidbody2D. Unity blocks 2D physics on objects carrying 3D physics components; the tool refuses with the blocker named.",
             "parameters": {
                 "type": "object",
                 "properties": {

@@ -31,17 +31,11 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Physics2D
             Undo.RecordObject(rb, "Set Rigidbody2D Properties");
             Physics2DUtils.ApplyRigidbody2DProperties(rb, args);
 
-            var warnings = Physics2DUtils.CollectMixedPhysicsWarnings(obj);
             var extras = Physics2DUtils.DescribeRigidbody2D(rb);
             extras["hasColliders2D"] = obj.GetComponents<Collider2D>().Length > 0;
-            if (warnings.Count > 0)
-                extras["warnings"] = warnings;
 
-            string message = $"Updated Rigidbody2D on '{gameObjectPath}' (bodyType={rb.bodyType}, gravityScale={rb.gravityScale})";
-            if (warnings.Count > 0)
-                message += ". See warnings in response.";
-
-            return ToolUtils.CreateSuccessResponse(message, extras);
+            return ToolUtils.CreateSuccessResponse(
+                $"Updated Rigidbody2D on '{gameObjectPath}' (bodyType={rb.bodyType}, gravityScale={rb.gravityScale})", extras);
         }
     }
 }
