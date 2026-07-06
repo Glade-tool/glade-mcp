@@ -136,6 +136,14 @@ var _pending_async: Array = []
 var _cached_engine_mode: String = "edit"
 var _cached_mutex: Mutex = null
 
+# Project identity, seeded on the main thread in start() before the worker
+# spawns (same contract as VERSION — written once, then read-only, so the
+# worker thread can read them on every health request without a mutex).
+# Reported in the health payload so clients can locate this project on disk
+# (e.g. to update the addon files in place) without guessing from scans.
+var _project_name: String = ""
+var _project_path: String = ""
+
 # Main-thread heartbeat: last Time.get_ticks_msec() at which the main thread
 # made progress (each _process tick, and after each dispatched tool inside a
 # batch). Written by the main thread, read by the worker thread, guarded by
@@ -155,6 +163,8 @@ func start() -> void:
 	# Resolve VERSION before anything reads it. Must happen before _thread
 	# spawns (the worker thread reads VERSION on every health request).
 	VERSION = _read_version()
+	_project_name = str(ProjectSettings.get_setting("application/config/name", ""))
+	_project_path = ProjectSettings.globalize_path("res://").trim_suffix("/")
 	_port = _resolve_port()
 	_registry = ToolRegistry.new()
 	_tcp_server = TCPServer.new()
@@ -1099,6 +1109,8 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 				"bridgeVersion": VERSION,
 				"bridgeKind": BRIDGE_KIND,
 				"godotVersion": Engine.get_version_info().get("string", ""),
+				"projectName": _project_name,
+				"projectPath": _project_path,
 				"engineMode": mode,
 				"toolCount": _registry.get_tool_count(),
 				# How long since the editor's main thread last made progress.
