@@ -1,5 +1,5 @@
 """
-Godot physics tools (4 tools).
+Godot physics tools (5 tools).
 
 Godot's physics body classes are nodes: StaticBody{3D,2D}, RigidBody{3D,2D},
 CharacterBody{3D,2D}. A body without a CollisionShape child does nothing,
@@ -9,6 +9,13 @@ folded into this — Godot devs almost always want a body with a shape,
 and forcing two calls is friction. The `space` arg ("3d" default / "2d")
 picks the dimension, so the same tool builds 3D props and 2D platformer
 bodies alike.
+
+`configure_physics_body` is the config counterpart to `create_physics_body`:
+it sets an existing body or area's collision layers and mask (passed as layer
+numbers, not a raw bitmask), its surface friction and bounce (via a
+PhysicsMaterial — StaticBody/RigidBody only), and RigidBody dynamics (mass,
+gravity_scale, damping, freeze, lock_rotation). Fields that don't apply to the
+target node type are reported back as skipped rather than raising an error.
 
 `raycast` is the spatial-query counterpart: cast a ray through the scene's
 physics space and report the first collider hit. It runs against the open
@@ -102,6 +109,97 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["body_type"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "configure_physics_body",
+            "description": (
+                "Configure an EXISTING collision object's physics behaviour — the "
+                "config counterpart to create_physics_body. Three optional groups; "
+                "only what you pass is applied. (1) COLLISION FILTERING (any body or "
+                "area): collision_layers = layer numbers 1..32 the object OCCUPIES, "
+                "collision_mask_layers = layer numbers it SCANS. Pass layer NUMBERS "
+                "(e.g. [2] and [1,3]), not a raw bitmask — this is how you make "
+                "'coins not collide with walls', 'enemies only hit the player', "
+                "'bullets pass through pickups'. (2) SURFACE MATERIAL (StaticBody / "
+                "RigidBody only): friction (0..1, 0=ice) and bounce (0..1, 1=bouncy "
+                "ball) create/assign a PhysicsMaterial — there is NO other tool to "
+                "set friction/bounce. (3) RIGIDBODY DYNAMICS (RigidBody only): mass, "
+                "gravity_scale (0=float), linear_damp, angular_damp, freeze, "
+                "lock_rotation. Fields that don't apply to the node type are returned "
+                "in `skipped` with a reason, not errored."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_path": {
+                        "type": "string",
+                        "description": "Target CollisionObject (body or area) in the edited scene.",
+                    },
+                    "collision_layers": {
+                        "type": "array",
+                        "description": (
+                            "Layer numbers (1..32) this object OCCUPIES — packed into "
+                            "its collision_layer. E.g. [2] = the 'player' layer."
+                        ),
+                        "items": {"type": "integer"},
+                    },
+                    "collision_mask_layers": {
+                        "type": "array",
+                        "description": (
+                            "Layer numbers (1..32) this object SCANS for — packed into "
+                            "its collision_mask. E.g. [1,3] = collide with world + enemies."
+                        ),
+                        "items": {"type": "integer"},
+                    },
+                    "friction": {
+                        "type": "number",
+                        "description": "Surface friction 0..1 (0 = frictionless/ice). StaticBody/RigidBody only.",
+                    },
+                    "bounce": {
+                        "type": "number",
+                        "description": "Bounciness 0..1 (1 = fully elastic). StaticBody/RigidBody only.",
+                    },
+                    "rough": {
+                        "type": "boolean",
+                        "description": "PhysicsMaterial.rough — multiply friction when combining. Optional.",
+                    },
+                    "absorbent": {
+                        "type": "boolean",
+                        "description": "PhysicsMaterial.absorbent — multiply bounce when combining. Optional.",
+                    },
+                    "mass": {
+                        "type": "number",
+                        "description": "Mass (RigidBody only).",
+                    },
+                    "gravity_scale": {
+                        "type": "number",
+                        "description": "Gravity multiplier (RigidBody only). 0 = floats, negative = rises.",
+                    },
+                    "linear_damp": {
+                        "type": "number",
+                        "description": "Linear velocity damping (RigidBody only).",
+                    },
+                    "angular_damp": {
+                        "type": "number",
+                        "description": "Angular (spin) damping (RigidBody only).",
+                    },
+                    "freeze": {
+                        "type": "boolean",
+                        "description": "Freeze the body in place (RigidBody only).",
+                    },
+                    "lock_rotation": {
+                        "type": "boolean",
+                        "description": (
+                            "Prevent rotation (RigidBody only) — maps to lock_rotation "
+                            "in 2D or all three axis_lock_angular_* in 3D."
+                        ),
+                    },
+                },
+                "required": ["node_path"],
             },
         },
     },

@@ -111,6 +111,10 @@ const CreateResourceTool      = preload("res://addons/com.gladekit.mcp-bridge/to
 
 # ── Physics tools (Phase 3) ────────────────────────────────────────────────
 const CreatePhysicsBodyTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/create_physics_body.gd")
+# Config counterpart to create_physics_body: set collision layers/masks (by
+# layer number), friction/bounce (physics_material_override), and RigidBody
+# dynamics (mass/gravity_scale/damping/freeze/lock_rotation) on an existing body.
+const ConfigurePhysicsBodyTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/configure_physics_body.gd")
 # Spatial query: cast a ray through the edited scene's physics space and report
 # the first collider hit. Works at edit time (no play session needed).
 const RaycastTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/physics/raycast.gd")
@@ -341,6 +345,7 @@ func _register_all() -> void:
 	register_tool(CreateResourceTool.new())
 	# Physics (4)
 	register_tool(CreatePhysicsBodyTool.new())
+	register_tool(ConfigurePhysicsBodyTool.new())
 	register_tool(RaycastTool.new())
 	register_tool(OverlapShapeTool.new())
 	register_tool(ShapeCastTool.new())
