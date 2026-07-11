@@ -2,9 +2,9 @@
 
 Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients directly to your Unity or Godot editor.
 
-**Unity:** 235+ tools, full Unity-aware system prompt, GLADE.md project context, script semantic search, skill calibration, free CC0 asset pipeline, cloud intelligence layer with RAG and cross-session memory.
+**Unity:** 260+ tools, full Unity-aware system prompt, GLADE.md project context, script semantic search, skill calibration, free CC0 asset pipeline, cloud intelligence layer with RAG and cross-session memory.
 
-**Godot (4.3+):** 53 native tools across scene/node, scripts, resources, signals, runtime (incl. structured runtime-event observation), project introspection, Control / Window UI, and lighting & WorldEnvironment.
+**Godot (4.3+):** 105 native tools across scene/node, scripts, resources, signals, physics, 2D (sprites, tilemaps, parallax), audio, particles, animation, camera, navigation, runtime (incl. structured runtime-event observation), project introspection, Control / Window UI, and lighting & WorldEnvironment.
 
 The MCP server auto-detects which editor is running (Unity on `:8765`, Godot on `:8766`) and exposes the matching tool set.
 
@@ -41,7 +41,7 @@ The Unity bridge starts automatically on `localhost:8765`.
 The Godot bridge starts automatically on `localhost:8766`. You should see a confirmation line in the editor Output panel:
 
 ```
-[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.6.4, 60 tools registered, thread-polled at 200Hz)
+[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.7.6, 105 tools registered, thread-polled at 200Hz)
 ```
 
 **Supported:** Godot 4.3+ GDScript projects, Forward+ and Compatibility renderers, 2D and 3D. **Not yet supported:** Godot Mono / C# projects, web export targets, headless server builds. The bridge is editor-only; it never runs in exported games.
@@ -165,7 +165,7 @@ In Windsurf, open **Windsurf Settings → MCP Servers → Open MCP Registry**, t
 <details>
 <summary><strong>Unity AI Gateway (native in-editor)</strong></summary>
 
-Unity's built-in AI Assistant can connect to GladeKit via MCP. This gives you GladeKit's 230+ tools directly inside the Unity Editor - no external AI client needed.
+Unity's built-in AI Assistant can connect to GladeKit via MCP. This gives you GladeKit's 260+ tools directly inside the Unity Editor - no external AI client needed.
 
 **Requires:** Unity 6000.3+ with AI Gateway package (`com.unity.ai.assistant@2.x`)
 
@@ -225,7 +225,7 @@ Add to `.vscode/mcp.json` in your workspace:
 
 | Feature            | GladeKit Unity MCP                                                                                   | unity-mcp (CoplayDev)  |
 | ------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------- |
-| Tools              | **235+ granular tools** across 16 categories                                                         | ~40 consolidated tools |
+| Tools              | **260+ granular tools** across 16+ categories                                                        | ~40 consolidated tools |
 | System prompt      | **Full Unity intelligence** - render pipeline detection, input system routing, tool discipline rules | None                   |
 | Project context    | **GLADE.md** - inject your game design doc into every request                                        | None                   |
 | Script search      | **Semantic search** via OpenAI embeddings (bring your own key)                                       | None                   |
@@ -241,11 +241,11 @@ All core features are **free and local**. The cloud intelligence layer is option
 ## Features
 
 <details>
-<summary><strong>235+ tools across 16 categories</strong></summary>
+<summary><strong>260+ tools across 16+ categories</strong></summary>
 
-Scene • GameObjects • Scripts • Prefabs • Materials • Lighting • VFX & Audio • Animation • IK • Physics • Camera • UI • Input System • Terrain & NavMesh • Profiler • Asset Pipeline
+Scene • GameObjects • Scripts • Prefabs • Materials • Lighting • VFX & Audio • Animation • IK • Physics (3D & 2D) • Tilemaps • Camera • UI • Input System • Terrain & NavMesh • Profiler • Asset Pipeline
 
-All 235+ tools are dispatchable. Claude Code sees ~80 curated core tools by default (Claude Code has a practical 128-tool limit; Unity AI Gateway has a cloud token budget). Use `get_relevant_tools` to discover extended tools for specialized work (blend trees, NavMesh, IK, Cinemachine, etc.).
+All 260+ tools are dispatchable. Claude Code sees ~80 curated core tools by default (Claude Code has a practical 128-tool limit; Unity AI Gateway has a cloud token budget). Use `get_relevant_tools` to discover extended tools for specialized work (blend trees, NavMesh, IK, Cinemachine, etc.).
 
 **5 meta-tools:** `get_relevant_tools` (task-based tool discovery + RAG context), `remember_for_session` (store facts), `recall_session_memories` (retrieve facts), `batch_execute` (multi-step tool dispatch), `search_project_scripts` (semantic code search).
 
@@ -524,7 +524,7 @@ Endpoints:
 
 **Tools not appearing in Claude Code**
 
-- Claude Code has a practical ~128-tool limit. GladeKit shows ~80 curated core tools by default - this is intentional. All 230+ are dispatchable: use `get_relevant_tools` to find extended tools by task description.
+- Claude Code has a practical ~128-tool limit. GladeKit shows ~80 curated core tools by default - this is intentional. All 260+ are dispatchable: use `get_relevant_tools` to find extended tools by task description.
 
 **`GLADE.md` not being picked up**
 
@@ -535,7 +535,7 @@ Endpoints:
 - Unity caches UPM git packages and never refetches, so an `?path=unity-bridge` install drifts behind `main` over time. Update via Unity → **Window > Package Manager > GladeKit MCP Bridge > Update**, or pin the manifest entry to a specific tag so future updates are explicit:
 
   ```json
-  "com.gladekit.mcp-bridge": "https://github.com/Glade-tool/glade-mcp.git?path=unity-bridge#v0.4.1"
+  "com.gladekit.mcp-bridge": "https://github.com/Glade-tool/glade-mcp.git?path=unity-bridge#v0.7.12"
   ```
 
 - The same warning also appears as a one-shot prefix on the next tool response so you see it in chat. To silence both: add `"GLADEKIT_MCP_SUPPRESS_BRIDGE_WARNING": "1"` to the `env` of your MCP client config.
@@ -561,14 +561,14 @@ Endpoints:
 [gladekit_mcp Python process]
     bridge.py -> HTTP localhost:8765
     prompts.py -> system prompt (auto-reads render pipeline, input system, GLADE.md)
-    tools/ -> 230+ tool schemas + dispatch
+    tools/ -> 260+ tool schemas + dispatch
     cloud.py -> optional GLADEKIT_API_KEY -> api.gladekit.com
          |
          | HTTP localhost:8765
          v
 [Unity Bridge -- C# Editor extension (UPM package)]
     UnityBridgeServer.cs -> HttpListener on :8765
-    230+ ITool implementations
+    260+ ITool implementations
     UnityContextGatherer -> scene, scripts, packages, render pipeline
 ```
 
@@ -577,7 +577,7 @@ Endpoints:
 <details>
 <summary><strong>Contributing</strong></summary>
 
-The Unity bridge (`unity-bridge/`) is the source of truth for C# tools. Adding a tool requires two files:
+The Unity bridge (`unity-bridge/`) is the source of truth for C# tools. Adding a tool requires three changes:
 
 **1. C# implementation** (`unity-bridge/Editor/Tools/Implementations/<Category>/MyTool.cs`):
 
@@ -593,11 +593,13 @@ public class MyTool : ITool
 }
 ```
 
-**2. Python schema** (`mcp-server/src/gladekit_mcp/tools/<category>.py`):
+**2. C# registration** (`unity-bridge/Editor/Tools/Registrars/<Category>Tools.cs`):
+
+Add `Register(new MyTool());` to the matching category registrar. Registration is explicit — an unregistered tool compiles fine but returns "Tool was blocked from executing or null." when dispatched.
+
+**3. Python schema** (`mcp-server/src/gladekit_mcp/tools/<category>.py`):
 
 Add an entry to the category's tool list following the existing format (OpenAI function-calling schema).
-
-Tools are auto-discovered via reflection - no registration needed beyond these two files.
 
 </details>
 

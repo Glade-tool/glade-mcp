@@ -1,4 +1,4 @@
-"""GladeKit MCP Server — Unity game development tools for AI clients."""
+"""GladeKit MCP Server — Unity and Godot game development tools for AI clients."""
 
 from importlib.metadata import PackageNotFoundError, version
 
@@ -23,7 +23,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="gladekit",
-        description="GladeKit — AI tools for Unity game development",
+        description="GladeKit — AI tools for Unity and Godot game development",
     )
     parser.add_argument(
         "--bridge-url",
