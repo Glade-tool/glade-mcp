@@ -1,8 +1,8 @@
 """
-Godot runtime / process control tools (10 tools).
+Godot runtime / process control tools (11 tools).
 
 Three observability tools (get_play_mode_state, get_selection,
-get_godot_console_logs) plus a four-tool process control surface:
+get_godot_console_logs) plus a five-tool process control surface:
 
   run_project / get_debug_output / stop_project — spawn a headless
     Godot subprocess that runs the project (or a specific scene),
@@ -10,6 +10,14 @@ get_godot_console_logs) plus a four-tool process control surface:
     it. The bridge keeps the editor alive in parallel via per-session
     background drainer threads, so the agent can iterate on the
     scene WHILE watching the running game.
+
+  run_gameplay_probe — run_project's input-driven sibling: boots the
+    scene through a probe main loop that presses InputMap actions on
+    a schedule, tracks the player body, and prints a machine-readable
+    GLADEKIT_PROBE_REPORT line (per-step displacement / jump gain /
+    fall detection + declared-expectation problems). Answers "does
+    the gameplay work?" where run_project only answers "does it run
+    without errors?". Rides the same session lifecycle.
 
   launch_editor — spawn a separate editor instance on a different
     project (useful for opening a freshly-scaffolded project).
@@ -146,6 +154,126 @@ TOOLS: List[Dict] = [
                             "this the tool refuses if any session is still running, so a retry "
                             "doesn't open a second game window."
                         ),
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_gameplay_probe",
+            "description": (
+                "Input-driven playtest: run the scene headlessly while a probe presses "
+                "the input actions you specify on a schedule, tracks the player body "
+                "(position, jump height, is_on_floor, falling out of the world), and "
+                "reports what actually happened. Use this after wiring input-driven "
+                "gameplay (movement, jumping) to verify the gameplay WORKS — "
+                "run_project only verifies the scene runs without errors; nothing "
+                "presses the keys. "
+                "\n\n"
+                "Declare an expectation per step: expect='move' asserts the body "
+                "gained horizontal distance while the action was held; expect='jump' "
+                "asserts upward gain shortly after the press; 'none' just measures. "
+                "Use the action names you wired (check get_project_info's "
+                "input_actions). The probe auto-tracks the first 'player'-group "
+                "member, else the first CharacterBody, else the first RigidBody — "
+                "pass track to override. "
+                "\n\n"
+                "Returns a session_id immediately (same lifecycle as run_project). "
+                "The child exits on its own; wait the suggested seconds from the "
+                "response, then call get_debug_output(session_id) and read the "
+                "GLADEKIT_PROBE_REPORT line — per-step displacement / up_gain / "
+                "satisfied, plus a 'problems' list (unmet expectations, actions "
+                "missing from the InputMap, body fell out of the world). Runtime "
+                "script errors appear in the same output, so one probe run checks "
+                "both. Refuses to launch while another play session is running "
+                "(stop_project it first)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "scene": {
+                        "type": "string",
+                        "description": (
+                            "Scene to probe. Defaults to the scene open in the editor "
+                            "(almost always the one you just edited). A res:// path "
+                            "probes that scene instead."
+                        ),
+                    },
+                    "steps": {
+                        "type": "array",
+                        "description": (
+                            "Input schedule, executed sequentially unless start_frame "
+                            "is set (max 16 steps). Physics runs at 60 fps, so "
+                            "hold_frames=60 holds the action for ~1s."
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action": {
+                                    "type": "string",
+                                    "description": (
+                                        "InputMap action name to press (e.g. move_right, jump, ui_accept)."
+                                    ),
+                                },
+                                "hold_frames": {
+                                    "type": "integer",
+                                    "description": "How many physics frames to hold the action. Default 30.",
+                                },
+                                "start_frame": {
+                                    "type": "integer",
+                                    "description": (
+                                        "Absolute frame to press at. Omit to schedule "
+                                        "sequentially after the previous step."
+                                    ),
+                                },
+                                "strength": {
+                                    "type": "number",
+                                    "description": "Analog action strength 0.0-1.0. Default 1.0.",
+                                },
+                                "expect": {
+                                    "type": "string",
+                                    "enum": ["move", "jump", "none"],
+                                    "description": (
+                                        "What the tracked body should do while this action "
+                                        "is held: 'move' = horizontal displacement, 'jump' = "
+                                        "upward gain, 'none' = just measure. Unmet "
+                                        "expectations land in the report's problems list. "
+                                        "Default 'none'."
+                                    ),
+                                },
+                            },
+                            "required": ["action"],
+                        },
+                    },
+                    "max_frames": {
+                        "type": "integer",
+                        "description": (
+                            "Probe duration ceiling in physics frames (default 300 ≈ 5s, "
+                            "cap 1800). The probe exits early once all steps finish."
+                        ),
+                    },
+                    "track": {
+                        "type": "string",
+                        "description": (
+                            "Node path or name of the body to track. Omit to auto-detect "
+                            "('player' group, then CharacterBody, then RigidBody)."
+                        ),
+                    },
+                    "settle_frames": {
+                        "type": "integer",
+                        "description": "Frames to wait before the first input (default 10).",
+                    },
+                    "auto_save": {
+                        "type": "boolean",
+                        "description": (
+                            "Save the edited scene before spawning so the probe runs your latest changes. Default true."
+                        ),
+                    },
+                    "allow_multiple": {
+                        "type": "boolean",
+                        "description": ("Allow launching while another play session is running. Default false."),
                     },
                 },
             },

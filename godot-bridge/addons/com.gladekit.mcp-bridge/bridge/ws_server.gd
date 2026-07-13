@@ -238,6 +238,17 @@ func _process(_delta: float) -> void:
 	_refresh_cached_engine_mode()
 	_drain_pending_dispatches()
 	_drain_async_dispatches()
+	# Drain any live play-session pipes every tick. A headless child (run_project
+	# / run_gameplay_probe) writes stdout/stderr into an OS pipe of bounded size
+	# (small on Windows); if the bridge only drained on demand, a child that
+	# spams stderr — exactly what a broken input action does, printing an
+	# InputMap error every frame — fills the pipe and BLOCKS on write() on its
+	# own main thread, so it never reaches quit() and the run hangs. Draining
+	# each tick keeps the pipe clear so the child runs to completion, and makes
+	# freshly-printed output (e.g. the gameplay-probe report) visible to the
+	# next get_debug_output without waiting for a pipe-sized backlog to flush.
+	if PlaySessionManager.has_active_sessions():
+		PlaySessionManager.tick_all_sessions()
 
 
 func _refresh_cached_engine_mode() -> void:

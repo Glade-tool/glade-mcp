@@ -54,10 +54,12 @@ func test_registry_contains_all_mvp_tools() -> void:
 	# find_references (1) = 98; find_scene_usages (1) = 99;
 	# create_blend_space_1d (1) = 100; arrange_nodes (1) = 101;
 	# raycast (1) = 102; overlap_shape (1) = 103; shape_cast (1) = 104;
-	# snap_to_ground (1) = 105 total.
+	# snap_to_ground (1) = 105; configure_physics_body (1, was registered
+	# earlier but never added to this tally — corrected here) = 106;
+	# run_gameplay_probe (1) = 107 total.
 	# (create_camera_3d → create_camera was a rename, not an add; it stays callable
 	# via a registry alias which does NOT count toward get_tool_count.)
-	assert_eq(registry.get_tool_count(), 105, "Catalog should register exactly 105 tools")
+	assert_eq(registry.get_tool_count(), 107, "Catalog should register exactly 107 tools")
 
 	# Critical names that must be present for the schema-mock layer to wire
 	# up correctly. Failing here means a registration line went missing.
@@ -89,6 +91,8 @@ func test_registry_contains_all_mvp_tools() -> void:
 		# Phase 3 — Runtime / process
 		"get_play_mode_state", "get_selection", "get_godot_console_logs",
 		"run_project", "stop_project", "get_debug_output", "launch_editor",
+		# Input-driven gameplay probe (run_project's "does the gameplay work?" sibling)
+		"run_gameplay_probe",
 		# Phase 3 — UID (4.4+)
 		"get_uid", "update_project_uids",
 		# Phase 5 — Signal wiring (persistent, scene-saved)

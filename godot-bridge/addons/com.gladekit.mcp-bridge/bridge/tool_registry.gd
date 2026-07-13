@@ -144,6 +144,11 @@ const GetPlayModeStateTool    = preload("res://addons/com.gladekit.mcp-bridge/to
 const GetSelectionTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/get_selection.gd")
 const GetGodotConsoleLogsTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/get_godot_console_logs.gd")
 const RunProjectTool          = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/run_project.gd")
+# Input-driven playtest: run_project's sibling that boots the scene through a
+# probe main-loop which presses input actions on a schedule, tracks the player
+# body, and prints a GLADEKIT_PROBE_REPORT line. Answers "does the gameplay
+# work?" where run_project(verify=true) only answers "does it run clean?".
+const RunGameplayProbeTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/run_gameplay_probe.gd")
 const StopProjectTool         = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/stop_project.gd")
 const GetDebugOutputTool      = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/get_debug_output.gd")
 const LaunchEditorTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/runtime/launch_editor.gd")
@@ -358,11 +363,13 @@ func _register_all() -> void:
 	register_tool(OpenSceneTool.new())
 	register_tool(SaveSceneTool.new())
 	register_tool(InstantiateSceneTool.new())
-	# Runtime / process (10) — 7 Phase 3 + 3 structured observation (v0.5.2)
+	# Runtime / process (11) — 7 Phase 3 + 3 structured observation (v0.5.2)
+	# + the input-driven gameplay probe
 	register_tool(GetPlayModeStateTool.new())
 	register_tool(GetSelectionTool.new())
 	register_tool(GetGodotConsoleLogsTool.new())
 	register_tool(RunProjectTool.new())
+	register_tool(RunGameplayProbeTool.new())
 	register_tool(StopProjectTool.new())
 	register_tool(GetDebugOutputTool.new())
 	register_tool(LaunchEditorTool.new())

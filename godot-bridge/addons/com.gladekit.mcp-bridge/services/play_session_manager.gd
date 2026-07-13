@@ -338,6 +338,14 @@ static func list_recently_exited() -> Array:
 	return out
 
 
+# Cheap "is there anything to drain?" probe for the per-tick drain in the WS
+# server's _process loop — lets it skip reap()/pipe work entirely on the
+# common path where no play session is live. Does NOT reap (callers that need
+# a reaped view use list_sessions()).
+static func has_active_sessions() -> bool:
+	return not _sessions.is_empty()
+
+
 static func list_sessions() -> Array:
 	reap()
 	var out: Array = []
