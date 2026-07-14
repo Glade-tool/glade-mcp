@@ -1,0 +1,63 @@
+{
+  "manifest_version": "0.4",
+  "name": "gladekit-mcp",
+  "display_name": "GladeKit MCP",
+  "version": "0.7.12",
+  "description": "Connect Claude Code, Cursor, Windsurf, Claude Desktop, and other AI clients to the Unity and Godot editors. Build scenes, write and attach scripts, and configure physics, materials, UI, audio, and signals directly from your AI client.",
+  "long_description": "GladeKit turns your AI client into a Unity and Godot collaborator. It exposes the running editor as MCP tools so the model can build scenes, write and attach scripts, and wire up physics, materials, UI, audio, and signals, then verify the result. The server auto-detects which editor is running (Unity on port 8765, Godot on 8766) and exposes the matching tool set. Requires the free GladeKit editor bridge to be installed and running; see the repository README for one-time setup.",
+  "author": {
+    "name": "GladeKit",
+    "url": "https://github.com/Glade-tool/glade-mcp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Glade-tool/glade-mcp"
+  },
+  "homepage": "https://github.com/Glade-tool/glade-mcp",
+  "documentation": "https://github.com/Glade-tool/glade-mcp#readme",
+  "support": "https://github.com/Glade-tool/glade-mcp/issues",
+  "license": "MIT",
+  "keywords": [
+    "unity",
+    "godot",
+    "game-development",
+    "gamedev",
+    "editor",
+    "mcp",
+    "developer-tools"
+  ],
+  "server": {
+    "type": "python",
+    "entry_point": "src/gladekit_mcp/__main__.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "python",
+        "-m",
+        "gladekit_mcp"
+      ],
+      "env": {
+        "GLADEKIT_API_KEY": "${user_config.gladekit_api_key}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  },
+  "user_config": {
+    "gladekit_api_key": {
+      "type": "string",
+      "title": "GladeKit API key (optional)",
+      "description": "Leave blank to run fully local. Set a key to enable the GladeKit cloud layer: RAG knowledge base and cross-session memory.",
+      "sensitive": true,
+      "required": false
+    }
+  }
+}

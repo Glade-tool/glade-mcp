@@ -21,6 +21,9 @@ htmlcov/
 # Eval run artifacts
 eval/results/
 
+# MCPB bundle build artifact (published to Smithery, not committed)
+*.mcpb
+
 # Editor
 .vscode/
 .idea/

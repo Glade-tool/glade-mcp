@@ -1,0 +1,29 @@
+# Files excluded from the packed .mcpb bundle.
+# The bundle only needs the runtime package plus its lockfile and licensing.
+# uv resolves dependencies from pyproject.toml + uv.lock at install time, so no
+# vendored site-packages should ever be shipped (see the MCPB uv-runtime spec).
+
+# Dev + test surface (not needed at runtime)
+tests/
+eval/
+CONTRIBUTING.md
+TESTING.md
+
+# Python / uv build artifacts
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+server/lib/
+server/venv/
+
+# Packaging output + tooling config
+*.mcpb
+.mcpbignore
+.gitignore
+
+# Local dev-only config (the bundle is driven by manifest.json, not these)
+.mcp.json
+.python-version
