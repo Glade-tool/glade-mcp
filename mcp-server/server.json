@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.glade-tool/glade-mcp",
+  "name": "io.github.Glade-tool/glade-mcp",
   "description": "Control the Unity and Godot editors from AI clients: scenes, scripts, physics, materials.",
   "repository": {
     "url": "https://github.com/Glade-tool/glade-mcp",
