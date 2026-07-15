@@ -1,0 +1,43 @@
+name: Publish to MCP Registry
+
+# Publishes mcp-server/server.json to the Official MCP Registry
+# (registry.modelcontextprotocol.io) as io.github.glade-tool/glade-mcp.
+#
+# Auth is GitHub OIDC: this workflow's id-token asserts that the repository
+# belongs to the Glade-tool organization, which authorizes the
+# io.github.glade-tool/* namespace with no secrets and no personal tokens.
+#
+# Prerequisite: the gladekit-mcp PyPI package must already be published at the
+# version in server.json, and its README/description must contain the matching
+# `mcp-name: io.github.glade-tool/glade-mcp` marker — that is how the registry
+# verifies package ownership. Bump server.json's version to match before re-running.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-mcp-registry
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required for OIDC authentication
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mcp-publisher CLI
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        working-directory: mcp-server
+        run: mcp-publisher login github-oidc
+
+      - name: Publish server.json to MCP Registry
+        working-directory: mcp-server
+        run: mcp-publisher publish
