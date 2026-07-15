@@ -47,6 +47,7 @@ public class GameManager : MonoBehaviour
     private Vector3 playerStart;
     private CharacterController playerController;
     private Rigidbody playerBody;
+    private Rigidbody2D playerBody2D;   // 2D games use a Rigidbody2D instead of a CharacterController/Rigidbody
 
     private Text scoreLabel;
     private Text livesLabel;
@@ -136,6 +137,17 @@ public class GameManager : MonoBehaviour
 #endif
             playerBody.angularVelocity = Vector3.zero;
         }
+        if (playerBody2D != null)
+        {
+            // Rigidbody2D.velocity was renamed to linearVelocity in Unity 6, same
+            // as the 3D body — guard so the template compiles clean on both.
+#if UNITY_6000_0_OR_NEWER
+            playerBody2D.linearVelocity = Vector2.zero;
+#else
+            playerBody2D.velocity = Vector2.zero;
+#endif
+            playerBody2D.angularVelocity = 0f;   // 2D angular velocity is a scalar
+        }
         if (playerController != null)
         {
             // A CharacterController overrides direct transform writes while
@@ -148,6 +160,9 @@ public class GameManager : MonoBehaviour
         {
             player.position = playerStart;
         }
+        // Keep the 2D physics body in step with the teleport (a dynamic body's
+        // internal position otherwise lags a transform write by a physics step).
+        if (playerBody2D != null) playerBody2D.position = playerStart;
     }
 
     public void Win()
@@ -174,6 +189,7 @@ public class GameManager : MonoBehaviour
         player = go.transform;
         playerController = go.GetComponent<CharacterController>();
         playerBody = go.GetComponent<Rigidbody>();
+        playerBody2D = go.GetComponent<Rigidbody2D>();
         playerStart = player.position;
     }
 

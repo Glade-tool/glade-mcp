@@ -6,7 +6,13 @@ using UnityEngine;
 // no GameManager is in the scene (nothing happens) — pair with
 // create_game_manager. One vetted script is shared by every hazard; each carries
 // its own `damage`.
-[RequireComponent(typeof(Collider))]
+//
+// Dimension-agnostic: the SAME script serves 2D and 3D games. Unity dispatches
+// OnTriggerEnter for 3D physics and OnTriggerEnter2D for 2D physics, so a hazard
+// built with a 3D collider and one built with a 2D collider both work with no
+// code change — the tool that spawns it decides the geometry. No
+// [RequireComponent(typeof(Collider))] so a 2D hazard is not saddled with a 3D
+// collider alongside its Collider2D.
 public class Hazard : MonoBehaviour
 {
     [Tooltip("Lives removed when the player touches this hazard. The GameManager respawns the player while lives remain, and ends the game at zero.")]
@@ -16,11 +22,22 @@ public class Hazard : MonoBehaviour
     {
         var col = GetComponent<Collider>();
         if (col != null) col.isTrigger = true;
+        var col2D = GetComponent<Collider2D>();
+        if (col2D != null) col2D.isTrigger = true;
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Player")) return;
+        if (other.CompareTag("Player")) Hit();
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.CompareTag("Player")) Hit();
+    }
+
+    private void Hit()
+    {
         if (GameManager.Instance != null) GameManager.Instance.LoseLife(damage);
     }
 }

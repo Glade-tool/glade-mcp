@@ -53,7 +53,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_third_person_controller",
-            "description": "ALWAYS use this — not create_script — for ANY request that wants a player that (a) moves with WASD/arrow keys AND (b) jumps AND (c) is followed by a camera, INCLUDING when the player is one of several systems being scaffolded in the same turn (e.g. 'build a player + an enemy + collectibles'). Hand-written third-person controllers reliably ship two runtime bugs the playability probe catches automatically: a self-referential camera offset that makes the player walk in circles, and a fragile collision-callback isGrounded that kills the jump. This tool is ATOMIC and does the whole setup for you: it copies two vetted, Play-tested scripts VERBATIM (ThirdPersonController.cs — CharacterController movement + grounded jump, camera-relative input; FollowCamera.cs — modern mouse/right-stick orbit camera), ensures a Player capsule and a Main Camera exist, adds CharacterController to the Player, and attaches ThirdPersonController + FollowCamera automatically as soon as the scripts compile. After it returns, your ONLY remaining step is to call compile_scripts and wait for status='idle' — do NOT call add_component for the controller, the follow camera, or the character controller (the tool already handled all three), and no object-reference wiring is needed (the scripts self-resolve: ThirdPersonController → Camera.main, FollowCamera → the 'Player' tag). Use create_script ONLY for non-third-person controllers (2D platformer, top-down, twin-stick) — no template exists for those yet.",
+            "description": "ALWAYS use this — not create_script — for ANY request that wants a player that (a) moves with WASD/arrow keys AND (b) jumps AND (c) is followed by a camera, INCLUDING when the player is one of several systems being scaffolded in the same turn (e.g. 'build a player + an enemy + collectibles'). Hand-written third-person controllers reliably ship two runtime bugs the playability probe catches automatically: a self-referential camera offset that makes the player walk in circles, and a fragile collision-callback isGrounded that kills the jump. This tool is ATOMIC and does the whole setup for you: it copies two vetted, Play-tested scripts VERBATIM (ThirdPersonController.cs — CharacterController movement + grounded jump, camera-relative input; FollowCamera.cs — modern mouse/right-stick orbit camera), ensures a Player capsule and a Main Camera exist, adds CharacterController to the Player, and attaches ThirdPersonController + FollowCamera automatically as soon as the scripts compile. After it returns, your ONLY remaining step is to call compile_scripts and wait for status='idle' — do NOT call add_component for the controller, the follow camera, or the character controller (the tool already handled all three), and no object-reference wiring is needed (the scripts self-resolve: ThirdPersonController → Camera.main, FollowCamera → the 'Player' tag). For a 2D SIDE-SCROLLING platformer player instead, use create_platformer_controller (a separate vetted template). Use create_script ONLY for other controllers with no template yet (top-down, twin-stick).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -81,8 +81,45 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "create_platformer_controller",
+            "description": "ALWAYS use this — not create_script — for ANY request that wants a 2D SIDE-SCROLLING PLATFORMER player: a character that runs left/right AND jumps under 2D physics (a Mario-style platformer, a 2D jump-and-run). It is the 2D counterpart of create_third_person_controller. Hand-written 2D controllers reliably ship two runtime bugs: a mid-air jump (a collision-normal ground check done wrong) and a character that tips over (Rigidbody2D rotation left unfrozen). This tool is ATOMIC: it copies the vetted PlatformerController2D script VERBATIM (Rigidbody2D run + a grounded jump detected by a feet overlap test), builds a sprite Player with a Rigidbody2D (rotation frozen) + BoxCollider2D, adds an ORTHOGRAPHIC Main Camera, and (optionally) a ground platform, then attaches PlatformerController2D automatically as soon as the script compiles. After it returns your ONLY remaining step is compile_scripts (wait for status='idle') — do NOT call add_component or add the Rigidbody2D/collider yourself. Placeholder sprites are used; the player runs with A/D or arrows and jumps with Space. For the collectible/hazard loop around it, call create_game_manager, create_collectible and create_hazard with dimension='2d'. Use create_third_person_controller instead for a 3D player.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) to write PlatformerController2D.cs into. Defaults to 'Scripts'. The filename is fixed (Unity requires the MonoBehaviour class name to match the file name).",
+                    },
+                    "playerName": {
+                        "type": "string",
+                        "description": "Name of the player GameObject. Defaults to 'Player'. If a GameObject with this name (or the 'Player' tag) already exists it is reused (and gets a Rigidbody2D + BoxCollider2D if missing); otherwise a sprite Player is created at (0,1,0) and tagged 'Player'. Errors if the reused object already carries 3D physics (Unity can't mix 2D and 3D physics on one object).",
+                    },
+                    "moveSpeed": {
+                        "type": "number",
+                        "description": "Horizontal run speed in units/second. Defaults to 7.",
+                    },
+                    "jumpForce": {
+                        "type": "number",
+                        "description": "Upward velocity applied on jump. Defaults to 12.",
+                    },
+                    "createGround": {
+                        "type": "boolean",
+                        "description": "Create a wide static ground platform when the scene has no floor-like object. Defaults to true so a standalone call yields a character that can stand. Set false if you are building the level yourself (e.g. with a tilemap).",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY when the user explicitly asked to regenerate the controller. The shared PlatformerController2D.cs is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_game_manager",
-            "description": "Use this — not create_script — to add the HUB of a simple game: a GameManager that tracks SCORE and LIVES, RESPAWNS the player on a hit, handles WIN/LOSE, and builds its own on-screen HUD (score + lives readouts and a centered win/lose banner, R to restart). It is what turns a playable character into an actual game — something you can win or lose — and it is the counterpart create_collectible and create_hazard wire into. Call it once per scene. Hand-written game-state hubs reliably ship subtle bugs (scoring that keeps counting after the game ends, respawn that forgets to clear the player's velocity); this tool copies a vetted, Play-tested script VERBATIM instead. It is ATOMIC: it writes the script, creates the GameManager object, and attaches the GameManager component automatically as soon as the script compiles — so after it returns your ONLY remaining step is to call compile_scripts and wait for status='idle'. DO NOT call add_component for GameManager. Gameplay code reaches it WITHOUT a reference via the static GameManager.Instance (e.g. GameManager.Instance?.AddScore(1)); create_collectible and create_hazard already emit those calls. Currently 3D-oriented (respawn handles CharacterController/Rigidbody).",
+            "description": "Use this — not create_script — to add the HUB of a simple game: a GameManager that tracks SCORE and LIVES, RESPAWNS the player on a hit, handles WIN/LOSE, and builds its own on-screen HUD (score + lives readouts and a centered win/lose banner, R to restart). It is what turns a playable character into an actual game — something you can win or lose — and it is the counterpart create_collectible and create_hazard wire into. Call it once per scene. Hand-written game-state hubs reliably ship subtle bugs (scoring that keeps counting after the game ends, respawn that forgets to clear the player's velocity); this tool copies a vetted, Play-tested script VERBATIM instead. It is ATOMIC: it writes the script, creates the GameManager object, and attaches the GameManager component automatically as soon as the script compiles — so after it returns your ONLY remaining step is to call compile_scripts and wait for status='idle'. DO NOT call add_component for GameManager. Gameplay code reaches it WITHOUT a reference via the static GameManager.Instance (e.g. GameManager.Instance?.AddScore(1)); create_collectible and create_hazard already emit those calls. Works for 2D and 3D games — respawn handles CharacterController, Rigidbody, and Rigidbody2D, so it pairs with either create_third_person_controller or create_platformer_controller.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -115,7 +152,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_collectible",
-            "description": "Use this — not create_script — to add a COLLECTIBLE (coin / star / pickup): a visible sphere with a trigger collider that, when the player (tag 'Player') touches it, adds to the score via the GameManager and removes itself. With create_game_manager and create_hazard it completes the core gameplay loop. ATOMIC: it writes a vetted trigger-pickup script, builds the sphere, and attaches the Collectible component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_game_manager too, or the pickup vanishes without scoring (this tool ensures GameManager.cs exists so the pickup compiles, but does NOT add the HUD/win-logic hub — only create_game_manager does). Call repeatedly to place many pickups; the script is shared and each object gets a unique name. Currently 3D.",
+            "description": "Use this — not create_script — to add a COLLECTIBLE (coin / star / pickup): a visible sphere with a trigger collider that, when the player (tag 'Player') touches it, adds to the score via the GameManager and removes itself. With create_game_manager and create_hazard it completes the core gameplay loop. ATOMIC: it writes a vetted trigger-pickup script, builds the pickup, and attaches the Collectible component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_game_manager too, or the pickup vanishes without scoring (this tool ensures GameManager.cs exists so the pickup compiles, but does NOT add the HUD/win-logic hub — only create_game_manager does). Call repeatedly to place many pickups; the script is shared and each object gets a unique name. Works in 2D or 3D — pass dimension='2d' for a sprite pickup with a CircleCollider2D trigger (pair with create_platformer_controller), otherwise a 3D sphere is built.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -127,6 +164,11 @@ TOOLS: List[Dict] = [
                         "type": "string",
                         "description": "Name of the collectible GameObject. Defaults to 'Collectible'. If one with this name exists, a numeric suffix is added so each pickup is addressable.",
                     },
+                    "dimension": {
+                        "type": "string",
+                        "enum": ["2d", "3d"],
+                        "description": "'3d' (default) builds a sphere with a 3D trigger collider; '2d' builds a sprite with a CircleCollider2D trigger for a 2D game. Match the player: use '2d' alongside create_platformer_controller, '3d' alongside create_third_person_controller. The Collectible script itself is dimension-agnostic (handles both OnTriggerEnter and OnTriggerEnter2D).",
+                    },
                     "value": {
                         "type": "integer",
                         "description": "Score added when this collectible is picked up. Defaults to 1.",
@@ -134,9 +176,9 @@ TOOLS: List[Dict] = [
                     "x": {"type": "number", "description": "World X position. Defaults to 0."},
                     "y": {
                         "type": "number",
-                        "description": "World Y position. Defaults to 1 (so it floats above a ground plane).",
+                        "description": "World Y position. Defaults to 1 (so it floats above the ground).",
                     },
-                    "z": {"type": "number", "description": "World Z position. Defaults to 0."},
+                    "z": {"type": "number", "description": "World Z position. Defaults to 0 (ignored for 2D)."},
                     "confirmExistingFileModification": {
                         "type": "boolean",
                         "description": "Set true ONLY to force-regenerate the shared Collectible.cs script. It is REUSED (not clobbered) when present. Defaults to false.",
@@ -150,7 +192,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_hazard",
-            "description": "Use this — not create_script — to add a HAZARD (spikes / lava / a pit trigger): a visible cube with a trigger collider that, when the player (tag 'Player') touches it, costs the player lives via the GameManager — which respawns the player while lives remain and ends the game at zero. With create_game_manager and create_collectible it completes the core gameplay loop (the way to LOSE). ATOMIC: it writes a vetted trigger-danger script, builds the cube, and attaches the Hazard component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_game_manager too, or nothing happens on contact (this tool ensures GameManager.cs exists so the hazard compiles, but does NOT add the lives/respawn hub — only create_game_manager does). Call repeatedly to place many hazards. Currently 3D.",
+            "description": "Use this — not create_script — to add a HAZARD (spikes / lava / a pit trigger): a visible cube with a trigger collider that, when the player (tag 'Player') touches it, costs the player lives via the GameManager — which respawns the player while lives remain and ends the game at zero. With create_game_manager and create_collectible it completes the core gameplay loop (the way to LOSE). ATOMIC: it writes a vetted trigger-danger script, builds the danger volume, and attaches the Hazard component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_game_manager too, or nothing happens on contact (this tool ensures GameManager.cs exists so the hazard compiles, but does NOT add the lives/respawn hub — only create_game_manager does). Call repeatedly to place many hazards. Works in 2D or 3D — pass dimension='2d' for a sprite with a BoxCollider2D trigger (pair with create_platformer_controller), otherwise a 3D cube is built.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -162,16 +204,21 @@ TOOLS: List[Dict] = [
                         "type": "string",
                         "description": "Name of the hazard GameObject. Defaults to 'Hazard'. A numeric suffix is added if the name is taken, so each hazard is addressable.",
                     },
+                    "dimension": {
+                        "type": "string",
+                        "enum": ["2d", "3d"],
+                        "description": "'3d' (default) builds a cube with a 3D trigger collider; '2d' builds a sprite with a BoxCollider2D trigger for a 2D game. Match the player: use '2d' alongside create_platformer_controller, '3d' alongside create_third_person_controller. The Hazard script itself is dimension-agnostic (handles both OnTriggerEnter and OnTriggerEnter2D).",
+                    },
                     "damage": {
                         "type": "integer",
                         "description": "Lives removed when the player touches this hazard. Defaults to 1. The GameManager respawns the player while lives remain and ends the game at zero.",
                     },
                     "x": {"type": "number", "description": "World X position. Defaults to 0."},
                     "y": {"type": "number", "description": "World Y position. Defaults to 0.5."},
-                    "z": {"type": "number", "description": "World Z position. Defaults to 0."},
+                    "z": {"type": "number", "description": "World Z position. Defaults to 0 (ignored for 2D)."},
                     "size": {
                         "type": "number",
-                        "description": "Uniform scale of the hazard cube. Defaults to 1.",
+                        "description": "Uniform scale of the hazard. Defaults to 1.",
                     },
                     "confirmExistingFileModification": {
                         "type": "boolean",

@@ -1,0 +1,101 @@
+using UnityEngine;
+using UnityEngine.InputSystem; // project inputSystem is BOTH/NEW (matches ThirdPersonController)
+
+// A 2D side-scrolling platformer character: horizontal run + a grounded jump,
+// driven by a Rigidbody2D. It is the 2D counterpart of the vetted
+// ThirdPersonController — the same "known-good movement you can't get subtly
+// wrong" idea, for the 2D physics world.
+//
+// Movement writes the horizontal velocity directly for crisp, arcade-style
+// control while the Rigidbody2D's gravity handles falling. Jump only fires when
+// grounded, detected by a short overlap test at the character's feet rather than
+// a collision-normal check (which beginners routinely get wrong, producing a
+// character that can jump in mid-air or not at all).
+[RequireComponent(typeof(Rigidbody2D))]
+public class PlatformerController2D : MonoBehaviour
+{
+    // Public so the scaffolder can set them via reflection when it attaches the
+    // component (the deferred-wiring ApplyFields path reaches public fields only —
+    // the same convention Collectible.value / GameManager.startingLives follow).
+    [Tooltip("Horizontal run speed in units/second.")]
+    public float moveSpeed = 7f;
+
+    [Tooltip("Upward velocity applied on jump.")]
+    public float jumpForce = 12f;
+
+    [Tooltip("Physics layers treated as ground for the jump check. Default = everything.")]
+    [SerializeField] private LayerMask groundLayers = ~0;
+
+    private Rigidbody2D body;
+    private Collider2D bodyCollider;
+
+    private void Awake()
+    {
+        body = GetComponent<Rigidbody2D>();
+        bodyCollider = GetComponent<Collider2D>();
+        // A platformer character should never tip over from a stray torque.
+        body.freezeRotation = true;
+    }
+
+    private void Update()
+    {
+        var kb = Keyboard.current;
+
+        // --- horizontal input (A/D or arrows) ---
+        float move = 0f;
+        if (kb != null)
+        {
+            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) move += 1f;
+            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) move -= 1f;
+        }
+
+        // Write horizontal velocity directly; keep vertical velocity from gravity.
+        Vector2 v = CurrentVelocity();
+        v.x = move * moveSpeed;
+
+        // --- grounded jump (Space / W / Up) ---
+        bool jumpPressed = kb != null &&
+            (kb.spaceKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame);
+        if (jumpPressed && IsGrounded())
+            v.y = jumpForce;
+
+        SetVelocity(v);
+    }
+
+    // A thin overlap circle just below the collider's bottom edge. Ignores our own
+    // collider and any triggers (coins/hazards are triggers and must not count as
+    // ground). OverlapCircleAll — not the single-result OverlapCircle — so our own
+    // collider being first in the results can't hide the real ground beneath it.
+    private bool IsGrounded()
+    {
+        Bounds b = bodyCollider != null ? bodyCollider.bounds : new Bounds(transform.position, Vector3.one);
+        Vector2 origin = new Vector2(b.center.x, b.min.y);
+        Collider2D[] hits = Physics2D.OverlapCircleAll(origin, 0.12f, groundLayers);
+        foreach (var h in hits)
+        {
+            if (h == null || h == bodyCollider || h.isTrigger) continue;
+            return true;
+        }
+        return false;
+    }
+
+    // Rigidbody2D.velocity was renamed to linearVelocity in Unity 6 — guard so the
+    // template compiles clean on both (and never trips the API Updater).
+    private Vector2 CurrentVelocity()
+    {
+#if UNITY_6000_0_OR_NEWER
+        return body.linearVelocity;
+#else
+        return body.velocity;
+#endif
+    }
+
+    private void SetVelocity(Vector2 v)
+    {
+#if UNITY_6000_0_OR_NEWER
+        body.linearVelocity = v;
+#else
+        body.velocity = v;
+#endif
+    }
+}

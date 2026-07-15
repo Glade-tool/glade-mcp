@@ -38,6 +38,7 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Gameplay
             string baseName = ToolUtils.GetStringArg(args, "name", "Collectible");
             if (string.IsNullOrEmpty(baseName)) baseName = "Collectible";
             int value = Mathf.Max(0, ToolUtils.GetIntArg(args, "value", 1));
+            bool is2D = GameplayScaffold.WantsTwoD(args);
             float x = ToolUtils.GetFloatArg(args, "x", 0f);
             float y = ToolUtils.GetFloatArg(args, "y", 1f);
             float z = ToolUtils.GetFloatArg(args, "z", 0f);
@@ -54,14 +55,14 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Gameplay
                 "Collectible.cs.txt", "Collectible.cs", dir, confirmOverwrite, out string scriptPath);
             if (!string.IsNullOrEmpty(scriptErr)) return ToolUtils.CreateErrorResponse(scriptErr);
 
-            // Build a visible sphere with a trigger collider (placeholder art).
+            // Build a visible trigger pickup — a 3D sphere or a 2D sprite disc,
+            // per the requested dimension (placeholder art either way).
             string objName = GameplayScaffold.UniqueName(baseName);
-            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            go.name = objName;
-            go.transform.position = new Vector3(x, y, z);
-            go.transform.localScale = Vector3.one * 0.5f;
-            var col = go.GetComponent<Collider>();
-            if (col != null) col.isTrigger = true;
+            var go = GameplayScaffold.BuildTriggerObject(
+                objName, is2D, PrimitiveType.Sphere, circleCollider2D: true,
+                new Vector3(x, y, z), scale: 0.5f,
+                tint2D: new Color(1f, 0.85f, 0.2f), // coin gold
+                notes);
             Undo.RegisterCreatedObjectUndo(go, "Create Collectible");
 
             PendingControllerWiring.Queue(new[]
@@ -83,13 +84,14 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Gameplay
                 { "requiresCompilation", true },
                 { "collectibleObject", objName },
                 { "value", value },
+                { "dimension", is2D ? "2d" : "3d" },
                 { "queuedComponents", new List<string> { $"Collectible → {objName}" } },
                 { "sceneSetup", notes },
             };
 
             return ToolUtils.CreateSuccessResponse(
-                $"Added a collectible worth {value} ('{objName}'). This tool is ATOMIC: it wrote a VETTED trigger " +
-                "pickup script, built a sphere with a trigger collider, and QUEUED the Collectible component to " +
+                $"Added a {(is2D ? "2D" : "3D")} collectible worth {value} ('{objName}'). This tool is ATOMIC: it wrote a VETTED trigger " +
+                $"pickup script, built a {(is2D ? "sprite disc with a CircleCollider2D trigger" : "sphere with a trigger collider")}, and QUEUED the Collectible component to " +
                 "attach as soon as scripts compile. It calls GameManager.Instance.AddScore on player touch and " +
                 "frees itself — so call create_game_manager too (or the pickup vanishes without scoring). Place more " +
                 "by calling this again (the script is reused; each gets a unique name). Replace the sphere with real " +
