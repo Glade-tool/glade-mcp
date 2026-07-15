@@ -608,3 +608,6 @@ Add an entry to the category's tool list following the existing format (OpenAI f
 **License:** MIT - see [LICENSE](LICENSE).
 
 The [GladeKit desktop app](https://gladekit.com) is a separate commercial product that layers streaming, miss recovery, and a memory UI on top of this MCP server.
+
+<!-- mcp-name: io.github.glade-tool/glade-mcp -->
+

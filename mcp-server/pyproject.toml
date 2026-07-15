@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gladekit-mcp"
-version = "0.7.12"
+version = "0.7.13"
 description = "MCP server for Unity game development — connect Cursor, Claude Code, Windsurf, and other AI clients to your Unity Editor."
 readme = "README.md"
 license = "MIT"
