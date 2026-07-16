@@ -68,6 +68,14 @@ const CreateJuiceTool = preload("res://addons/com.gladekit.mcp-bridge/tools/impl
 # helpers. Turns the menu/win/death hard scene CUTS into smooth fades.
 const CreateSceneTransitionTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_scene_transition.gd")
 
+# Vetted save/load system registered as an AUTOLOAD (persistence is global, so it
+# must be a singleton reachable from every scene). Writes a known-good SaveManager
+# that stores a JSON key/value file under user:// (the only writable, per-user,
+# cross-platform location), tolerates a missing/corrupt file, supports multiple
+# slots, and auto-saves on quit. Turns a session-only prototype into a game that
+# remembers progress, unlocks, and high scores.
+const CreateSaveSystemTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/create_save_system.gd")
+
 # 2D gameplay-loop family: vetted scaffolders that turn a playable character into
 # a winnable/losable game. create_game_manager is the hub (score/lives/respawn/
 # win-lose + HUD, reached via the "game_manager" group); create_collectible and
@@ -328,6 +336,7 @@ func _register_all() -> void:
 	register_tool(CreateScreenShakeTool.new())
 	register_tool(CreateJuiceTool.new())
 	register_tool(CreateSceneTransitionTool.new())
+	register_tool(CreateSaveSystemTool.new())
 	register_tool(CreateGameManagerTool.new())
 	register_tool(CreateCollectibleTool.new())
 	register_tool(CreateHazardTool.new())

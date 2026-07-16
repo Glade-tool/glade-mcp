@@ -534,6 +534,68 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "create_save_system",
+            "description": (
+                "Add a full SAVE/LOAD system as an AUTOLOAD in ONE atomic call — the piece "
+                "that turns a session-only prototype into a game that REMEMBERS (progress, "
+                "unlocked levels, high scores, settings survive a quit). PREFER THIS over "
+                "hand-writing save/load code: it writes a VETTED GDScript VERBATIM and "
+                "registers it as a project autoload (default name 'SaveManager'). It MUST be "
+                "a singleton — save data is global to the whole game, so every scene reaches "
+                "the same store by name. Hand-rolled save code reliably loses data (writes to "
+                "the read-only res://, no handling for a missing/corrupt file, editor-vs-export "
+                "path drift); the template persists JSON to user:// (the only writable, "
+                "per-user, cross-platform location), tolerates a missing/corrupt file, supports "
+                "multiple slots, and auto-saves on quit. Reach it globally by name (no "
+                "node/group lookup): SaveManager.set_value('coins', 42) remembers a value; "
+                "SaveManager.get_value('coins', 0) reads it back with a default when unset; "
+                "SaveManager.save() flushes to disk; SaveManager.has_save() gates a 'Continue' "
+                "button. It activates on the next play — nothing is added to the current scene, "
+                "so NO save_scene is needed."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "singleton_name": {
+                        "type": "string",
+                        "description": (
+                            "Autoload (global) name you call it by. Must be a valid identifier. Default 'SaveManager'."
+                        ),
+                    },
+                    "autosave": {
+                        "type": "boolean",
+                        "description": (
+                            "Auto-save on quit (and on app-pause on mobile) so progress is never dropped. Default true."
+                        ),
+                    },
+                    "default_slot": {
+                        "type": "integer",
+                        "description": (
+                            "Which save slot the game starts on (0-based). Each slot is a "
+                            "separate file (user://savegame_<slot>.json); switch at runtime "
+                            "with SaveManager.set_slot(n). Default 0."
+                        ),
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "res:// folder for the generated save_manager.gd. Default 'res://scripts'.",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": (
+                            "Rewrite save_manager.gd even if it exists. Default false "
+                            "(reuses the existing script; autosave/default_slot apply only "
+                            "with overwrite=true)."
+                        ),
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_game_manager",
             "description": (
                 "Drop the HUB of a simple 2D game into the scene in ONE atomic call — the "
