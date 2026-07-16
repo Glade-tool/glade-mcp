@@ -401,6 +401,61 @@ namespace GladeAgenticAI.Services
             }
         }
 
+        /// <summary>
+        /// Reads a 1-based inclusive line range from a text asset so the agent can pull one method
+        /// out of a large file instead of the whole thing. startLine &lt;= 0 means "from the top";
+        /// endLine &lt;= 0 means "to the end". Out-of-range bounds are clamped, and a start past the
+        /// end returns empty content (not an error). totalLines always reports the file's real line
+        /// count so the caller knows whether it saw a slice or the whole file.
+        /// </summary>
+        public static bool TryGetScriptContentSlice(
+            string scriptPath, int startLine, int endLine,
+            out string content, out int totalLines, out int returnedStart, out int returnedEnd, out string error)
+        {
+            content = null;
+            totalLines = 0;
+            returnedStart = 0;
+            returnedEnd = 0;
+            error = null;
+
+            if (!TryGetScriptContent(scriptPath, out var full, out error))
+                return false;
+
+            // Split on '\n' and strip a trailing '\r' per line so line numbers match an editor's
+            // regardless of CRLF vs LF. A trailing newline yields one empty final element, which we
+            // drop so totalLines reflects the visible line count.
+            string[] lines = full.Split('\n');
+            int count = lines.Length;
+            if (count > 0 && lines[count - 1].Length == 0)
+                count--;
+            totalLines = count;
+
+            int start = startLine <= 0 ? 1 : startLine;
+            int end = endLine <= 0 ? count : endLine;
+            if (end > count) end = count;
+
+            if (count == 0 || start > count)
+            {
+                content = "";
+                returnedStart = start;
+                returnedEnd = start - 1;
+                return true;
+            }
+            if (start < 1) start = 1;
+
+            var sb = new System.Text.StringBuilder();
+            for (int i = start - 1; i <= end - 1; i++)
+            {
+                sb.Append(lines[i].TrimEnd('\r'));
+                if (i < end - 1)
+                    sb.Append('\n');
+            }
+            content = sb.ToString();
+            returnedStart = start;
+            returnedEnd = end;
+            return true;
+        }
+
         public static string[] FindScriptPaths(string nameContains, int maxResults = 20)
         {
             var results = new List<string>();
@@ -473,16 +528,22 @@ namespace GladeAgenticAI.Services
         /// "PlayerController" or a substring inside another word. This is the dependency-edge
         /// primitive: before refactoring a symbol, find the scripts that would break.
         ///
-        /// Returns one entry per matching file: { path, count, matches:[{ line, text }] }.
-        /// Results are ordered by match count (descending) so the heaviest dependents surface
-        /// first. The walk stops after maxFiles distinct files match to bound cost on large
-        /// projects (same early-out as SearchScriptsContent). Editor and Packages scripts are
-        /// excluded to match the other script-search tools.
+        /// Returns one entry per matching file: { path, count, matches:[{ line, text }] }, capped
+        /// at maxFiles entries and ordered by match count (descending) so the heaviest dependents
+        /// surface first. Unlike a naive early-out, the walk continues scanning past maxFiles to
+        /// tally the TRUE blast radius — totalFileCount / totalMatchCount report how many files and
+        /// references exist in total, even when only the top maxFiles carry line-level detail. This
+        /// keeps a refactor from acting on a partial picture (the old code stopped counting at the
+        /// cap, so a widely-used symbol looked far less used than it was). Editor and Packages
+        /// scripts are excluded to match the other script-search tools.
         /// </summary>
         public static List<Dictionary<string, object>> FindReferences(
-            string symbol, int maxFiles = 40, int maxMatchesPerFile = 5)
+            string symbol, int maxFiles, int maxMatchesPerFile,
+            out int totalFileCount, out int totalMatchCount)
         {
             var results = new List<Dictionary<string, object>>();
+            totalFileCount = 0;
+            totalMatchCount = 0;
             if (string.IsNullOrEmpty(symbol))
                 return results;
 
@@ -513,41 +574,45 @@ namespace GladeAgenticAI.Services
                     if (!File.Exists(fullPath))
                         continue;
 
-                    string[] lines;
-                    try { lines = File.ReadAllLines(fullPath); }
+                    string content;
+                    try { content = File.ReadAllText(fullPath); }
                     catch { continue; }
 
+                    int fileMatchCount = pattern.Matches(content).Count;
+                    if (fileMatchCount == 0)
+                        continue;
+
+                    totalFileCount++;
+                    totalMatchCount += fileMatchCount;
+
+                    // Collect line-level detail only for the first maxFiles matching files; past
+                    // the cap we keep scanning purely to tally the totals above.
+                    if (results.Count >= maxFiles)
+                        continue;
+
                     var matches = new List<Dictionary<string, object>>();
-                    int fileMatchCount = 0;
-                    for (int li = 0; li < lines.Length; li++)
+                    string[] lines = content.Split('\n');
+                    for (int li = 0; li < lines.Length && matches.Count < maxMatchesPerFile; li++)
                     {
-                        if (!pattern.IsMatch(lines[li]))
+                        string line = lines[li].TrimEnd('\r');
+                        if (!pattern.IsMatch(line))
                             continue;
-                        fileMatchCount++;
-                        if (matches.Count < maxMatchesPerFile)
+                        string text = line.Trim();
+                        if (text.Length > 200)
+                            text = text.Substring(0, 200);
+                        matches.Add(new Dictionary<string, object>
                         {
-                            string text = lines[li].Trim();
-                            if (text.Length > 200)
-                                text = text.Substring(0, 200);
-                            matches.Add(new Dictionary<string, object>
-                            {
-                                { "line", li + 1 },
-                                { "text", text }
-                            });
-                        }
+                            { "line", li + 1 },
+                            { "text", text }
+                        });
                     }
 
-                    if (fileMatchCount > 0)
+                    results.Add(new Dictionary<string, object>
                     {
-                        results.Add(new Dictionary<string, object>
-                        {
-                            { "path", path },
-                            { "count", fileMatchCount },
-                            { "matches", matches }
-                        });
-                        if (results.Count >= maxFiles)
-                            break;
-                    }
+                        { "path", path },
+                        { "count", fileMatchCount },
+                        { "matches", matches }
+                    });
                 }
             }
             catch { }

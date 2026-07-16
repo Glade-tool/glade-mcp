@@ -16,6 +16,16 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Scripts
             // Tool schema uses "scriptContent", but also check "scriptText" for backward compatibility
             string scriptContent = args.ContainsKey("scriptContent") ? args["scriptContent"].ToString()
                 : (args.ContainsKey("scriptText") ? args["scriptText"].ToString() : "");
+
+            // Anchor-edit mode: instead of rewriting the whole file, replace an exact snippet
+            // (oldString → newString). This is the surgical path for large existing files — the
+            // caller sends only the fragment that changes, not thousands of lines. When oldString
+            // is present we edit; otherwise we fall back to the full-content rewrite above.
+            string oldString = ToolUtils.GetStringArg(args, "oldString", null);
+            string newString = ToolUtils.GetStringArg(args, "newString", null);
+            bool replaceAll = ToolUtils.GetBoolArg(args, "replaceAll", false);
+            bool anchorMode = !string.IsNullOrEmpty(oldString);
+
             // Defense-in-depth flag: the caller must explicitly acknowledge
             // it has user permission to modify a pre-existing project script.
             // Defaults false. AI clients should set this only when the user
@@ -30,9 +40,11 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Scripts
                 return ToolUtils.CreateErrorResponse("scriptPath is required");
             }
 
-            if (string.IsNullOrEmpty(scriptContent))
+            if (!anchorMode && string.IsNullOrEmpty(scriptContent))
             {
-                return ToolUtils.CreateErrorResponse("scriptContent is required");
+                return ToolUtils.CreateErrorResponse(
+                    "Provide either scriptContent (full file rewrite) or oldString (surgical edit). " +
+                    "For a small change to a large file, prefer oldString/newString.");
             }
 
             // Ensure path starts with Assets/
@@ -91,16 +103,51 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Scripts
             // NOTE: Backup is handled by the revert system via /api/file/backup endpoint
             // The frontend calls backupFile() before executing modify_script
             // No need to create .backup files in Assets folder anymore
-            
+
+            int replacements = 0;
+            if (anchorMode)
+            {
+                // Resolve the surgical edit against the current file. Exact, literal matching
+                // (ordinal) — no regex — so the snippet the model sends is what gets replaced.
+                string current;
+                try { current = System.IO.File.ReadAllText(scriptPath); }
+                catch (Exception ex) { return ToolUtils.CreateErrorResponse($"Failed to read '{scriptPath}': {ex.Message}"); }
+
+                newString = newString ?? "";
+                if (oldString == newString)
+                {
+                    return ToolUtils.CreateErrorResponse("oldString and newString are identical — no change to make.");
+                }
+
+                int occurrences = CountOccurrences(current, oldString);
+                if (occurrences == 0)
+                {
+                    return ToolUtils.CreateErrorResponse(
+                        $"oldString was not found in '{scriptPath}'. It must match the file's current text exactly " +
+                        "(whitespace and indentation included). Read the script first to copy the exact snippet.");
+                }
+                if (occurrences > 1 && !replaceAll)
+                {
+                    return ToolUtils.CreateErrorResponse(
+                        $"oldString matched {occurrences} times in '{scriptPath}'. Include more surrounding context to " +
+                        "make it unique, or set replaceAll=true to replace every occurrence.");
+                }
+
+                scriptContent = replaceAll
+                    ? current.Replace(oldString, newString)
+                    : ReplaceFirst(current, oldString, newString);
+                replacements = replaceAll ? occurrences : 1;
+            }
+
             // Write modified file
             System.IO.File.WriteAllText(scriptPath, scriptContent);
 
             // Refresh AssetDatabase
             AssetDatabase.Refresh(ImportAssetOptions.Default);
-            
+
             // Determine if compilation is needed (only for .cs files)
             bool requiresCompilation = extension.Equals(".cs", StringComparison.OrdinalIgnoreCase);
-            
+
             var extras = new Dictionary<string, object>
             {
                 { "scriptPath", scriptPath }
@@ -109,12 +156,42 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Scripts
             {
                 extras.Add("requiresCompilation", true);
             }
-            
-            string message = requiresCompilation 
-                ? $"Modified {fileType} at '{scriptPath}'. Unity will auto-compile the script."
-                : $"Modified {fileType} at '{scriptPath}'. Unity will import the {fileType}.";
-            
+            if (anchorMode)
+            {
+                extras.Add("mode", "anchor");
+                extras.Add("replacements", replacements);
+            }
+
+            string editNote = anchorMode
+                ? $" ({replacements} replacement{(replacements == 1 ? "" : "s")})"
+                : "";
+            string message = requiresCompilation
+                ? $"Modified {fileType} at '{scriptPath}'{editNote}. Unity will auto-compile the script."
+                : $"Modified {fileType} at '{scriptPath}'{editNote}. Unity will import the {fileType}.";
+
             return ToolUtils.CreateSuccessResponse(message, extras);
+        }
+
+        private static int CountOccurrences(string haystack, string needle)
+        {
+            if (string.IsNullOrEmpty(needle))
+                return 0;
+            int count = 0;
+            int idx = 0;
+            while ((idx = haystack.IndexOf(needle, idx, StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                idx += needle.Length;
+            }
+            return count;
+        }
+
+        private static string ReplaceFirst(string haystack, string needle, string replacement)
+        {
+            int idx = haystack.IndexOf(needle, StringComparison.Ordinal);
+            if (idx < 0)
+                return haystack;
+            return haystack.Substring(0, idx) + replacement + haystack.Substring(idx + needle.Length);
         }
     }
 }

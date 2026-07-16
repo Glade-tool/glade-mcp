@@ -679,7 +679,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "modify_script",
-            "description": "Modify an existing text-based asset file (.cs, .shader, .compute, etc.). File MUST exist in the project — verify in Unity context first. Provide the complete file content including all existing code. SAFETY: the bridge refuses modify_script against scripts the agentic loop did NOT create in this session unless confirmExistingFileModification=true is set. Set the flag ONLY when the user explicitly named the file (e.g. 'update PlayerMovement.cs') or used language like 'extend' / 'modify the existing X'. Absent that signal, do NOT set the flag and do NOT call modify_script — call create_script with a new path for fresh-scaffold prompts.",
+            "description": "Modify an existing text-based asset file (.cs, .shader, .compute, etc.). File MUST exist — verify in Unity context first. TWO MODES: (1) SURGICAL EDIT (preferred for anything but a near-total rewrite) — pass oldString + newString to replace one exact snippet, leaving the rest of the file untouched. Far cheaper and safer on large files than resending the whole thing. (2) FULL REWRITE — pass scriptContent with the complete file. SAFETY: the bridge refuses modify_script against scripts the agentic loop did NOT create in this session unless confirmExistingFileModification=true is set. Set the flag ONLY when the user explicitly named the file (e.g. 'update PlayerMovement.cs') or used language like 'extend' / 'modify the existing X'. Absent that signal, do NOT set the flag and do NOT call modify_script — call create_script with a new path for fresh-scaffold prompts.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -687,16 +687,28 @@ TOOLS: List[Dict] = [
                         "type": "string",
                         "description": "Path relative to Assets folder with file extension (e.g., 'Scripts/MyScript.cs', 'Shaders/MyShader.shader'). MUST match exactly a path shown in the Unity context. If the file is not listed in context, it doesn't exist - use create_script instead. Follow the project's existing folder structure.",
                     },
+                    "oldString": {
+                        "type": "string",
+                        "description": "SURGICAL EDIT MODE: the exact snippet to replace, copied verbatim from the current file (whitespace and indentation included). Must be UNIQUE in the file — include enough surrounding lines to disambiguate, or set replaceAll=true. Read the file first (get_script_content, optionally with startLine/endLine) to copy the snippet exactly. When set, scriptContent is ignored.",
+                    },
+                    "newString": {
+                        "type": "string",
+                        "description": "SURGICAL EDIT MODE: the replacement for oldString. Use an empty string to delete the snippet. Required whenever oldString is set.",
+                    },
+                    "replaceAll": {
+                        "type": "boolean",
+                        "description": "SURGICAL EDIT MODE: replace every occurrence of oldString instead of requiring it to be unique. Default false (a non-unique oldString is rejected so you never edit the wrong spot). Useful for renaming a repeated local identifier.",
+                    },
                     "scriptContent": {
                         "type": "string",
-                        "description": "Complete modified file content. MUST include ALL existing code from the context, then ADD your changes. Never remove existing fields, methods, or functionality. For .cs files: complete C# script code. For .shader files: complete HLSL/CG shader code.",
+                        "description": "FULL REWRITE MODE: complete modified file content. MUST include ALL existing code from the context, then ADD your changes. Never remove existing fields, methods, or functionality. Prefer oldString/newString for small changes to large files. For .cs files: complete C# script code. For .shader files: complete HLSL/CG shader code.",
                     },
                     "confirmExistingFileModification": {
                         "type": "boolean",
                         "description": "Set to true ONLY when the user explicitly named the file to extend or modify (e.g. 'update PlayerMovement.cs', 'extend the existing HealthSystem'). Required for any modify_script against a script not created via create_script in the current session. Defaults to false. Setting this without explicit user authorization risks corrupting real project code.",
                     },
                 },
-                "required": ["scriptPath", "scriptContent"],
+                "required": ["scriptPath"],
             },
         },
     },
@@ -704,14 +716,22 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "get_script_content",
-            "description": "Read the full content of a text-based asset file by path (e.g., 'Assets/Scripts/PlayerMovement.cs', 'Assets/Shaders/MyShader.shader'). Supports .cs (C# scripts), .shader (HLSL/CG shaders), .compute (compute shaders), .hlsl, .cginc, and other text-based Unity assets. Use this when the user asks to fix or update a specific script or shader.",
+            "description": "Read a text-based asset file by path (e.g., 'Assets/Scripts/PlayerMovement.cs', 'Assets/Shaders/MyShader.shader'). Supports .cs (C# scripts), .shader (HLSL/CG shaders), .compute (compute shaders), .hlsl, .cginc, and other text-based Unity assets. Reads the WHOLE file by default. For a LARGE file, pass startLine/endLine to read just the range you need instead of loading thousands of lines into context — the response always includes totalLines so you know how much you didn't read. Use this when the user asks to fix or update a specific script or shader.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "scriptPath": {
                         "type": "string",
                         "description": "Path to the file with extension (relative to Assets, e.g., 'Scripts/MyScript.cs' or 'Shaders/MyShader.shader').",
-                    }
+                    },
+                    "startLine": {
+                        "type": "integer",
+                        "description": "Optional 1-based first line to read (inclusive). Omit (or 0) to start at the top. Pair with endLine to read one method/region out of a big file.",
+                    },
+                    "endLine": {
+                        "type": "integer",
+                        "description": "Optional 1-based last line to read (inclusive). Omit (or 0) to read to the end of the file.",
+                    },
                 },
                 "required": ["scriptPath"],
             },
@@ -763,7 +783,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "find_references",
-            "description": "Find every script that references a symbol (a class, method, or field name), with per-file line context. Matches whole identifiers only (so 'Player' does NOT match 'PlayerController'), unlike the raw substring search_scripts. ALWAYS call this BEFORE renaming, changing the signature of, or refactoring a public class/method/field — it reveals the dependent scripts a change would break so you can update them too. Returns files ordered by reference count (heaviest dependents first).",
+            "description": "Find every script that references a symbol (a class, method, or field name), with per-file line context. Matches whole identifiers only (so 'Player' does NOT match 'PlayerController'), unlike the raw substring search_scripts. ALWAYS call this BEFORE renaming, changing the signature of, or refactoring a public class/method/field — it reveals the dependent scripts a change would break so you can update them too. Returns files ordered by reference count (heaviest dependents first). totalFileCount / totalMatches report the TRUE project-wide blast radius even when line detail is capped at maxFiles, and truncated=true means more files reference the symbol than were returned — raise maxFiles (or update the returned files first, then re-run) so you don't refactor against a partial picture.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -773,7 +793,7 @@ TOOLS: List[Dict] = [
                     },
                     "maxFiles": {
                         "type": "integer",
-                        "description": "Max distinct files to return (1-100). Default: 40",
+                        "description": "Max distinct files to return WITH line detail (1-100). Default: 40. The scan still counts every referencing file for totalFileCount regardless of this cap.",
                     },
                     "maxMatchesPerFile": {
                         "type": "integer",

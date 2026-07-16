@@ -33,24 +33,38 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Scripts
             if (args.ContainsKey("maxMatchesPerFile") && int.TryParse(args["maxMatchesPerFile"]?.ToString(), out var parsedMatches))
                 maxMatchesPerFile = Mathf.Clamp(parsedMatches, 1, 50);
 
-            var references = UnityContextGatherer.FindReferences(symbol, maxFiles, maxMatchesPerFile);
+            var references = UnityContextGatherer.FindReferences(
+                symbol, maxFiles, maxMatchesPerFile, out int totalFiles, out int totalMatches);
 
-            int totalMatches = 0;
-            foreach (var r in references)
-                totalMatches += System.Convert.ToInt32(r["count"]);
+            // totalFiles/totalMatches are the true project-wide counts even when only the top
+            // maxFiles carry line detail; references.Count is how many of those were returned.
+            bool truncated = totalFiles > references.Count;
 
             var extras = new Dictionary<string, object>
             {
                 { "symbol", symbol },
                 { "fileCount", references.Count },
+                { "totalFileCount", totalFiles },
                 { "totalMatches", totalMatches },
-                { "truncated", references.Count >= maxFiles },
+                { "truncated", truncated },
                 { "references", references }
             };
 
-            string message = references.Count == 0
-                ? $"No references to '{symbol}' found in project scripts."
-                : $"Found {totalMatches} reference(s) to '{symbol}' across {references.Count} script(s).";
+            string message;
+            if (totalFiles == 0)
+            {
+                message = $"No references to '{symbol}' found in project scripts.";
+            }
+            else if (truncated)
+            {
+                message = $"Found {totalMatches} reference(s) to '{symbol}' across {totalFiles} script(s); "
+                    + $"showing line detail for the top {references.Count}. "
+                    + "Raise maxFiles to see more, or narrow the symbol.";
+            }
+            else
+            {
+                message = $"Found {totalMatches} reference(s) to '{symbol}' across {totalFiles} script(s).";
+            }
 
             return ToolUtils.CreateSuccessResponse(message, extras);
         }
