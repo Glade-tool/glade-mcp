@@ -1,0 +1,209 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using UnityEngine;
+
+// A global SAVE/LOAD service: the missing piece that turns a session-only
+// prototype into a game that REMEMBERS — coins, unlocked levels, high scores, and
+// settings survive a quit. It persists a typed key/value store as JSON under
+// Application.persistentDataPath (the ONLY writable, per-user, cross-platform
+// location — NOT PlayerPrefs, which is a size-limited registry/plist bucket, and
+// NOT a path under the project, which is read-only in a built player).
+//
+// Reach it from anywhere WITHOUT a hard reference, via the static Instance — the
+// Unity counterpart of a Godot autoload:
+//     SaveSystem.Instance.SetInt("coins", 42);          // remember something
+//     int coins = SaveSystem.Instance.GetInt("coins", 0); // read it back (0 if unset)
+//     SaveSystem.Instance.Save();                        // flush to disk now
+//     if (SaveSystem.Instance.HasSave()) { /* ... */ }   // is there a save to continue from?
+//     SaveSystem.Instance.SetSlot(1);                    // switch to a second save slot
+//
+// It stays alive across scene loads (DontDestroyOnLoad) and — because Unity has no
+// autoload equivalent — self-bootstraps on Play via a RuntimeInitializeOnLoadMethod
+// so it exists even when you enter Play from a scene that has no SaveSystem object.
+// Values are stored typed (int/float/bool/string); wire it into gameplay by calling
+// a Set on progress changes (score, level, unlocks) and a Get on startup to restore.
+[DisallowMultipleComponent]
+public class SaveSystem : MonoBehaviour
+{
+    // Single point of contact for gameplay code. Set in Awake; a second instance
+    // destroys itself so two savers can never fight over the same file.
+    public static SaveSystem Instance { get; private set; }
+
+    [Tooltip("Auto-save on quit (and on app-pause on mobile) so progress is never silently dropped.")]
+    public bool autosave = __AUTOSAVE__;
+
+    [Tooltip("Which save slot is active. Each slot is a separate file. Use SetSlot() to switch.")]
+    public int slot = __DEFAULT_SLOT__;
+
+    // The store is kept as string→string internally so a single JSON shape covers
+    // every value type; the typed accessors convert with invariant culture so a
+    // float never round-trips differently on a machine with a comma decimal.
+    private readonly Dictionary<string, string> _data = new Dictionary<string, string>();
+
+    // Unity has no engine-level singleton service (no Godot autoload), so create
+    // the saver before the first scene's own scripts run if nothing placed one.
+    // AfterSceneLoad (not Before) lets a SaveSystem object already present in the
+    // scene win — its Awake sets Instance first and this backstop then no-ops —
+    // so a designer-tuned instance is respected and the backstop only covers
+    // scenes that lack one.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void Bootstrap()
+    {
+        if (Instance != null) return;
+        var go = new GameObject("SaveSystem");
+        go.AddComponent<SaveSystem>();
+    }
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+        Load();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    // OnApplicationQuit is the desktop "session is ending" moment; OnApplicationPause
+    // covers mobile going to background (where OnApplicationQuit may never fire).
+    private void OnApplicationQuit()
+    {
+        if (autosave) Save();
+    }
+
+    private void OnApplicationPause(bool paused)
+    {
+        if (autosave && paused) Save();
+    }
+
+    // ── Typed key/value access ────────────────────────────────────────────────
+    // Each getter takes a default returned when the key is missing (or unparseable),
+    // so callers never have to null-check or catch.
+
+    public void SetInt(string key, int value) { _data[key] = value.ToString(CultureInfo.InvariantCulture); }
+
+    public int GetInt(string key, int defaultValue = 0)
+    {
+        return _data.TryGetValue(key, out var s)
+               && int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v)
+            ? v : defaultValue;
+    }
+
+    public void SetFloat(string key, float value) { _data[key] = value.ToString("R", CultureInfo.InvariantCulture); }
+
+    public float GetFloat(string key, float defaultValue = 0f)
+    {
+        return _data.TryGetValue(key, out var s)
+               && float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v)
+            ? v : defaultValue;
+    }
+
+    public void SetBool(string key, bool value) { _data[key] = value ? "true" : "false"; }
+
+    public bool GetBool(string key, bool defaultValue = false)
+    {
+        return _data.TryGetValue(key, out var s) ? s == "true" : defaultValue;
+    }
+
+    public void SetString(string key, string value) { _data[key] = value ?? string.Empty; }
+
+    public string GetString(string key, string defaultValue = "")
+    {
+        return _data.TryGetValue(key, out var s) ? s : defaultValue;
+    }
+
+    public bool HasKey(string key) { return _data.ContainsKey(key); }
+
+    public void DeleteKey(string key) { _data.Remove(key); }
+
+    public void Clear() { _data.Clear(); }
+
+    // ── Persistence ───────────────────────────────────────────────────────────
+
+    private string SaveFilePath() { return System.IO.Path.Combine(Application.persistentDataPath, "savegame_" + slot + ".json"); }
+
+    // JsonUtility cannot serialize a Dictionary, so the store is flattened to a
+    // parallel key/value list wrapper it CAN handle.
+    [Serializable]
+    private class Entry { public string key; public string value; }
+
+    [Serializable]
+    private class Store { public List<Entry> entries = new List<Entry>(); }
+
+    // Write the current data to disk as JSON. Returns true on success.
+    public bool Save()
+    {
+        var store = new Store();
+        foreach (var kv in _data)
+            store.entries.Add(new Entry { key = kv.Key, value = kv.Value });
+        try
+        {
+            File.WriteAllText(SaveFilePath(), JsonUtility.ToJson(store, true));
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("[SaveSystem] Could not write save file '" + SaveFilePath() + "': " + e.Message);
+            return false;
+        }
+    }
+
+    // Load data from disk into memory. Missing file → start empty (not an error).
+    // Corrupt file → warn and start empty rather than crash. Returns true if an
+    // existing, valid save was read.
+    public bool Load()
+    {
+        _data.Clear();
+        if (!HasSave()) return false;
+        try
+        {
+            var store = JsonUtility.FromJson<Store>(File.ReadAllText(SaveFilePath()));
+            if (store == null || store.entries == null)
+            {
+                Debug.LogWarning("[SaveSystem] Save file '" + SaveFilePath() + "' is corrupt; starting empty.");
+                return false;
+            }
+            foreach (var e in store.entries)
+                if (e != null && e.key != null) _data[e.key] = e.value;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[SaveSystem] Save file '" + SaveFilePath() + "' could not be parsed (" + ex.Message + "); starting empty.");
+            return false;
+        }
+    }
+
+    public bool HasSave() { return File.Exists(SaveFilePath()); }
+
+    // Delete the current slot's save file and clear in-memory data. Returns true if
+    // a file was removed.
+    public bool DeleteSave()
+    {
+        _data.Clear();
+        if (!HasSave()) return false;
+        try { File.Delete(SaveFilePath()); return true; }
+        catch (Exception e)
+        {
+            Debug.LogError("[SaveSystem] Could not delete save file '" + SaveFilePath() + "': " + e.Message);
+            return false;
+        }
+    }
+
+    // Switch to a different save slot and load its data (if any). Useful for a
+    // multiple-save-file UI.
+    public void SetSlot(int newSlot)
+    {
+        slot = newSlot;
+        Load();
+    }
+}

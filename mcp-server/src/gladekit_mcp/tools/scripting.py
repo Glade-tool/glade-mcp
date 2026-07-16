@@ -151,6 +151,39 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "create_save_system",
+            "description": "Use this — not create_script — to add a SAVE/LOAD system: the piece that makes a game REMEMBER between sessions (coins, unlocked levels, high scores, settings survive a quit). Trigger on 'save/load', 'persist', 'carry over between sessions', 'don't lose progress on quit', 'high score', 'save slots'. It writes a vetted SaveSystem MonoBehaviour that persists a typed key/value store as JSON to Application.persistentDataPath — the ONLY writable, per-user, cross-platform location. Hand-written save code reliably ships data-loss bugs, the #1 being PlayerPrefs (a size-limited registry/plist bucket, the wrong scope) or writing under the project folder (read-only in a built player); this tool avoids all of them and also tolerates a missing/corrupt file, supports multiple slots, and auto-saves on quit. It is ATOMIC: it writes the script, creates the SaveSystem object, and attaches the SaveSystem component automatically as soon as the script compiles (it also self-bootstraps on Play via RuntimeInitializeOnLoadMethod, so it works even in scenes without the object) — so after it returns your ONLY remaining step is compile_scripts (wait for status='idle'). DO NOT call add_component for SaveSystem. Reach it globally WITHOUT a reference via the static SaveSystem.Instance: SetInt(\"coins\", 42) to remember a value, GetInt(\"coins\", 0) to read it back with a default, Save() to flush to disk, HasSave() to gate a Continue button (SetFloat/GetFloat, SetString/GetString, SetBool/GetBool exist too). Works for 2D and 3D games. Call once per game.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) to write SaveSystem.cs into. Defaults to 'Scripts'. The filename is fixed (SaveSystem.cs) because Unity requires the MonoBehaviour class name to match the file name.",
+                    },
+                    "saveSystemName": {
+                        "type": "string",
+                        "description": "Name of the SaveSystem GameObject. Defaults to 'SaveSystem'. If one already exists in the scene the tool reuses it (two savers would fight over the same file).",
+                    },
+                    "autosave": {
+                        "type": "boolean",
+                        "description": "Auto-save on quit (and on app-pause on mobile) so progress is never silently dropped. Defaults to true. Baked into the generated script, so it only applies when the script is (re)written.",
+                    },
+                    "defaultSlot": {
+                        "type": "integer",
+                        "description": "Which save slot the game starts on (0-based). Each slot is a separate file (savegame_<slot>.json). Defaults to 0. Baked into the generated script, so it only applies when the script is (re)written.",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set to true ONLY when the user explicitly asked to regenerate the SaveSystem script. The shared SaveSystem.cs is REUSED (not clobbered) when it already exists; this forces a fresh copy of the vetted template (and re-applies autosave/defaultSlot). Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_collectible",
             "description": "Use this — not create_script — to add a COLLECTIBLE (coin / star / pickup): a visible sphere with a trigger collider that, when the player (tag 'Player') touches it, adds to the score via the GameManager and removes itself. With create_game_manager and create_hazard it completes the core gameplay loop. ATOMIC: it writes a vetted trigger-pickup script, builds the pickup, and attaches the Collectible component automatically on the next compile — so after it returns your ONLY remaining step is compile_scripts. DO NOT call add_component. Call create_game_manager too, or the pickup vanishes without scoring (this tool ensures GameManager.cs exists so the pickup compiles, but does NOT add the HUD/win-logic hub — only create_game_manager does). Call repeatedly to place many pickups; the script is shared and each object gets a unique name. Works in 2D or 3D — pass dimension='2d' for a sprite pickup with a CircleCollider2D trigger (pair with create_platformer_controller), otherwise a 3D sphere is built.",
             "parameters": {
