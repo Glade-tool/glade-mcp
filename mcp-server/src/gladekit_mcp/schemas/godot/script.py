@@ -54,11 +54,14 @@ TOOLS: List[Dict] = [
         "function": {
             "name": "modify_script",
             "description": (
-                "Overwrite an existing .gd file. SAFETY: refuses to modify a file the "
-                "bridge did not create in this session unless confirm_existing_file_modification=true. "
-                "Set the confirm flag ONLY when the user explicitly named the file to extend or "
-                "modify (e.g. 'update Player.gd'). On fresh-scaffold prompts call create_script "
-                "with a new path instead."
+                "Modify an existing .gd file. TWO MODES: (1) SURGICAL EDIT (preferred for "
+                "anything but a near-total rewrite) — pass old_string + new_string to replace "
+                "one exact snippet, leaving the rest of the file untouched. Far cheaper and safer "
+                "on large files than resending the whole thing. (2) FULL REWRITE — pass content "
+                "with the complete file. SAFETY: refuses to modify a file the bridge did not "
+                "create in this session unless confirm_existing_file_modification=true. Set the "
+                "confirm flag ONLY when the user explicitly named the file to extend or modify "
+                "(e.g. 'update Player.gd'). On fresh-scaffold prompts call create_script instead."
             ),
             "parameters": {
                 "type": "object",
@@ -67,9 +70,37 @@ TOOLS: List[Dict] = [
                         "type": "string",
                         "description": "res:// path to an existing .gd file.",
                     },
+                    "old_string": {
+                        "type": "string",
+                        "description": (
+                            "SURGICAL EDIT MODE: the exact snippet to replace, copied verbatim "
+                            "from the current file (whitespace and indentation included). Must be "
+                            "UNIQUE in the file — include enough surrounding lines to disambiguate, "
+                            "or set replace_all=true. Read the file first (get_script_content) to "
+                            "copy the snippet exactly. When set, content is ignored."
+                        ),
+                    },
+                    "new_string": {
+                        "type": "string",
+                        "description": (
+                            "SURGICAL EDIT MODE: the replacement for old_string. Use an empty "
+                            "string to delete the snippet. Required whenever old_string is set."
+                        ),
+                    },
+                    "replace_all": {
+                        "type": "boolean",
+                        "description": (
+                            "SURGICAL EDIT MODE: replace every occurrence of old_string instead "
+                            "of requiring it to be unique. Default false (a non-unique old_string "
+                            "is rejected so you never edit the wrong spot)."
+                        ),
+                    },
                     "content": {
                         "type": "string",
-                        "description": "Full new file contents (replaces everything).",
+                        "description": (
+                            "FULL REWRITE MODE: complete new file contents (replaces everything). "
+                            "Prefer old_string/new_string for small changes to large files."
+                        ),
                     },
                     "confirm_existing_file_modification": {
                         "type": "boolean",
@@ -80,7 +111,7 @@ TOOLS: List[Dict] = [
                         ),
                     },
                 },
-                "required": ["script_path", "content"],
+                "required": ["script_path"],
             },
         },
     },
@@ -163,7 +194,11 @@ TOOLS: List[Dict] = [
                 "only (so 'Player' does NOT match 'PlayerController'), unlike a raw "
                 "substring search. Call this BEFORE renaming or changing a symbol other "
                 "scripts may use — it reveals the dependent scripts a change would break "
-                "so you can update them too. Returns files ordered by reference count."
+                "so you can update them too. Returns files ordered by reference count. "
+                "total_file_count / total_matches report the TRUE project-wide blast radius "
+                "even when line detail is capped at max_files, and truncated=true means more "
+                "files reference the symbol than were returned — raise max_files (or update the "
+                "returned files first, then re-run) so you don't refactor against a partial picture."
             ),
             "parameters": {
                 "type": "object",
@@ -174,7 +209,7 @@ TOOLS: List[Dict] = [
                     },
                     "max_files": {
                         "type": "integer",
-                        "description": "Max distinct files to return (1-100). Default 40.",
+                        "description": "Max distinct files to return WITH line detail (1-100). Default 40. The scan still counts every referencing file for total_file_count regardless of this cap.",
                     },
                     "max_matches_per_file": {
                         "type": "integer",

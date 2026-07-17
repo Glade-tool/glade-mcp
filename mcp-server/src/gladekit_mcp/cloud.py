@@ -3,7 +3,7 @@ GladeKit cloud integration — activated by GLADEKIT_API_KEY env var.
 
 Without the API key, all functions return None silently (free tier behavior).
 With the key, these functions call GladeKit's cloud API for:
-  - RAG knowledge base: curated Unity docs, API corrections, error patterns
+  - RAG knowledge base: curated engine docs (Unity, Godot), API corrections, error patterns
   - Cross-session persistent memory: AI-extracted memories from past sessions
   - Convention extraction: coding patterns distilled from accumulated memories
 
@@ -86,23 +86,31 @@ def is_available() -> bool:
     return _cloud_available
 
 
-async def fetch_rag_context(query: str, top_k: int = 5) -> Optional[str]:
+async def fetch_rag_context(query: str, top_k: int = 5, engine: str = "unity") -> Optional[str]:
     """
-    Retrieve relevant Unity knowledge from GladeKit's RAG knowledge base.
+    Retrieve relevant engine knowledge from GladeKit's RAG knowledge base.
 
-    Returns a formatted string of relevant Unity docs, API corrections, and
-    error patterns relevant to the query. Returns None when unavailable.
+    Returns a formatted string of relevant docs, API corrections, and error
+    patterns for the given engine, or None when unavailable.
+
+    Args:
+        query: The user's task/question to search against.
+        top_k: Maximum number of knowledge snippets to retrieve.
+        engine: Which engine's knowledge base to search ('unity' | 'godot').
+            Unknown values fall back to 'unity'.
 
     Requires GLADEKIT_API_KEY.
     """
     if not _cloud_available:
         return None
 
+    engine = engine.lower() if engine and engine.lower() in ("unity", "godot") else "unity"
+
     try:
         client = _get_client()
         resp = await client.post(
             f"{_CLOUD_BASE_URL}/mcp-rag-query",
-            json={"query": query, "top_k": top_k},
+            json={"query": query, "top_k": top_k, "engine": engine},
             timeout=15.0,
         )
         resp.raise_for_status()

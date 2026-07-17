@@ -267,11 +267,15 @@ async def _handle_tool_call(
                 skill.maybe_persist(project_path, session_id=sid)
         result = get_relevant_tool_summary(message)
 
-        # Inject RAG context from cloud knowledge base (paid tier)
+        # Inject RAG context from cloud knowledge base (paid tier), scoped to
+        # the active engine so a Godot session pulls Godot knowledge.
         if message and cloud.is_available():
-            rag_context = await cloud.fetch_rag_context(message)
+            engine = get_active_engine()
+            if engine not in ("unity", "godot"):
+                engine = "unity"
+            rag_context = await cloud.fetch_rag_context(message, engine=engine)
             if rag_context:
-                result += f"\n\n## Unity Knowledge Base\n\n{rag_context}"
+                result += f"\n\n## {engine.capitalize()} Knowledge Base\n\n{rag_context}"
 
         return [types.TextContent(type="text", text=result)]
 

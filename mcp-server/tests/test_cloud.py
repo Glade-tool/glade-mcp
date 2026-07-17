@@ -113,7 +113,27 @@ async def test_fetch_rag_context_success():
     mock_client.post.assert_called_once()
     call_kwargs = mock_client.post.call_args
     assert "mcp-rag-query" in call_kwargs.args[0]
-    assert call_kwargs.kwargs["json"] == {"query": "player movement", "top_k": 3}
+    # Defaults to the Unity knowledge base.
+    assert call_kwargs.kwargs["json"] == {"query": "player movement", "top_k": 3, "engine": "unity"}
+
+
+async def test_fetch_rag_context_sends_engine():
+    """A Godot session queries the Godot knowledge base; unknown engines fall
+    back to Unity."""
+    mock_response = httpx.Response(
+        200,
+        json={"context": "CharacterBody3D move_and_slide docs..."},
+        request=httpx.Request("POST", "http://test"),
+    )
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    with patch.object(cloud, "_get_client", return_value=mock_client):
+        await cloud.fetch_rag_context("how to move a body", engine="godot")
+        assert mock_client.post.call_args.kwargs["json"]["engine"] == "godot"
+
+        await cloud.fetch_rag_context("q", engine="unknown")  # unsupported -> unity
+        assert mock_client.post.call_args.kwargs["json"]["engine"] == "unity"
 
 
 async def test_fetch_rag_context_auth_failure_disables():

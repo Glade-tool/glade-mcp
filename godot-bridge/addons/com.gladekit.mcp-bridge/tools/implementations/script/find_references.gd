@@ -13,12 +13,17 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #                         (the per-file count is exact even when snippets are capped).
 #
 # Response payload:
-#   symbol:       String
-#   file_count:   int
-#   total_matches:int
-#   truncated:    bool — true if the file scan hit max_files
-#   references:   [ { path:String, count:int, matches:[ {line:int, text:String} ] } ]
-#                 ordered by count descending (heaviest dependents first).
+#   symbol:          String
+#   file_count:      int  — files returned WITH line detail (capped at max_files)
+#   total_file_count:int  — true number of files referencing the symbol
+#   total_matches:   int  — true total across all referencing files
+#   truncated:       bool — true when total_file_count > file_count
+#   references:      [ { path:String, count:int, matches:[ {line:int, text:String} ] } ]
+#                    ordered by count descending (heaviest dependents first).
+#
+# The scan continues past max_files to tally the TRUE blast radius — a refactor
+# never acts on a partial picture (an early-out that stopped counting at the cap
+# made a widely-used symbol look far less used than it is).
 
 const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
 
@@ -50,10 +55,13 @@ func execute(args: Dictionary) -> Dictionary:
 		return ToolUtils.error("Could not build a search pattern for '%s'" % symbol)
 
 	var references: Array = []
-	var truncated := false
+	var total_file_count := 0
+	var total_matches := 0
 
 	# Manual stack walk (matches find_scripts) so deep trees don't blow the stack.
 	# addons/ is always skipped — addon internals are never the user's project.
+	# The walk does NOT stop at max_files: it keeps scanning to tally the true
+	# blast radius, and only collects per-line detail for the first max_files.
 	var stack: Array = ["res://"]
 	while not stack.is_empty():
 		var dir_path: String = stack.pop_back()
@@ -75,29 +83,30 @@ func execute(args: Dictionary) -> Dictionary:
 			elif entry.ends_with(".gd"):
 				var hit := _scan_file(entry_path, re, max_matches)
 				if hit["count"] > 0:
-					references.append(hit)
-					if references.size() >= max_files:
-						truncated = true
-						break
+					total_file_count += 1
+					total_matches += hit["count"]
+					if references.size() < max_files:
+						references.append(hit)
 		dir.list_dir_end()
-		if truncated:
-			break
 
 	references.sort_custom(func(a, b): return a["count"] > b["count"])
 
-	var total_matches := 0
-	for r in references:
-		total_matches += r["count"]
+	var truncated: bool = total_file_count > references.size()
 
 	var msg: String
-	if references.is_empty():
+	if total_file_count == 0:
 		msg = "No references to '%s' found in project scripts." % symbol
+	elif truncated:
+		msg = "Found %d reference(s) to '%s' across %d script(s); showing line detail for the top %d. Raise max_files to see more, or narrow the symbol." % [
+			total_matches, symbol, total_file_count, references.size()
+		]
 	else:
-		msg = "Found %d reference(s) to '%s' across %d script(s)." % [total_matches, symbol, references.size()]
+		msg = "Found %d reference(s) to '%s' across %d script(s)." % [total_matches, symbol, total_file_count]
 
 	return ToolUtils.success(msg, {
 		"symbol": symbol,
 		"file_count": references.size(),
+		"total_file_count": total_file_count,
 		"total_matches": total_matches,
 		"truncated": truncated,
 		"references": references,
