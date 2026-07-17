@@ -4,6 +4,12 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ## [Unreleased]
 
+## [0.7.15] - 2026-07-16
+
+### Changed
+
+- **Cloud knowledge base retrieval is now engine-aware (paid tier).** When a Godot session queries the curated knowledge base, it retrieves Godot documentation and API references instead of Unity content. The active engine is detected automatically, sent with the query, and the injected context block is labeled for that engine.
+
 ## [0.7.12] - 2026-06-30
 
 ### Added

@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "gladekit-mcp",
   "display_name": "GladeKit MCP",
-  "version": "0.7.14",
+  "version": "0.7.15",
   "description": "Connect Claude Code, Cursor, Windsurf, Claude Desktop, and other AI clients to the Unity and Godot editors. Build scenes, write and attach scripts, and configure physics, materials, UI, audio, and signals directly from your AI client.",
   "long_description": "GladeKit turns your AI client into a Unity and Godot collaborator. It exposes the running editor as MCP tools so the model can build scenes, write and attach scripts, and wire up physics, materials, UI, audio, and signals, then verify the result. The server auto-detects which editor is running (Unity on port 8765, Godot on 8766) and exposes the matching tool set. Requires the free GladeKit editor bridge to be installed and running; see the repository README for one-time setup.",
   "author": {
