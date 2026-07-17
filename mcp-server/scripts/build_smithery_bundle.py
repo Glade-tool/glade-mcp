@@ -36,6 +36,7 @@ then publish the result:
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -80,8 +81,11 @@ def _load_tool_schemas() -> list[dict]:
 def _pack_clean_bundle(dest: Path) -> None:
     """Run `mcpb pack` on the committed (pack-valid) manifest to get a bundle
     with the correct structure and .mcpbignore handling."""
+    # Resolve the full npx path so this works on Windows too — subprocess
+    # (no shell) can't find `npx` there without the `.cmd` extension.
+    npx = shutil.which("npx") or "npx"
     subprocess.run(
-        ["npx", "-y", "@anthropic-ai/mcpb@latest", "pack", ".", str(dest)],
+        [npx, "-y", "@anthropic-ai/mcpb@latest", "pack", ".", str(dest)],
         cwd=MCP_SERVER_ROOT,
         check=True,
     )
