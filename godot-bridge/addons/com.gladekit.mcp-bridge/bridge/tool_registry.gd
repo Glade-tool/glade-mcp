@@ -41,6 +41,7 @@ const ModifyScriptTool       = preload("res://addons/com.gladekit.mcp-bridge/too
 const GetScriptContentTool   = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/get_script_content.gd")
 const FindScriptsTool        = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/find_scripts.gd")
 const FindReferencesTool     = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/find_references.gd")
+const RenameSymbolTool       = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/rename_symbol.gd")
 const FindSceneUsagesTool    = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/find_scene_usages.gd")
 const AttachScriptToNodeTool = preload("res://addons/com.gladekit.mcp-bridge/tools/implementations/script/attach_script_to_node.gd")
 # Vetted-template scaffolder: writes a known-good CharacterBody3D controller +
@@ -329,6 +330,7 @@ func _register_all() -> void:
 	register_tool(GetScriptContentTool.new())
 	register_tool(FindScriptsTool.new())
 	register_tool(FindReferencesTool.new())
+	register_tool(RenameSymbolTool.new())
 	register_tool(FindSceneUsagesTool.new())
 	register_tool(AttachScriptToNodeTool.new())
 	register_tool(CreateThirdPersonControllerTool.new())

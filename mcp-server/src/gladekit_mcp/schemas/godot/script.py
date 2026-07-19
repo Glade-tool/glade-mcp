@@ -191,10 +191,12 @@ TOOLS: List[Dict] = [
             "description": (
                 "Find every .gd script that references a symbol (a class_name, func, "
                 "or var name), with per-file line context. Matches whole identifiers "
-                "only (so 'Player' does NOT match 'PlayerController'), unlike a raw "
-                "substring search. Call this BEFORE renaming or changing a symbol other "
-                "scripts may use — it reveals the dependent scripts a change would break "
-                "so you can update them too. Returns files ordered by reference count. "
+                "only in CODE — 'Player' does NOT match 'PlayerController', and matches "
+                "inside string literals or comments (including multi-line docstrings) are "
+                "ignored, unlike a raw substring search. Call this BEFORE renaming or "
+                "changing a symbol other scripts may use — it reveals the dependent scripts "
+                "a change would break so you can update them too (or use rename_symbol to "
+                "update them all at once). Returns files ordered by reference count. "
                 "total_file_count / total_matches report the TRUE project-wide blast radius "
                 "even when line detail is capped at max_files, and truncated=true means more "
                 "files reference the symbol than were returned — raise max_files (or update the "
@@ -217,6 +219,53 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["symbol"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rename_symbol",
+            "description": (
+                "Rename a GDScript identifier (class_name, func, var, const, signal, …) "
+                "across every .gd file in the project in one operation. Rewrites ONLY "
+                "whole-identifier occurrences in CODE — never inside a string literal or "
+                "comment, and never a substring (renaming 'Player' leaves 'PlayerController' "
+                "untouched) — so it is safe where a plain find-and-replace is not. WORKFLOW: "
+                "for anything but a trivially-unique name, call with dry_run=true FIRST to see "
+                "the blast radius (which files, how many occurrences), then call again with "
+                "dry_run=false to apply. This is a LEXICAL rename: it does NOT distinguish two "
+                "DIFFERENT symbols that happen to share a name (that needs full type analysis), "
+                "so scope an ambiguous rename with 'directory' or verify the dry-run list first. "
+                "Apply is refused if it would touch more than max_files files (a partial rename "
+                "would break parsing) — narrow the scope or raise the cap. Every modified file is "
+                "backed up before it is overwritten."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "old_name": {
+                        "type": "string",
+                        "description": "The existing identifier to rename (e.g. 'PlayerController', 'max_health'). Must be a valid GDScript identifier.",
+                    },
+                    "new_name": {
+                        "type": "string",
+                        "description": "The new identifier. Must be a valid GDScript identifier and not a reserved keyword.",
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "When true, report the files and occurrence counts that WOULD change without modifying anything. Default false. Strongly prefer a dry run first on any non-trivial or ambiguous rename.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Optional res:// folder to scope the rename to (e.g. 'res://scripts/enemy'). Default: the whole project (the addons/ folder is always excluded). Use to disambiguate a common name.",
+                    },
+                    "max_files": {
+                        "type": "integer",
+                        "description": "Safety cap on how many files an APPLY may modify (default 200). If the rename would exceed it, apply is refused with the full count so you can narrow scope or raise the cap. Ignored when dry_run=true.",
+                    },
+                },
+                "required": ["old_name", "new_name"],
             },
         },
     },
