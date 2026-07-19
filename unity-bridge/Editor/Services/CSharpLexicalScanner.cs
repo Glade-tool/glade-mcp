@@ -77,20 +77,20 @@ namespace GladeAgenticAI.Services
         }
 
         /// <summary>
-        /// Return the (start, length) span of every identifier token that lies in a
-        /// code region. Identifiers are maximal <c>[A-Za-z0-9_]</c> runs starting
-        /// with a letter or '_', so "whole identifier" falls out for free:
-        /// <c>PlayerController</c> is one span, never matched by a search for
-        /// <c>Player</c>, and <c>foo.Player</c> yields two spans (<c>foo</c>,
-        /// <c>Player</c>).
+        /// Per-character code mask: <c>mask[i]</c> is true when <c>s[i]</c> is a code
+        /// character (identifier, operator, structural brace, or interpolation-hole
+        /// content) and false when it is inside a comment, a string / char / verbatim
+        /// literal, or an interpolation delimiter. This is the shared primitive that
+        /// <see cref="CodeIdentifierSpans"/> and <see cref="BlankNonCode"/> derive from,
+        /// so all three stay in exact lexical agreement.
         /// </summary>
-        internal static List<(int start, int len)> CodeIdentifierSpans(string s)
+        public static bool[] ComputeCodeMask(string s)
         {
-            var spans = new List<(int, int)>();
             if (string.IsNullOrEmpty(s))
-                return spans;
+                return new bool[0];
 
             int n = s.Length;
+            var mask = new bool[n];
             // Stack of enclosing interpolated strings; last = innermost.
             var interp = new List<Interp>();
             int i = 0;
@@ -240,20 +240,62 @@ namespace GladeAgenticAI.Services
                     }
                 }
 
-                // Identifier token
-                if (IsIdentStart(ch))
+                // Ordinary code char (identifier char, operator, structural brace, …).
+                mask[i] = true;
+                i++;
+            }
+
+            return mask;
+        }
+
+        /// <summary>
+        /// Return the (start, length) span of every identifier token that lies in a
+        /// code region. Identifiers are maximal <c>[A-Za-z0-9_]</c> runs starting with a
+        /// letter or '_', so "whole identifier" falls out for free: <c>PlayerController</c>
+        /// is one span, never matched by a search for <c>Player</c>, and <c>foo.Player</c>
+        /// yields two spans (<c>foo</c>, <c>Player</c>).
+        /// </summary>
+        internal static List<(int start, int len)> CodeIdentifierSpans(string s)
+        {
+            var spans = new List<(int, int)>();
+            if (string.IsNullOrEmpty(s))
+                return spans;
+
+            var mask = ComputeCodeMask(s);
+            int n = s.Length;
+            int i = 0;
+            while (i < n)
+            {
+                if (mask[i] && IsIdentStart(s[i]))
                 {
                     int start = i;
                     i++;
-                    while (i < n && IsIdentPart(s[i])) i++;
+                    while (i < n && mask[i] && IsIdentPart(s[i])) i++;
                     spans.Add((start, i - start));
-                    continue;
                 }
-
-                i++; // any other code char
+                else
+                {
+                    i++;
+                }
             }
-
             return spans;
+        }
+
+        /// <summary>
+        /// Return a copy of <paramref name="source"/> with every non-code character
+        /// (comment, string / char literal, interpolation delimiter) replaced by a space,
+        /// preserving newlines and length. Lets a caller run line-oriented structural
+        /// analysis (e.g. a file outline) without matching inside strings or comments.
+        /// </summary>
+        public static string BlankNonCode(string source)
+        {
+            if (string.IsNullOrEmpty(source))
+                return source ?? "";
+            var mask = ComputeCodeMask(source);
+            var chars = new char[source.Length];
+            for (int k = 0; k < source.Length; k++)
+                chars[k] = (mask[k] || source[k] == '\n') ? source[k] : ' ';
+            return new string(chars);
         }
 
         /// <summary>Every whole-identifier occurrence of <paramref name="symbol"/> in a code region, with line/column.</summary>

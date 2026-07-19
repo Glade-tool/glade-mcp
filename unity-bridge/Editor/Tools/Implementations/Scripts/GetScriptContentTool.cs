@@ -15,6 +15,31 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Scripts
 
             string scriptPath = args["scriptPath"]?.ToString() ?? "";
 
+            // Outline mode: return just the file's structure (types + methods + properties
+            // with line numbers) instead of its content, so the agent can navigate a large
+            // C# file and then read only the relevant lines via startLine/endLine.
+            if (ToolUtils.GetBoolArg(args, "outline", false))
+            {
+                if (!scriptPath.EndsWith(".cs", System.StringComparison.OrdinalIgnoreCase))
+                    return ToolUtils.CreateErrorResponse("outline mode is only available for C# (.cs) scripts.");
+                if (!UnityContextGatherer.TryGetScriptContent(scriptPath, out var full, out var outlineError))
+                    return ToolUtils.CreateErrorResponse(outlineError ?? "Failed to read script");
+
+                var symbols = CSharpOutline.Extract(full);
+                int lineCount = full.Split('\n').Length;
+                var outlineExtras = new Dictionary<string, object>
+                {
+                    { "scriptPath", scriptPath },
+                    { "outline", symbols },
+                    { "symbolCount", symbols.Count },
+                    { "totalLines", lineCount }
+                };
+                return ToolUtils.CreateSuccessResponse(
+                    $"Outline of {scriptPath}: {symbols.Count} symbol(s) across {lineCount} lines. "
+                    + "Read a specific member with startLine/endLine.",
+                    outlineExtras);
+            }
+
             // Optional 1-based inclusive line range. When either bound is present the tool returns
             // just that slice (plus totalLines) so the agent can pull one method out of a large
             // file instead of loading thousands of lines into context. Absent both, behaviour is

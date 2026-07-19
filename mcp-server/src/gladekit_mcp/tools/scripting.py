@@ -716,13 +716,17 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "get_script_content",
-            "description": "Read a text-based asset file by path (e.g., 'Assets/Scripts/PlayerMovement.cs', 'Assets/Shaders/MyShader.shader'). Supports .cs (C# scripts), .shader (HLSL/CG shaders), .compute (compute shaders), .hlsl, .cginc, and other text-based Unity assets. Reads the WHOLE file by default. For a LARGE file, pass startLine/endLine to read just the range you need instead of loading thousands of lines into context — the response always includes totalLines so you know how much you didn't read. Use this when the user asks to fix or update a specific script or shader.",
+            "description": "Read a text-based asset file by path (e.g., 'Assets/Scripts/PlayerMovement.cs', 'Assets/Shaders/MyShader.shader'). Supports .cs (C# scripts), .shader (HLSL/CG shaders), .compute (compute shaders), .hlsl, .cginc, and other text-based Unity assets. Reads the WHOLE file by default. For a LARGE C# file, prefer outline=true FIRST to get its structure (types + methods + properties with line numbers) cheaply, then pass startLine/endLine to read only the member you need instead of loading thousands of lines into context — the response always includes totalLines so you know how much you didn't read. Use this when the user asks to fix or update a specific script or shader.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "scriptPath": {
                         "type": "string",
                         "description": "Path to the file with extension (relative to Assets, e.g., 'Scripts/MyScript.cs' or 'Shaders/MyShader.shader').",
+                    },
+                    "outline": {
+                        "type": "boolean",
+                        "description": "C# only. When true, return the file's STRUCTURE — an ordered list of {kind, name, line, signature} for each type and its methods/properties — instead of the content. The cheap way to map a large file before reading it: get the outline, then request the target member's lines via startLine/endLine. Ignored for non-.cs files.",
                     },
                     "startLine": {
                         "type": "integer",

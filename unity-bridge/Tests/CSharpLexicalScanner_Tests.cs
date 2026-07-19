@@ -190,5 +190,34 @@ namespace GladeAgenticAI.Tests
             Assert.AreEqual(0, Count("Player", ""));
             Assert.AreEqual(0, Count("Player", null));
         }
+
+        // ── BlankNonCode ─────────────────────────────────────────────────────
+
+        [Test]
+        public void BlankNonCode_SpacesOutStringsAndComments_KeepsCode()
+        {
+            string src = "int x = 5; // set Player\nvar s = \"Player\";";
+            string blanked = CSharpLexicalScanner.BlankNonCode(src);
+            Assert.AreEqual(src.Length, blanked.Length);        // length preserved
+            Assert.IsTrue(blanked.Contains("int x = 5;"));       // code kept
+            Assert.IsFalse(blanked.Contains("Player"));          // comment + string blanked
+            Assert.IsTrue(blanked.Contains("\n"));               // newline preserved
+            Assert.IsTrue(blanked.Contains("var s ="));          // code before the string kept
+        }
+
+        [Test]
+        public void BlankNonCode_KeepsInterpolationHoleIdentifiers()
+        {
+            string blanked = CSharpLexicalScanner.BlankNonCode("var s = $\"hi {name}\";");
+            Assert.IsTrue(blanked.Contains("name"));   // hole identifier is code
+            Assert.IsFalse(blanked.Contains("hi"));    // literal text blanked
+        }
+
+        [Test]
+        public void BlankNonCode_EmptyIsSafe()
+        {
+            Assert.AreEqual("", CSharpLexicalScanner.BlankNonCode(""));
+            Assert.AreEqual("", CSharpLexicalScanner.BlankNonCode(null));
+        }
     }
 }
