@@ -84,6 +84,7 @@ namespace GladeAgenticAI.Services
             Register(new CreateParallaxLayerTool());
             Register(new CreateSaveSystemTool());
             Register(new ModifyScriptTool());
+            Register(new RenameSymbolTool());
 
             // Tilemap (2D levels)
             Register(new Tilemap2D.CreateTilemapTool());

@@ -547,17 +547,11 @@ namespace GladeAgenticAI.Services
             if (string.IsNullOrEmpty(symbol))
                 return results;
 
-            // Identifier-boundary match: C# identifiers are [A-Za-z0-9_]. Escape the symbol so
-            // a caller passing a value with regex metacharacters can't break or widen the match.
-            Regex pattern;
-            try
-            {
-                pattern = new Regex(@"(?<![A-Za-z0-9_])" + Regex.Escape(symbol) + @"(?![A-Za-z0-9_])");
-            }
-            catch
-            {
+            // Only genuine C# identifiers can be referenced — a symbol with a space,
+            // dot, or operator character never matches a code identifier, so reject it
+            // early rather than scanning every file for something that can't occur.
+            if (!CSharpLexicalScanner.IsValidIdentifier(symbol))
                 return results;
-            }
 
             try
             {
@@ -578,7 +572,10 @@ namespace GladeAgenticAI.Services
                     try { content = File.ReadAllText(fullPath); }
                     catch { continue; }
 
-                    int fileMatchCount = pattern.Matches(content).Count;
+                    // Whole-identifier match in CODE regions only — never inside a
+                    // string literal or comment (the false-positive class the old
+                    // regex-over-file-content could not avoid).
+                    int fileMatchCount = CSharpLexicalScanner.CountOccurrences(content, symbol);
                     if (fileMatchCount == 0)
                         continue;
 
@@ -592,17 +589,20 @@ namespace GladeAgenticAI.Services
 
                     var matches = new List<Dictionary<string, object>>();
                     string[] lines = content.Split('\n');
-                    for (int li = 0; li < lines.Length && matches.Count < maxMatchesPerFile; li++)
+                    int lastLine = -1;
+                    foreach (var occ in CSharpLexicalScanner.FindOccurrences(content, symbol))
                     {
-                        string line = lines[li].TrimEnd('\r');
-                        if (!pattern.IsMatch(line))
-                            continue;
-                        string text = line.Trim();
+                        if (matches.Count >= maxMatchesPerFile)
+                            break;
+                        if (occ.Line == lastLine)
+                            continue; // one entry per matching line, mirroring the previous contract
+                        lastLine = occ.Line;
+                        string text = occ.Line - 1 < lines.Length ? lines[occ.Line - 1].Trim() : "";
                         if (text.Length > 200)
                             text = text.Substring(0, 200);
                         matches.Add(new Dictionary<string, object>
                         {
-                            { "line", li + 1 },
+                            { "line", occ.Line },
                             { "text", text }
                         });
                     }

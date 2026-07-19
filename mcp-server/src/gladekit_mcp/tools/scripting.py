@@ -783,7 +783,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "find_references",
-            "description": "Find every script that references a symbol (a class, method, or field name), with per-file line context. Matches whole identifiers only (so 'Player' does NOT match 'PlayerController'), unlike the raw substring search_scripts. ALWAYS call this BEFORE renaming, changing the signature of, or refactoring a public class/method/field — it reveals the dependent scripts a change would break so you can update them too. Returns files ordered by reference count (heaviest dependents first). totalFileCount / totalMatches report the TRUE project-wide blast radius even when line detail is capped at maxFiles, and truncated=true means more files reference the symbol than were returned — raise maxFiles (or update the returned files first, then re-run) so you don't refactor against a partial picture.",
+            "description": "Find every script that references a symbol (a class, method, or field name), with per-file line context. Matches whole identifiers only in CODE — 'Player' does NOT match 'PlayerController', and matches inside string literals ('\"Player\"') or comments ('// Player') are ignored, unlike the raw substring search_scripts. ALWAYS call this BEFORE renaming, changing the signature of, or refactoring a public class/method/field — it reveals the dependent scripts a change would break so you can update them too (or use rename_symbol to update them all at once). Returns files ordered by reference count (heaviest dependents first). totalFileCount / totalMatches report the TRUE project-wide blast radius even when line detail is capped at maxFiles, and truncated=true means more files reference the symbol than were returned — raise maxFiles (or update the returned files first, then re-run) so you don't refactor against a partial picture.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -801,6 +801,39 @@ TOOLS: List[Dict] = [
                     },
                 },
                 "required": ["symbol"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rename_symbol",
+            "description": "Rename a C# identifier (class, method, field, property, local, etc.) across every non-Editor project script in one operation. Rewrites ONLY whole-identifier occurrences in CODE — never inside string literals or comments, and never a substring (renaming 'Player' leaves 'PlayerController' untouched) — so it is safe where a plain find-and-replace is not. WORKFLOW: for anything but a trivially-unique name, call with dryRun=true FIRST to see the blast radius (which files, how many occurrences), then call again with dryRun=false to apply. This is a LEXICAL rename: it does NOT distinguish two DIFFERENT symbols that happen to share a name (that needs full type analysis), so scope an ambiguous rename with 'directory' or verify the dry-run list first. Apply is refused if it would touch more than maxFiles files (a partial rename would break compilation) — narrow the scope or raise the cap. Revert a cross-file rename via version control if needed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "oldName": {
+                        "type": "string",
+                        "description": "The existing identifier to rename (e.g. 'PlayerController', 'maxHealth'). Must be a valid C# identifier.",
+                    },
+                    "newName": {
+                        "type": "string",
+                        "description": "The new identifier. Must be a valid C# identifier and not a reserved C# keyword.",
+                    },
+                    "dryRun": {
+                        "type": "boolean",
+                        "description": "When true, report the files and occurrence counts that WOULD change without modifying anything. Default false. Strongly prefer a dry run first on any non-trivial or ambiguous rename.",
+                    },
+                    "directory": {
+                        "type": "string",
+                        "description": "Optional Assets-relative folder to scope the rename to (e.g. 'Scripts/Enemy'). Default: entire project (Editor and Packages folders are always excluded). Use to disambiguate a common name.",
+                    },
+                    "maxFiles": {
+                        "type": "integer",
+                        "description": "Safety cap on how many files an APPLY may modify (default 200). If the rename would exceed it, apply is refused with the full count so you can narrow scope or raise the cap. Ignored when dryRun=true.",
+                    },
+                },
+                "required": ["oldName", "newName"],
             },
         },
     },
