@@ -442,6 +442,26 @@ async def _diagnose_godot_timeout(bridge_url: str, tool_timeout: float) -> str:
     )
 
 
+def _read_godot_bridge_token(bridge_url: str) -> str:
+    """Read the Godot bridge's per-session auth token from
+    ``<home>/.gladekit/godot-bridge-<port>.token`` (published by the bridge — see
+    bridge_auth.gd). Read fresh on each call so a bridge restart that rotates the
+    token is picked up without restarting the server. Returns "" when absent: an
+    older bridge without auth ignores the extra field, so sending it is always safe.
+    """
+    try:
+        hostport = bridge_url.split("://", 1)[-1].split("/", 1)[0]
+        port = int(hostport.rsplit(":", 1)[-1]) if ":" in hostport else 8766
+    except (ValueError, IndexError):
+        port = 8766
+    try:
+        path = os.path.join(os.path.expanduser("~"), ".gladekit", f"godot-bridge-{port}.token")
+        with open(path, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
 async def _godot_call(bridge_url: str, payload: dict, *, timeout: float) -> dict:
     """One-shot request/response over a fresh WebSocket connection.
 
@@ -463,6 +483,9 @@ async def _godot_call(bridge_url: str, payload: dict, *, timeout: float) -> dict
 
     request_id = uuid.uuid4().hex
     envelope = {"id": request_id, **payload}
+    token = _read_godot_bridge_token(bridge_url)
+    if token and "token" not in envelope:
+        envelope["token"] = token
     try:
         async with asyncio.timeout(timeout):
             async with websockets.connect(bridge_url) as ws:

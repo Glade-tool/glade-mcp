@@ -102,11 +102,18 @@ const BackupManager     = preload("res://addons/com.gladekit.mcp-bridge/services
 const SessionTracker    = preload("res://addons/com.gladekit.mcp-bridge/bridge/session_tracker.gd")
 const RuntimeLogStream  = preload("res://addons/com.gladekit.mcp-bridge/services/runtime_log_stream.gd")
 const PlaySessionManager = preload("res://addons/com.gladekit.mcp-bridge/services/play_session_manager.gd")
+const BridgeAuth        = preload("res://addons/com.gladekit.mcp-bridge/services/bridge_auth.gd")
 
 # ── Bridge state ─────────────────────────────────────────────────────────
 # Populated once in start() from plugin.cfg, then read-only for the rest of
 # the bridge's lifetime — safe to read from the worker thread without a mutex.
 var VERSION: String = "unknown"
+
+# Per-session auth token. Generated + published to a local file in start() before
+# the worker thread spawns, then read-only — safe to read from the worker thread
+# without a mutex (same contract as VERSION). Empty string means auth is disabled
+# (opt-out env set, or token file could not be written → fail open).
+var _bridge_token: String = ""
 
 var _tcp_server: TCPServer = null
 var _peers: Array[WebSocketPeer] = []  # thread-owned after start()
@@ -166,6 +173,24 @@ func start() -> void:
 	_project_name = str(ProjectSettings.get_setting("application/config/name", ""))
 	_project_path = ProjectSettings.globalize_path("res://").trim_suffix("/")
 	_port = _resolve_port()
+
+	# Per-session token auth. Generate a token and publish it to a local file
+	# only the current OS user can read (BridgeAuth); every request except
+	# `health` must echo it. This is the only defense available against a browser
+	# drive-by, since Godot 4 can't inspect the WS handshake. Opt out with
+	# GLADEKIT_GODOT_NO_AUTH=1. Runs before the worker thread spawns so
+	# `_bridge_token` is set before any request is handled.
+	if BridgeAuth.is_auth_disabled():
+		push_warning("[GladeKit MCP Bridge] token auth DISABLED via %s — any local web page can drive this bridge." % BridgeAuth.ENV_OPT_OUT)
+	else:
+		_bridge_token = BridgeAuth.generate_token()
+		var tok_path := BridgeAuth.write_token(_port, _bridge_token)
+		if tok_path == "":
+			# Fail open: a bridge that can't publish a token must not refuse every
+			# client. Logged loudly; the operator can investigate the home dir.
+			_bridge_token = ""
+			push_warning("[GladeKit MCP Bridge] could not write the auth token file; auth is DISABLED (fail-open). Clients will connect unauthenticated.")
+
 	_registry = ToolRegistry.new()
 	_tcp_server = TCPServer.new()
 	var err := _tcp_server.listen(_port, BIND_ADDRESS)
@@ -1106,6 +1131,16 @@ func _thread_handle_packet(peer: WebSocketPeer, packet_text: String) -> void:
 	var endpoint := str(request.get("endpoint", ""))
 	if endpoint.is_empty():
 		_enqueue_send(peer, _make_error(request_id, "Missing 'endpoint' field"))
+		return
+	if not BridgeAuth.is_request_authorized(endpoint, request, _bridge_token):
+		_enqueue_send(peer, _make_error(
+			request_id,
+			(
+				"Unauthorized: missing or invalid bridge token. Read the per-session "
+				+ "token from %s and send it as the \"token\" field on every request, "
+				+ "or set %s=1 to disable auth."
+			) % [BridgeAuth.token_path(_port), BridgeAuth.ENV_OPT_OUT]
+		))
 		return
 	match endpoint:
 		"health":
