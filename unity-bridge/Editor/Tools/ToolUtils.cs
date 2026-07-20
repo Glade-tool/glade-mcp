@@ -1156,6 +1156,57 @@ namespace GladeAgenticAI.Core.Tools
         }
 
         /// <summary>
+        /// Absolute path to the Unity project root — the parent of the "Assets"
+        /// folder (Application.dataPath is "&lt;project&gt;/Assets"). Unity's process
+        /// working directory equals this at runtime.
+        /// </summary>
+        public static string GetProjectRoot()
+        {
+            return Path.GetDirectoryName(Application.dataPath.Replace('\\', '/'));
+        }
+
+        /// <summary>
+        /// True only when <paramref name="path"/> resolves to a location INSIDE the
+        /// project root. Unlike <see cref="IsAssetPathSafe"/> — which only rejects
+        /// literal ".." segments — this also rejects ABSOLUTE paths that escape the
+        /// project (e.g. "/etc/passwd", "C:\\Windows\\..."), so it is the correct
+        /// guard for the raw File.Copy / File.Delete endpoints that act on
+        /// wire-supplied paths. A relative path is resolved against Unity's working
+        /// directory, which is the project root; ".." is collapsed by GetFullPath.
+        /// </summary>
+        public static bool IsPathInsideProject(string path)
+        {
+            return IsPathInsideRoot(path, GetProjectRoot());
+        }
+
+        /// <summary>
+        /// Testable core of <see cref="IsPathInsideProject"/> with the root injected.
+        /// A relative <paramref name="path"/> is resolved against
+        /// <paramref name="projectRoot"/> (not the process CWD), and an absolute path
+        /// is taken as-is; either way ".." is collapsed before the containment check.
+        /// A sibling like "/proj-evil" is rejected against root "/proj" by the
+        /// separator boundary, so a prefix match alone never passes.
+        /// </summary>
+        public static bool IsPathInsideRoot(string path, string projectRoot)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(projectRoot))
+                return false;
+            try
+            {
+                string root = Path.GetFullPath(projectRoot).TrimEnd('/', '\\');
+                string full = Path.GetFullPath(path, root);
+                if (full.Equals(root, System.StringComparison.OrdinalIgnoreCase))
+                    return true;
+                return full.StartsWith(root + Path.DirectorySeparatorChar, System.StringComparison.OrdinalIgnoreCase)
+                    || full.StartsWith(root + Path.AltDirectorySeparatorChar, System.StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Convenience overload of NormalizeAssetPath that returns just the resolved path
         /// without the actualPath out-param. Use when callers don't need to differentiate
         /// "exact match" from "case-corrected match".

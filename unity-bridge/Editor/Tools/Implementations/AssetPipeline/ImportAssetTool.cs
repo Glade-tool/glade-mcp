@@ -123,6 +123,8 @@ namespace GladeAgenticAI.Core.Tools.Implementations.AssetPipeline
             targetPath = NormalizeTargetPath(targetPath);
             if (!targetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
                 return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse("targetPath must start with 'Assets/'"));
+            if (!ToolUtils.IsAssetPathSafe(targetPath))
+                return ImportAssetHandle.Failed(ToolUtils.CreateErrorResponse("targetPath must not contain directory traversal ('..')."));
 
             // ── Client-resolved fields ───────────────────────────────────────
             // The caller (an MCP client or other orchestrator) populates these

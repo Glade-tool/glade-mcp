@@ -40,7 +40,8 @@ namespace GladeAgenticAI.Services
         {
             "assetPath", "prefabPath", "scenePath", "materialPath", "controllerPath", "clipPath",
             "sourcePath", "destinationPath", "scriptPath", "texturePath", "skyboxMaterial", "profilePath",
-            "avatarMaskPath", "maskPath", "meshPath", "dataPath", "terrainDataPath", "spritePath", "folderPath"
+            "avatarMaskPath", "maskPath", "meshPath", "dataPath", "terrainDataPath", "spritePath", "folderPath",
+            "targetPath"
         };
 
         /// <summary>
@@ -117,11 +118,12 @@ namespace GladeAgenticAI.Services
         /// for the sync path).
         ///
         /// <para>
-        /// Demo-path rejection and arg parsing happen here exactly as in
-        /// <see cref="ExecuteTool"/> — when a demo path is blocked, the
+        /// The full security gate runs here exactly as in <see cref="ExecuteTool"/> —
+        /// directory-traversal rejection AND demo-path rejection — so an async tool
+        /// never sees a "../" or otherwise escaping path. When a call is blocked the
         /// returned result has <c>Handle</c> = null and <c>ImmediateResult</c>
-        /// populated with the same error envelope sync callers would see.
-        /// This keeps the security gate in one place.
+        /// populated with the same error envelope sync callers would see. This keeps
+        /// the security gate in one place across the sync and async dispatch paths.
         /// </para>
         /// </summary>
         public static AsyncBeginResult TryBeginAsync(string toolName, string argumentsJson)
@@ -133,6 +135,8 @@ namespace GladeAgenticAI.Services
             try
             {
                 var args = ToolUtils.ParseJsonToDict(argumentsJson);
+                var traversalErr = RejectIfAnyArgPathEscapesProject(args);
+                if (traversalErr != null) return new AsyncBeginResult { ImmediateResult = traversalErr };
                 var demoErr = RejectIfAnyArgPathIsDemoDisallowed(args);
                 if (demoErr != null) return new AsyncBeginResult { ImmediateResult = demoErr };
 

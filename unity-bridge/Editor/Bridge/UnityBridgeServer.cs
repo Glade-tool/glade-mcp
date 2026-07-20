@@ -1347,7 +1347,18 @@ namespace GladeAgenticAI.Bridge
                 {
                     filePath = "Assets/" + filePath;
                 }
-                
+
+                if (!ToolUtils.IsPathInsideProject(filePath))
+                {
+                    SendJson(context.Response, new FileBackupResponse
+                    {
+                        success = false,
+                        backupPath = "",
+                        error = "filePath escapes the project root"
+                    });
+                    return;
+                }
+
                 if (!File.Exists(filePath))
                 {
                     var errorResponse = new FileBackupResponse
@@ -1546,6 +1557,12 @@ namespace GladeAgenticAI.Bridge
                             // Delete created file
                             // Normalize path (Unity uses forward slashes)
                             string normalizedPath = change.filePath.Replace('\\', '/');
+
+                            if (!ToolUtils.IsPathInsideProject(normalizedPath))
+                            {
+                                Debug.LogWarning($"[TurnRevert] Refusing to delete path outside project root: {normalizedPath}");
+                                continue;
+                            }
                             
                             if (File.Exists(normalizedPath))
                             {
@@ -1576,6 +1593,12 @@ namespace GladeAgenticAI.Bridge
                             // Restore from backup
                             if (!string.IsNullOrEmpty(change.backupPath) && File.Exists(change.backupPath))
                             {
+                                if (!ToolUtils.IsPathInsideProject(change.filePath)
+                                    || !ToolUtils.IsPathInsideProject(change.backupPath))
+                                {
+                                    Debug.LogWarning($"[TurnRevert] Refusing to restore path outside project root: {change.filePath}");
+                                    continue;
+                                }
                                 string dir = Path.GetDirectoryName(change.filePath);
                                 if (!Directory.Exists(dir))
                                 {

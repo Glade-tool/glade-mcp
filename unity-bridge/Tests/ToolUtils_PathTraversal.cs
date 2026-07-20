@@ -1,3 +1,4 @@
+using System.IO;
 using NUnit.Framework;
 using GladeAgenticAI.Core.Tools;
 
@@ -55,6 +56,66 @@ namespace GladeAgenticAI.Tests
         {
             // Windows clients may send backslashes.
             Assert.IsFalse(ToolUtils.IsAssetPathSafe("Assets\\..\\..\\evil.cs"));
+        }
+
+        // ── IsPathInsideRoot: containment guard for the raw File.Copy/File.Delete
+        // endpoints (turn/revert, file/backup). Unlike IsAssetPathSafe it also
+        // rejects ABSOLUTE escapes that carry no ".." segment, and rejects a
+        // sibling dir that merely shares the root's name prefix. Root is injected
+        // so the logic is testable without a live Unity project. ──
+
+        // A synthetic absolute root that need not exist on disk — GetFullPath
+        // resolves it without requiring the directory to be present.
+        private static readonly string Root = Path.GetFullPath("GladeSecTestRoot");
+
+        [Test]
+        public void InsideRoot_AllowsRelativeUnderRoot()
+        {
+            Assert.IsTrue(ToolUtils.IsPathInsideRoot("Assets/Scripts/Player.cs", Root));
+            Assert.IsTrue(ToolUtils.IsPathInsideRoot(".gladekit-backups/turn1/files/x.cs", Root));
+        }
+
+        [Test]
+        public void InsideRoot_AllowsAbsoluteUnderRoot()
+        {
+            Assert.IsTrue(ToolUtils.IsPathInsideRoot(Path.Combine(Root, "Assets", "x.cs"), Root));
+        }
+
+        [Test]
+        public void InsideRoot_AllowsExactRoot()
+        {
+            Assert.IsTrue(ToolUtils.IsPathInsideRoot(Root, Root));
+        }
+
+        [Test]
+        public void InsideRoot_RejectsTraversalEscape()
+        {
+            Assert.IsFalse(ToolUtils.IsPathInsideRoot("Assets/../../evil.cs", Root));
+        }
+
+        [Test]
+        public void InsideRoot_RejectsAbsoluteEscapeWithoutDotDot()
+        {
+            // The turn/revert exploit: an absolute path with no ".." segment —
+            // IsAssetPathSafe would pass it; IsPathInsideRoot must reject it.
+            Assert.IsFalse(ToolUtils.IsPathInsideRoot("/etc/passwd", Root));
+        }
+
+        [Test]
+        public void InsideRoot_RejectsSiblingSharingNamePrefix()
+        {
+            // "/x/GladeSecTestRoot-evil" must NOT count as inside "/x/GladeSecTestRoot":
+            // the separator-boundary check defeats a bare StartsWith.
+            Assert.IsFalse(ToolUtils.IsPathInsideRoot(Root + "-evil/x.cs", Root));
+        }
+
+        [Test]
+        public void InsideRoot_RejectsNullOrEmptyInputs()
+        {
+            Assert.IsFalse(ToolUtils.IsPathInsideRoot(null, Root));
+            Assert.IsFalse(ToolUtils.IsPathInsideRoot("", Root));
+            Assert.IsFalse(ToolUtils.IsPathInsideRoot("Assets/x.cs", null));
+            Assert.IsFalse(ToolUtils.IsPathInsideRoot("Assets/x.cs", ""));
         }
     }
 }
