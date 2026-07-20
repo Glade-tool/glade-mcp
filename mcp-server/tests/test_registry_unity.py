@@ -29,11 +29,11 @@ import pytest
 
 from gladekit_mcp.tools import get_unity_tool_schemas
 
-# Bridge-registered but deliberately absent from the agent schemas. The
-# playability probe enters Play mode and is driven by automation directly
-# through the bridge HTTP API — it is never offered to the model (see the
-# comment in unity-bridge/Editor/Tools/Registrars/RuntimeAndDiagnosticsTools.cs).
-_HARNESS_ONLY_TOOLS = {"start_playability_probe", "get_playability_probe_result"}
+# Bridge-registered but deliberately absent from the agent schemas. Empty now
+# that the playability probe is offered to the model (the boot-only mode backs
+# the Unity play-verify gate). Keep the set + guard: it pins each exemption to
+# a real one-sided state, so future harness-only tools are documented here.
+_HARNESS_ONLY_TOOLS: set = set()
 
 # Schema-described but with no C# implementation — legitimate "orphan
 # schemas", exempt from the orphan check:

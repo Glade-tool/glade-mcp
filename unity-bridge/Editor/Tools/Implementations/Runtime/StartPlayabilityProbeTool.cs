@@ -18,15 +18,27 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
     /// triggers a domain reload that wipes static state mid-run. State lives in
     /// <see cref="PlayabilityProbeStore"/> (SessionState — survives the reload).
     ///
-    /// Eval/automation tool: it hijacks the editor into Play mode, so it is
-    /// deliberately NOT exposed in the agent tool schema. Only the eval harness
-    /// calls it, directly via /api/tools/execute (the same path reset_eval_state
-    /// uses).
+    /// This enters Play mode, which is modal, so it is used narrowly: the eval
+    /// harness calls the movement mode directly via /api/tools/execute, and the
+    /// play-verify gate uses the boot-only mode to confirm a gameplay change
+    /// runs without throwing before reporting completion.
+    ///
+    /// Two modes:
+    ///   - movement (default): finds the target, holds forward, presses jump,
+    ///     and reports movement metrics (straightness, pathLength, jumpDy)
+    ///     alongside `threw`. Used by the eval harness.
+    ///   - boot-only (<c>bootOnly:true</c>): does NOT look for a target or drive
+    ///     input. It just enters Play, lets the scene run for <c>holdSeconds</c>,
+    ///     and reports whether anything was logged as an error (<c>threw</c> +
+    ///     the captured <c>errors</c> lines). This is the runtime-correctness
+    ///     check for an arbitrary gameplay change, where "did the player walk
+    ///     forward" is meaningless but "did Start/Update throw" is the point.
     ///
     /// Args (all optional):
+    ///   bootOnly        bool    boot-and-watch, no target/input (default false)
     ///   targetName      string  player GameObject to measure   (default "Player")
-    ///   holdSeconds     float   seconds to hold forward         (default 5)
-    ///   jumpAtSeconds   float   when to press jump              (default 2)
+    ///   holdSeconds     float   seconds to run before sampling  (default 5)
+    ///   jumpAtSeconds   float   when to press jump (movement)   (default 2)
     ///   watchdogSeconds float   hard cap before forced exit     (default 8)
     /// </summary>
     public class StartPlayabilityProbeTool : ITool
@@ -49,6 +61,9 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
                     ["pathLength"] = null,
                     ["jumpDy"] = null,
                     ["threw"] = false,
+                    // Shape parity with the boot-only success envelope so a
+                    // caller can read result["errors"] unconditionally.
+                    ["errors"] = new List<string>(),
                 });
             PlayabilityProbeStore.SetResult(naEnvelope);
             return ToolUtils.CreateSuccessResponse(
@@ -61,12 +76,16 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
                     "Cannot start playability probe: editor is already in (or entering) Play mode");
             }
 
+            bool bootOnly = ToolUtils.GetBoolArg(args, "bootOnly", false);
             var probeParams = new Dictionary<string, object>
             {
+                ["bootOnly"] = bootOnly,
                 ["targetName"] = ToolUtils.GetStringArg(args, "targetName", "Player"),
-                ["holdSeconds"] = ToolUtils.GetFloatArg(args, "holdSeconds", 5f),
+                // Boot-only just needs enough frames for Start/Update to run and
+                // throw; a short window keeps the modal Play-mode enter brief.
+                ["holdSeconds"] = ToolUtils.GetFloatArg(args, "holdSeconds", bootOnly ? 3f : 5f),
                 ["jumpAtSeconds"] = ToolUtils.GetFloatArg(args, "jumpAtSeconds", 2f),
-                ["watchdogSeconds"] = ToolUtils.GetFloatArg(args, "watchdogSeconds", 8f),
+                ["watchdogSeconds"] = ToolUtils.GetFloatArg(args, "watchdogSeconds", bootOnly ? 5f : 8f),
             };
 
             PlayabilityProbeStore.Arm(ToolUtils.SerializeDictToJson(probeParams));

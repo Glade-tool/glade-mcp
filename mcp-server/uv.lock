@@ -212,7 +212,7 @@ wheels = [
 
 [[package]]
 name = "gladekit-mcp"
-version = "0.7.17"
+version = "0.7.18"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

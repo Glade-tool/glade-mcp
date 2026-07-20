@@ -106,6 +106,66 @@ TOOLS: List[Dict] = [
     {
         "type": "function",
         "function": {
+            "name": "start_playability_probe",
+            "description": (
+                "Play-test a gameplay change to catch runtime errors before "
+                "finishing. Enters Play mode, runs the current scene for a few "
+                "seconds, and captures anything logged as an Error/Exception "
+                "(e.g. a NullReferenceException in Awake/Start/Update that "
+                "compiled fine but only throws at runtime). Use bootOnly=true "
+                "for a general 'does it run without throwing' check on any "
+                "gameplay script — it does NOT require a Player object or drive "
+                "input. Two-phase: this arms + enters Play and returns "
+                "immediately with status='running'; then poll "
+                "get_playability_probe_result after ~2-3s for the outcome. "
+                "Requires the new Input System; on a legacy-input project it "
+                "returns status='not_applicable' (fall back to "
+                "get_runtime_events to read logged errors instead)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "bootOnly": {
+                        "type": "boolean",
+                        "description": (
+                            "True (recommended for verifying an arbitrary "
+                            "gameplay change): just boot the scene and watch for "
+                            "runtime errors, no target/input. False: also drive "
+                            "a movement controller and report motion metrics."
+                        ),
+                    },
+                    "holdSeconds": {
+                        "type": "number",
+                        "description": "Seconds to let the scene run (default 3 in bootOnly).",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_playability_probe_result",
+            "description": (
+                "Poll for the result of start_playability_probe. Read-only. "
+                "Returns status ('running' | 'done' | 'error' | "
+                "'not_applicable'), threw (bool — did the run log any runtime "
+                "error), and errors (the captured error lines, empty on a clean "
+                "run). Poll again while status='running' (the probe simulates "
+                "for a few seconds). A result with threw=false and no error "
+                "lines is a clean run."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_play_mode_state",
             "description": (
                 "Get Unity Play Mode state. Read-only. Returns isPlaying, "

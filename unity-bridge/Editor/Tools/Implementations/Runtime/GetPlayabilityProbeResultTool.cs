@@ -15,11 +15,10 @@ namespace GladeAgenticAI.Core.Tools.Implementations.Runtime
     ///   - error "no probe armed": nothing was started (defensive — the harness
     ///     always arms before polling).
     ///
-    /// The harness (run_playability_probe) calls this on a poll loop until it
-    /// sees a terminal status or its own deadline elapses.
-    ///
-    /// Eval/automation tool — not exposed in the agent schema (see
-    /// StartPlayabilityProbeTool for why).
+    /// The caller (the eval harness, or the play-verify gate) polls this until
+    /// it sees a terminal status or its own deadline elapses. A boot-only run
+    /// additionally carries an `errors` list of the runtime-error lines logged
+    /// during the run (empty on a clean run).
     /// </summary>
     public class GetPlayabilityProbeResultTool : ITool
     {

@@ -54,6 +54,21 @@ namespace GladeAgenticAI.Services
         private static float _jumpAtSeconds = 2f;
         private static float _watchdogSeconds = 8f;
 
+        // Boot-only: enter Play and watch the log stream for holdSeconds without
+        // finding a target or driving input. The runtime-correctness check for an
+        // arbitrary gameplay change (see StartPlayabilityProbeTool for the two
+        // modes) — reports `threw` + captured error lines, no movement metrics.
+        private static bool _bootOnly;
+        // Runtime-log cursor snapshotted at the START of the play session (before
+        // any Awake/Start runs), so error lines logged DURING this run can be read
+        // back at finish (get_playability_probe_result surfaces them as `errors`).
+        // Snapshotted in SnapshotLogBaseline (BeforeSceneLoad) rather than in
+        // Initialize (first Tick): a NullReference thrown in Awake/Start — the most
+        // important class to catch — fires before the first editor-update tick, so
+        // an Initialize-time snapshot would sit PAST it and silently drop it.
+        private static long _logCursorAtStart;
+        private static bool _logBaselineSnapped;
+
         // Hold Space this long (wall seconds) so the InputSystem samples a frame
         // with Space down and fires wasPressedThisFrame. EditorApplication.update
         // ticks ~1000x/sec, far faster than the input update, so a one-tick press
@@ -67,7 +82,6 @@ namespace GladeAgenticAI.Services
         private static bool _spaceHeld;
         private static bool _jumpDone;
         private static int _jumpStartIndex;
-        private static int _logEventsAtStart;
 
         /// <summary>
         /// Fires once per Play-enter. Starts the editor-update probe only when a
@@ -75,6 +89,28 @@ namespace GladeAgenticAI.Services
         /// fine from the Editor assembly (it's a method, not a component) — the
         /// MonoBehaviour restriction only applies to AddComponent.
         /// </summary>
+        /// <summary>
+        /// Snapshot the runtime-log baseline as early as possible in the play
+        /// session — before scene objects Awake/Start — so an exception thrown in
+        /// those first callbacks is captured, not skipped. Runs on every play-enter
+        /// (RuntimeInitializeOnLoadMethod fires each time); only acts when a probe
+        /// is armed so normal Play sessions are untouched.
+        ///
+        /// Empty ring → baseline -1 (GetEventsSinceCursor is strict-greater-than,
+        /// and a fresh domain-reloaded session starts at cursor 0, so -1 is needed
+        /// to include that first event). Non-empty ring (Domain Reload disabled, so
+        /// prior-session errors persist) → the latest cursor, to exclude them.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void SnapshotLogBaseline()
+        {
+            if (!PlayabilityProbeStore.IsArmed) return;
+            _logCursorAtStart = RuntimeLogStream.CurrentSize == 0
+                ? -1
+                : RuntimeLogStream.LatestCursor();
+            _logBaselineSnapped = true;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoStart()
         {
@@ -101,6 +137,17 @@ namespace GladeAgenticAI.Services
 
             double elapsed = EditorApplication.timeSinceStartup - _startTime;
 
+            // Boot-only: no target, no input — just let the scene run and end the
+            // window. threw + captured error lines are gathered in FinishRun.
+            if (_bootOnly)
+            {
+                if (elapsed >= _holdSeconds || elapsed >= _watchdogSeconds)
+                {
+                    FinishRun();
+                }
+                return;
+            }
+
             // Drive input by CHANGE, not every tick. W is queued once at init
             // and stays held. Space is pressed for a JumpHoldSeconds window so
             // the input update actually samples a Space-down frame (a one-tick
@@ -122,18 +169,38 @@ namespace GladeAgenticAI.Services
 
             if (elapsed >= _holdSeconds || elapsed >= _watchdogSeconds)
             {
-                FinishWithMetrics();
+                FinishRun();
             }
         }
 
         private static void Initialize()
         {
             ParseParams(PlayabilityProbeStore.ReadParams());
-            _logEventsAtStart = RuntimeLogStream.TotalEventsObserved;
+            // The baseline is normally snapshotted in SnapshotLogBaseline
+            // (BeforeSceneLoad). Fall back here only if that hook somehow didn't
+            // run — better a slightly-late baseline than an uninitialized 0 that
+            // would drop the first captured error.
+            if (!_logBaselineSnapped)
+            {
+                _logCursorAtStart = RuntimeLogStream.CurrentSize == 0
+                    ? -1
+                    : RuntimeLogStream.LatestCursor();
+            }
             _samples.Clear();
             _spaceHeld = false;
             _jumpDone = false;
             _jumpStartIndex = -1;
+
+            // Boot-only skips target lookup + input device entirely: it only
+            // watches for runtime errors, so a missing "Player" is not a setup
+            // error here (a spawner/score script has no player to drive).
+            if (_bootOnly)
+            {
+                _target = null;
+                _startTime = EditorApplication.timeSinceStartup;
+                _initialized = true;
+                return;
+            }
 
             var go = GameObject.Find(_targetName);
             if (go == null)
@@ -157,14 +224,50 @@ namespace GladeAgenticAI.Services
             _initialized = true;
         }
 
-        private static void FinishWithMetrics()
+        private static void FinishRun()
         {
-            bool threw = RuntimeLogStream.TotalEventsObserved > _logEventsAtStart;
+            var errorLines = CollectErrorLines();
+            // Derive `threw` from the SAME cursor window as the captured lines,
+            // not from TotalEventsObserved: that counter increments on a lagged
+            // main-thread delayCall and is not cursor-scoped, so a pre-existing
+            // console error whose callback drains after the run's start snapshot
+            // would inflate it and mark a clean run dirty (with no line to show).
+            // CollectErrorLines only sees errors logged strictly after the run
+            // began, so its count is the run-scoped truth.
+            bool threw = errorLines.Count > 0;
+
+            if (_bootOnly)
+            {
+                // No target/input in boot-only, so no movement metrics — the
+                // runtime-error signal is the whole point.
+                Finish("done", null, null, null, null, threw, _samples.Count, errorLines);
+                return;
+            }
+
             float straightness = PlayabilityMetrics.Straightness(_samples);
             float pathLength = PlayabilityMetrics.PlanarPathLength(_samples);
             int jumpIndex = _jumpStartIndex >= 0 ? _jumpStartIndex : 0;
             float jumpDy = PlayabilityMetrics.MaxJumpRise(_samples, jumpIndex);
-            Finish("done", null, straightness, pathLength, jumpDy, threw, _samples.Count);
+            Finish("done", null, straightness, pathLength, jumpDy, threw, _samples.Count, errorLines);
+        }
+
+        /// <summary>
+        /// Read back the runtime-error messages logged since the run started
+        /// (deduped, length-capped). Best-effort: the gate treats `threw` as the
+        /// summary and these as the detail lines it echoes to the model/user.
+        /// </summary>
+        private static List<string> CollectErrorLines()
+        {
+            var lines = new List<string>();
+            var events = RuntimeLogStream.GetEventsSinceCursor(_logCursorAtStart, 20);
+            foreach (var evt in events)
+            {
+                string msg = (evt.Message ?? string.Empty).Trim();
+                if (msg.Length == 0) continue;
+                if (msg.Length > 300) msg = msg.Substring(0, 300);
+                if (!lines.Contains(msg)) lines.Add(msg);
+            }
+            return lines;
         }
 
         private static void Finish(
@@ -174,7 +277,8 @@ namespace GladeAgenticAI.Services
             float? pathLength = null,
             float? jumpDy = null,
             bool threw = false,
-            int samples = 0)
+            int samples = 0,
+            List<string> errorLines = null)
         {
             var extras = new Dictionary<string, object>
             {
@@ -183,6 +287,7 @@ namespace GladeAgenticAI.Services
                 ["pathLength"] = pathLength.HasValue ? (object)pathLength.Value : null,
                 ["jumpDy"] = jumpDy.HasValue ? (object)jumpDy.Value : null,
                 ["threw"] = threw,
+                ["errors"] = errorLines ?? new List<string>(),
                 ["error"] = error,
                 ["sampleCount"] = samples,
             };
@@ -203,6 +308,9 @@ namespace GladeAgenticAI.Services
                 _virtualKeyboard = null;
             }
             _running = false;
+            // Reset so the next armed session re-snapshots its own baseline
+            // (matters when Domain Reload is disabled and statics persist).
+            _logBaselineSnapped = false;
         }
 
         private static void ParseParams(string json)
@@ -213,6 +321,7 @@ namespace GladeAgenticAI.Services
                 var dto = JsonUtility.FromJson<ProbeParams>(json);
                 if (dto != null)
                 {
+                    _bootOnly = dto.bootOnly;
                     if (!string.IsNullOrEmpty(dto.targetName)) _targetName = dto.targetName;
                     if (dto.holdSeconds > 0f) _holdSeconds = dto.holdSeconds;
                     if (dto.jumpAtSeconds > 0f) _jumpAtSeconds = dto.jumpAtSeconds;
@@ -228,6 +337,7 @@ namespace GladeAgenticAI.Services
         [System.Serializable]
         private class ProbeParams
         {
+            public bool bootOnly;
             public string targetName;
             public float holdSeconds;
             public float jumpAtSeconds;

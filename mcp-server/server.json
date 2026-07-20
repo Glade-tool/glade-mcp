@@ -6,12 +6,12 @@
     "url": "https://github.com/Glade-tool/glade-mcp",
     "source": "github"
   },
-  "version": "0.7.17",
+  "version": "0.7.18",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "gladekit-mcp",
-      "version": "0.7.17",
+      "version": "0.7.18",
       "transport": {
         "type": "stdio"
       }
