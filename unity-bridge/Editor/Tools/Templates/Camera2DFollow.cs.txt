@@ -1,0 +1,52 @@
+using UnityEngine;
+
+// A smooth 2D follow camera: tracks the player on X/Y while keeping its own Z
+// (an orthographic camera must stay at its depth or the world clips away).
+// It self-resolves its target — first the 'Player' tag, then a GameObject named
+// 'Player' — so no object-reference wiring is needed, the same convention the
+// 3D FollowCamera uses. Resolution retries every frame until a player exists,
+// which covers the scaffold order where the camera compiles before the player
+// is (re)built.
+public class Camera2DFollow : MonoBehaviour
+{
+    [Tooltip("What to follow. Leave empty to auto-resolve the 'Player' tag (then a 'Player'-named object).")]
+    public Transform target;
+
+    [Tooltip("Seconds the camera takes to catch up. Smaller = snappier.")]
+    public float smoothTime = 0.15f;
+
+    [Tooltip("X/Y offset from the target. Z is ignored — the camera keeps its own depth.")]
+    public Vector2 offset = Vector2.zero;
+
+    private Vector3 velocity;
+
+    // LateUpdate so the camera moves AFTER the player moved this frame —
+    // following in Update produces a one-frame lag jitter.
+    private void LateUpdate()
+    {
+        if (target == null && !TryResolveTarget()) return;
+
+        Vector3 goal = new Vector3(
+            target.position.x + offset.x,
+            target.position.y + offset.y,
+            transform.position.z);
+        transform.position = Vector3.SmoothDamp(transform.position, goal, ref velocity, smoothTime);
+    }
+
+    private bool TryResolveTarget()
+    {
+        GameObject player = null;
+        try { player = GameObject.FindWithTag("Player"); }
+        catch { /* 'Player' tag not defined in this project — fall through to name lookup */ }
+        if (player == null) player = GameObject.Find("Player");
+        if (player == null) return false;
+
+        target = player.transform;
+        // Snap on first acquire so Play never opens with a long pan in from origin.
+        transform.position = new Vector3(
+            target.position.x + offset.x,
+            target.position.y + offset.y,
+            transform.position.z);
+        return true;
+    }
+}

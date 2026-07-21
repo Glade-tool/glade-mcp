@@ -66,6 +66,7 @@ namespace GladeAgenticAI.Services
 
             // Gameplay scaffolders (vetted-template "describe → playable game" layer)
             Register(new CreatePlatformerControllerTool());
+            Register(new CreateTopDownControllerTool());
             Register(new CreateGameManagerTool());
             Register(new CreateCollectibleTool());
             Register(new CreateHazardTool());

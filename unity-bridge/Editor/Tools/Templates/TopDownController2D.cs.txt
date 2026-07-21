@@ -1,0 +1,63 @@
+using UnityEngine;
+using UnityEngine.InputSystem; // project inputSystem is BOTH/NEW (matches PlatformerController2D)
+
+// A top-down 2D character (Zelda-like): 8-direction movement with no gravity,
+// driven by a Rigidbody2D. It completes the vetted 2D controller pair —
+// PlatformerController2D covers side-scrollers; this covers top-down.
+//
+// Velocity is written directly for crisp, arcade-style control. Diagonals are
+// NORMALIZED so moving diagonally isn't ~1.41x faster than moving straight —
+// the classic hand-written top-down bug (unnormalized (1,1) input). Gravity is
+// zeroed in Awake: a top-down world has no "down", and a forgotten gravityScale
+// is the other classic bug (the character slides off-screen on Play).
+[RequireComponent(typeof(Rigidbody2D))]
+public class TopDownController2D : MonoBehaviour
+{
+    // Public so the scaffolder can set it via reflection when it attaches the
+    // component (the deferred-wiring ApplyFields path reaches public fields only —
+    // the same convention PlatformerController2D.moveSpeed follows).
+    [Tooltip("Movement speed in units/second.")]
+    public float moveSpeed = 6f;
+
+    private Rigidbody2D body;
+
+    private void Awake()
+    {
+        body = GetComponent<Rigidbody2D>();
+        // No gravity in a top-down world, and the character should never spin
+        // from a stray collision torque.
+        body.gravityScale = 0f;
+        body.freezeRotation = true;
+    }
+
+    private void Update()
+    {
+        var kb = Keyboard.current;
+
+        // --- 8-direction input (WASD or arrows) ---
+        Vector2 move = Vector2.zero;
+        if (kb != null)
+        {
+            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) move.x += 1f;
+            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) move.x -= 1f;
+            if (kb.wKey.isPressed || kb.upArrowKey.isPressed) move.y += 1f;
+            if (kb.sKey.isPressed || kb.downArrowKey.isPressed) move.y -= 1f;
+        }
+
+        // Normalize so diagonal movement matches cardinal speed.
+        if (move.sqrMagnitude > 1f) move.Normalize();
+
+        SetVelocity(move * moveSpeed);
+    }
+
+    // Rigidbody2D.velocity was renamed to linearVelocity in Unity 6 — guard so the
+    // template compiles clean on both (and never trips the API Updater).
+    private void SetVelocity(Vector2 v)
+    {
+#if UNITY_6000_0_OR_NEWER
+        body.linearVelocity = v;
+#else
+        body.velocity = v;
+#endif
+    }
+}

@@ -53,7 +53,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_third_person_controller",
-            "description": "ALWAYS use this — not create_script — for ANY request that wants a player that (a) moves with WASD/arrow keys AND (b) jumps AND (c) is followed by a camera, INCLUDING when the player is one of several systems being scaffolded in the same turn (e.g. 'build a player + an enemy + collectibles'). Hand-written third-person controllers reliably ship two runtime bugs the playability probe catches automatically: a self-referential camera offset that makes the player walk in circles, and a fragile collision-callback isGrounded that kills the jump. This tool is ATOMIC and does the whole setup for you: it copies two vetted, Play-tested scripts VERBATIM (ThirdPersonController.cs — CharacterController movement + grounded jump, camera-relative input; FollowCamera.cs — modern mouse/right-stick orbit camera), ensures a Player capsule and a Main Camera exist, adds CharacterController to the Player, and attaches ThirdPersonController + FollowCamera automatically as soon as the scripts compile. After it returns, your ONLY remaining step is to call compile_scripts and wait for status='idle' — do NOT call add_component for the controller, the follow camera, or the character controller (the tool already handled all three), and no object-reference wiring is needed (the scripts self-resolve: ThirdPersonController → Camera.main, FollowCamera → the 'Player' tag). For a 2D SIDE-SCROLLING platformer player instead, use create_platformer_controller (a separate vetted template). Use create_script ONLY for other controllers with no template yet (top-down, twin-stick).",
+            "description": "ALWAYS use this — not create_script — for ANY request that wants a player that (a) moves with WASD/arrow keys AND (b) jumps AND (c) is followed by a camera, INCLUDING when the player is one of several systems being scaffolded in the same turn (e.g. 'build a player + an enemy + collectibles'). Hand-written third-person controllers reliably ship two runtime bugs the playability probe catches automatically: a self-referential camera offset that makes the player walk in circles, and a fragile collision-callback isGrounded that kills the jump. This tool is ATOMIC and does the whole setup for you: it copies two vetted, Play-tested scripts VERBATIM (ThirdPersonController.cs — CharacterController movement + grounded jump, camera-relative input; FollowCamera.cs — modern mouse/right-stick orbit camera), ensures a Player capsule and a Main Camera exist, adds CharacterController to the Player, and attaches ThirdPersonController + FollowCamera automatically as soon as the scripts compile. After it returns, your ONLY remaining step is to call compile_scripts and wait for status='idle' — do NOT call add_component for the controller, the follow camera, or the character controller (the tool already handled all three), and no object-reference wiring is needed (the scripts self-resolve: ThirdPersonController → Camera.main, FollowCamera → the 'Player' tag). For a 2D SIDE-SCROLLING platformer player instead, use create_platformer_controller; for a TOP-DOWN 2D player, use create_top_down_controller (both separate vetted templates). Use create_script ONLY for other controllers with no template yet (twin-stick, vehicles).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -82,7 +82,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "create_platformer_controller",
-            "description": "ALWAYS use this — not create_script — for ANY request that wants a 2D SIDE-SCROLLING PLATFORMER player: a character that runs left/right AND jumps under 2D physics (a Mario-style platformer, a 2D jump-and-run). It is the 2D counterpart of create_third_person_controller. Hand-written 2D controllers reliably ship two runtime bugs: a mid-air jump (a collision-normal ground check done wrong) and a character that tips over (Rigidbody2D rotation left unfrozen). This tool is ATOMIC: it copies the vetted PlatformerController2D script VERBATIM (Rigidbody2D run + a grounded jump detected by a feet overlap test), builds a sprite Player with a Rigidbody2D (rotation frozen) + BoxCollider2D, adds an ORTHOGRAPHIC Main Camera, and (optionally) a ground platform, then attaches PlatformerController2D automatically as soon as the script compiles. After it returns your ONLY remaining step is compile_scripts (wait for status='idle') — do NOT call add_component or add the Rigidbody2D/collider yourself. Placeholder sprites are used; the player runs with A/D or arrows and jumps with Space. For the collectible/hazard loop around it, call create_game_manager, create_collectible and create_hazard with dimension='2d'. Use create_third_person_controller instead for a 3D player.",
+            "description": "ALWAYS use this — not create_script — for ANY request that wants a 2D SIDE-SCROLLING PLATFORMER player: a character that runs left/right AND jumps under 2D physics (a Mario-style platformer, a 2D jump-and-run). It is the 2D counterpart of create_third_person_controller. Hand-written 2D controllers reliably ship two runtime bugs: a mid-air jump (a collision-normal ground check done wrong) and a character that tips over (Rigidbody2D rotation left unfrozen). This tool is ATOMIC: it copies the vetted PlatformerController2D script VERBATIM (Rigidbody2D run + a grounded jump detected by a feet overlap test), builds a sprite Player with a Rigidbody2D (rotation frozen) + BoxCollider2D, adds an ORTHOGRAPHIC Main Camera, and (optionally) a ground platform, then attaches PlatformerController2D automatically as soon as the script compiles. After it returns your ONLY remaining step is compile_scripts (wait for status='idle') — do NOT call add_component or add the Rigidbody2D/collider yourself. Placeholder sprites are used; the player runs with A/D or arrows and jumps with Space. For the collectible/hazard loop around it, call create_game_manager, create_collectible and create_hazard with dimension='2d'. Use create_top_down_controller instead for a top-down (no-gravity) 2D player, or create_third_person_controller for a 3D player.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -109,6 +109,39 @@ TOOLS: List[Dict] = [
                     "confirmExistingFileModification": {
                         "type": "boolean",
                         "description": "Set true ONLY when the user explicitly asked to regenerate the controller. The shared PlatformerController2D.cs is REUSED (not clobbered) when present. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_top_down_controller",
+            "description": "ALWAYS use this — not create_script — for ANY request that wants a TOP-DOWN 2D player: a character that moves in 8 directions with no gravity (a Zelda-like adventure, an RPG/farming walkabout, top-down shooter movement). It completes the vetted controller trio (create_third_person_controller = 3D, create_platformer_controller = 2D side-scroller, this = 2D top-down). Hand-written top-down controllers reliably ship two runtime bugs: diagonals ~1.41x faster than straight movement (unnormalized input) and a character that slides off-screen the moment Play starts (gravityScale left at 1). This tool is ATOMIC: it copies the vetted TopDownController2D script VERBATIM (8-direction Rigidbody2D movement, normalized diagonals, zero gravity) plus a Camera2DFollow that tracks the player, builds a sprite Player with a Rigidbody2D (gravity zeroed, rotation frozen) + BoxCollider2D, adds an ORTHOGRAPHIC Main Camera, then attaches both components automatically as soon as the scripts compile. After it returns your ONLY remaining step is compile_scripts (wait for status='idle') — do NOT call add_component or add the Rigidbody2D/collider yourself. Placeholder sprites are used; the player moves with WASD/arrows and the camera follows. For the collectible/hazard loop around it, call create_game_manager, create_collectible and create_hazard with dimension='2d'. Use create_platformer_controller instead for a side-scroller with jumping, or create_third_person_controller for a 3D player.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "Folder (relative to Assets) to write TopDownController2D.cs (and Camera2DFollow.cs) into. Defaults to 'Scripts'. The filenames are fixed (Unity requires the MonoBehaviour class name to match the file name).",
+                    },
+                    "playerName": {
+                        "type": "string",
+                        "description": "Name of the player GameObject. Defaults to 'Player'. If a GameObject with this name (or the 'Player' tag) already exists it is reused (and gets a Rigidbody2D + BoxCollider2D if missing); otherwise a sprite Player is created at (0,0,0) and tagged 'Player'. Errors if the reused object already carries 3D physics (Unity can't mix 2D and 3D physics on one object).",
+                    },
+                    "moveSpeed": {
+                        "type": "number",
+                        "description": "Movement speed in units/second. Defaults to 6.",
+                    },
+                    "followCamera": {
+                        "type": "boolean",
+                        "description": "Also write Camera2DFollow.cs and attach it to the Main Camera so the view tracks the player (a top-down player leaves a static frame in seconds). Defaults to true. Set false only when building a custom camera (e.g. a fixed-room view).",
+                    },
+                    "confirmExistingFileModification": {
+                        "type": "boolean",
+                        "description": "Set true ONLY when the user explicitly asked to regenerate the controller. The shared TopDownController2D.cs / Camera2DFollow.cs are REUSED (not clobbered) when present. Defaults to false.",
                     },
                 },
                 "required": [],
