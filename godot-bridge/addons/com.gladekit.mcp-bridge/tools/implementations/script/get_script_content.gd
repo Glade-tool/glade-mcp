@@ -9,12 +9,24 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #
 # Args:
 #   script_path: String (required) — res:// path.
+#   outline:     bool — true returns the file's STRUCTURE instead of content:
+#                      one { kind, name, line, signature } per declaration
+#                      (class_name, inner class, func, signal, enum, const,
+#                      @export/@onready var), so the agent can map a large
+#                      script and then read only the relevant lines. Pagination
+#                      args are ignored in outline mode. .gd files only.
 #   start_line:  int — 1-indexed start, default 1.
 #   end_line:    int — 1-indexed inclusive end, default 0 = "until EOF
 #                      or max_lines, whichever is smaller".
 #   max_lines:   int — cap on lines returned, default 500, clamped 1..5000.
 #
-# Response payload:
+# Response payload (outline mode):
+#   script_path:  String — normalized res:// path
+#   outline:      Array  — { kind, name, line, signature } per symbol
+#   symbol_count: int    — outline.size()
+#   total_lines:  int    — total lines in the file
+#
+# Response payload (content mode):
 #   script_path:  String — normalized res:// path
 #   content:      String — newline-joined slice
 #   bytes:        int    — byte length of `content`
@@ -24,6 +36,7 @@ extends "res://addons/com.gladekit.mcp-bridge/tools/i_tool.gd"
 #   truncated:    bool   — true if there are unreturned lines past end_line
 
 const ToolUtils = preload("res://addons/com.gladekit.mcp-bridge/bridge/tool_utils.gd")
+const GDScriptOutline = preload("res://addons/com.gladekit.mcp-bridge/services/gdscript_outline.gd")
 
 const DEFAULT_MAX_LINES := 500
 const HARD_CAP_LINES := 5000
@@ -53,6 +66,27 @@ func execute(args: Dictionary) -> Dictionary:
 	# empty line at the end.
 	var all_lines: PackedStringArray = raw.split("\n", true)
 	var total_lines: int = all_lines.size()
+
+	# Outline mode: return just the file's structure (declarations with line
+	# numbers) instead of its content, so the agent can navigate a large script
+	# and then read only the relevant lines via start_line/end_line. Pagination
+	# args are ignored here — an outline is always whole-file (same contract as
+	# the Unity bridge's outline mode).
+	if ToolUtils.parse_bool_arg(args, "outline", false):
+		if not script_path.to_lower().ends_with(".gd"):
+			return ToolUtils.error("outline mode is only available for GDScript (.gd) scripts.")
+		var symbols: Array = GDScriptOutline.extract(raw)
+		return ToolUtils.success(
+			"Outline of %s: %d symbol(s) across %d lines. Read a specific member with start_line/end_line." % [
+				script_path, symbols.size(), total_lines
+			],
+			{
+				"script_path": script_path,
+				"outline": symbols,
+				"symbol_count": symbols.size(),
+				"total_lines": total_lines,
+			}
+		)
 
 	var start_line: int = max(1, ToolUtils.parse_int_arg(args, "start_line", 1))
 	var requested_max: int = ToolUtils.parse_int_arg(args, "max_lines", DEFAULT_MAX_LINES)

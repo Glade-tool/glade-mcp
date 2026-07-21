@@ -128,7 +128,9 @@ TOOLS: List[Dict] = [
                 "return the first 500 lines and echo `total_lines` + `truncated` so you can "
                 "request the next slice via start_line on large files instead of pulling "
                 "the whole file into context. Use before modify_script to see what you're "
-                "about to change."
+                "about to change. Pass outline=true to get the file's STRUCTURE instead of "
+                "content — the cheap way to map a large script, then read only the target "
+                "member's lines."
             ),
             "parameters": {
                 "type": "object",
@@ -136,6 +138,19 @@ TOOLS: List[Dict] = [
                     "script_path": {
                         "type": "string",
                         "description": "res:// path to the .gd file.",
+                    },
+                    "outline": {
+                        "type": "boolean",
+                        "description": (
+                            "When true, return the file's STRUCTURE — an ordered list of "
+                            "{kind, name, line, signature} for each declaration (class_name, "
+                            "inner class, func incl. static, signal, enum, const, "
+                            "@export/@onready var) — instead of the content. Func-body "
+                            "locals are excluded. The cheap way to map a large file before "
+                            "reading it: get the outline, then request the target member's "
+                            "lines via start_line/end_line. Pagination args are ignored in "
+                            "outline mode. .gd files only (errors otherwise)."
+                        ),
                     },
                     "start_line": {
                         "type": "integer",
