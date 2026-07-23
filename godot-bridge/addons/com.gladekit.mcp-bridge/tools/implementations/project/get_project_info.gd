@@ -222,6 +222,11 @@ func _walk_project(counts: Dictionary, listings: Dictionary, detailed: bool) -> 
 						listings["scripts"].append({
 							"path": full,
 							"name": entry.get_basename(),
+							# Last-modified time (Unix epoch seconds) — a freshness
+							# signal so a client can surface recently-edited scripts
+							# first. The Unity bridge exposes the same field as an
+							# ISO-8601 string; consumers handle both forms.
+							"mtime": FileAccess.get_modified_time(full),
 						})
 				"tres", "res":
 					counts["resource"] += 1

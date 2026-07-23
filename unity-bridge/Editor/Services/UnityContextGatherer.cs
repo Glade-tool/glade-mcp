@@ -128,6 +128,7 @@ namespace GladeAgenticAI.Services
         public string name;
         public int lineCount;
         public string content; // Full content if available (server decides what's relevant)
+        public string mtime;   // ISO-8601 (round-trip "o") last-write UTC; freshness signal for retrieval ranking
     }
 
     [Serializable]
@@ -1112,7 +1113,11 @@ namespace GladeAgenticAI.Services
                             path = path,
                             name = name,
                             lineCount = lines.Length,
-                            content = content // Server decides what's relevant
+                            content = content, // Server decides what's relevant
+                            // Freshness signal for retrieval ranking (recently-edited scripts
+                            // rank first on a vague query). fullPath already validated above,
+                            // so this is a free stat — no extra I/O.
+                            mtime = File.GetLastWriteTimeUtc(fullPath).ToString("o")
                         });
                     }
                 }
