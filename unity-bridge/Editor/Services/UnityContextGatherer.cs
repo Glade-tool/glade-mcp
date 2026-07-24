@@ -117,6 +117,7 @@ namespace GladeAgenticAI.Services
         public float fieldOfView;
         public float nearClipPlane;
         public float farClipPlane;
+        public bool orthographic;
         public bool isMainCamera;
         public string parentName;
     }
@@ -1064,6 +1065,7 @@ namespace GladeAgenticAI.Services
                 fieldOfView = cam.fieldOfView,
                 nearClipPlane = cam.nearClipPlane,
                 farClipPlane = cam.farClipPlane,
+                orthographic = cam.orthographic,
                 isMainCamera = cam.CompareTag("MainCamera") || Camera.main == cam,
                 parentName = cam.transform.parent != null ? cam.transform.parent.name : null
             };
