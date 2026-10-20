@@ -1,4 +1,4 @@
-# Glade MCP 
+# GladeKit MCP
 
 Connect Cursor, Claude Code, Windsurf, Claude Desktop, and other AI clients directly to your Unity or Godot editor.
 
@@ -18,7 +18,7 @@ The MCP server auto-detects which editor is running (Unity on `:8765`, Godot on 
 
 ### 1. Install the editor bridge
 
-Glade MCP supports both Unity and Godot. Both bridges live in this repo: [`unity-bridge/`](https://github.com/Glade-tool/glade-mcp/tree/main/unity-bridge) is a UPM package, [`godot-bridge/`](https://github.com/Glade-tool/glade-mcp/tree/main/godot-bridge) wraps the editor addon at `godot-bridge/addons/com.gladekit.mcp-bridge/`. Install the one for your engine.
+GladeKit MCP supports both Unity and Godot. Both bridges live in this repo: [`unity-bridge/`](https://github.com/Glade-tool/glade-mcp/tree/main/unity-bridge) is a UPM package, [`godot-bridge/`](https://github.com/Glade-tool/glade-mcp/tree/main/godot-bridge) wraps the editor addon at `godot-bridge/addons/com.gladekit.mcp-bridge/`. Install the one for your engine.
 
 <details>
 <summary><strong>Unity (2021.3+)</strong></summary>
@@ -244,6 +244,7 @@ Add to `.vscode/mcp.json` in your workspace:
 | Tests                | 269 pytest + 37-case eval on 3 MCP SDK versions, schema↔bridge parity guards, Unity NUnit + Godot GUT suites                             | Unity CI matrix + NL suite                    | None                                                     |
 | License              | MIT                                                                                                                                     | MIT                                           | MIT                                                      |
 
+Verified against the unity-mcp v10.1.2 and godot-mcp 0.1.1 sources on 2026-08-29. godot-mcp is the most-starred Godot server; the closest *active* in-editor alternative, [godot-ai](https://github.com/hi-godot/godot-ai) (46 tools), has screenshots and batch execution but no scaffolders, refactoring, asset pipeline, export, or memory.
 
 All core features are **free and local**. The cloud intelligence layer is optional and requires a `GLADEKIT_API_KEY`.
 

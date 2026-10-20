@@ -116,6 +116,40 @@ func test_parse_vector3_malformed_string_returns_default() -> void:
 	assert_eq(v, d)
 
 
+# ── vector_arg_problem ────────────────────────────────────────────────────
+
+func test_vector_arg_problem_accepts_absent_and_well_formed() -> void:
+	assert_eq(ToolUtils.vector_arg_problem({}, "position", [3]), "")
+	assert_eq(ToolUtils.vector_arg_problem({"position": "0, 3, 0"}, "position", [3]), "")
+	assert_eq(ToolUtils.vector_arg_problem({"position": [0, 3, 0]}, "position", [3]), "")
+	assert_eq(ToolUtils.vector_arg_problem({"position": {"x": 0, "y": 3, "z": 0}}, "position", [3]), "")
+	assert_eq(ToolUtils.vector_arg_problem({"position": Vector3(0, 3, 0)}, "position", [3]), "")
+
+
+func test_vector_arg_problem_rejects_partial_string() -> void:
+	# The gpt-6.1-sol repro: ",3," meant "only set y" and used to no-op.
+	var p := ToolUtils.vector_arg_problem({"position": ",3,"}, "position", [3])
+	assert_string_contains(p, "blank or non-numeric")
+	assert_string_contains(p, "x,y,z")
+
+
+func test_vector_arg_problem_rejects_wrong_component_count_for_3d() -> void:
+	assert_ne(ToolUtils.vector_arg_problem({"position": "1,2"}, "position", [3]), "")
+	assert_ne(ToolUtils.vector_arg_problem({"position": [1, 2]}, "position", [3]), "")
+	assert_ne(ToolUtils.vector_arg_problem({"rotation": "45"}, "rotation", [3]), "")
+
+
+func test_vector_arg_problem_accepts_two_or_three_components_for_2d() -> void:
+	assert_eq(ToolUtils.vector_arg_problem({"position": "100,200"}, "position", [2, 3]), "")
+	assert_eq(ToolUtils.vector_arg_problem({"position": "100,200,0"}, "position", [2, 3]), "")
+	assert_eq(ToolUtils.vector_arg_problem({"position": {"x": 1, "y": 2}}, "position", [2, 3]), "")
+
+
+func test_vector_arg_problem_rejects_dictionary_missing_an_axis() -> void:
+	var p := ToolUtils.vector_arg_problem({"position": {"y": 3}}, "position", [3])
+	assert_string_contains(p, "missing 'x'")
+
+
 # ── serialize_vector3 ─────────────────────────────────────────────────────
 
 func test_serialize_vector3_format() -> void:

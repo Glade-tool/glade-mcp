@@ -159,6 +159,42 @@ static func parse_vector3_arg(args: Dictionary, key: String, default_value: Vect
 	return default_value
 
 
+## Why args[key] can't be applied as a full vector, or "" when it can (or is
+## absent). The parse_vector*_arg helpers fall back to their default on
+## malformed input, which a transform must not do silently: ",3," (a partial
+## "only set y") or a 2-part "x,y" on a Node3D used to leave the node where it
+## was while the tool reported success, and with operation=add it added the
+## node's own position to itself. A dictionary missing an axis would zero it.
+## `sizes` lists the component counts the key accepts: [3] for Node3D, [2, 3]
+## for Node2D (which reads x,y).
+static func vector_arg_problem(args: Dictionary, key: String, sizes: Array) -> String:
+	if not args.has(key) or args[key] == null:
+		return ""
+	var v = args[key]
+	if v is Vector2 or v is Vector2i or v is Vector3 or v is Vector3i:
+		return ""
+	var example: String = "x,y" if sizes.has(2) else "x,y,z"
+	if v is String:
+		var parts: PackedStringArray = (v as String).split(",", true)
+		for p in parts:
+			if not p.strip_edges().is_valid_float():
+				return "%s '%s' has a blank or non-numeric component. Send every component as '%s'; to change one axis, read the current value first." % [key, v, example]
+		if not sizes.has(parts.size()):
+			return "%s '%s' has %d component(s); expected '%s'." % [key, v, parts.size(), example]
+		return ""
+	if v is Array:
+		if not sizes.has((v as Array).size()):
+			return "%s has %d component(s); expected '%s'." % [key, (v as Array).size(), example]
+		return ""
+	if v is Dictionary:
+		var required: Array = ["x", "y"] if sizes.has(2) else ["x", "y", "z"]
+		for axis in required:
+			if not (v as Dictionary).has(axis):
+				return "%s is missing '%s'. Send every component; to change one axis, read the current value first." % [key, axis]
+		return ""
+	return "%s must be a '%s' vector." % [key, example]
+
+
 static func parse_vector2_arg(args: Dictionary, key: String, default_value: Vector2 = Vector2.ZERO) -> Vector2:
 	if not args.has(key):
 		return default_value

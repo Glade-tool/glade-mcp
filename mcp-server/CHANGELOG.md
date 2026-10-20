@@ -7,10 +7,12 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 ### Changed
 
 - **HTTP transport default port is now `8767` (was `8766`).** `8766` is the Godot bridge's port, so `gladekit-mcp --transport http` could not bind while a Godot editor was open. stdio, the default transport, is unaffected. Existing HTTP clients pointing at `http://127.0.0.1:8766/mcp` should update the URL or pass `--port 8766` explicitly.
+- **`start_playability_probe` no longer says to wait 2-3s.** The description now says to call `get_playability_probe_result` right away and again while it reports `status='running'`. There is no tool to wait with, so models took "poll after ~2-3s" literally and filled the gap with unrelated reads.
 - **Meta-tools on Godot.** `batch_execute`, `get_relevant_tools`, `remember_for_session`, and `recall_session_memories` are now exposed in Godot sessions; they were Unity-only. `batch_execute` runs the calls sequentially over the Godot WebSocket bridge and reports per-call results. `get_relevant_tools` groups Godot tools by category with Godot-specific keyword routing, and on the paid tier it is now the way a Godot session reaches the engine-aware knowledge base from an MCP client — the retrieval shipped in 0.7.15 was unreachable there without it. `search_project_scripts` remains Unity-only: the Godot bridge does not yet return script contents in one call.
 
 ### Fixed
 
+- **Godot `set_node_transform` silently ignored some positions.** On a Node2D, the documented `"x,y"` form went through a 3-component parser, so the node stayed where it was while the tool reported success. On any node, a partial vector such as `",3,"` did the same, and with `operation: "add"` it added the node's own position to itself. 2D now reads `x,y` (2 or 3 components), and a malformed or partial position, rotation or scale returns an error saying to send every component.
 - **The Godot release zip now carries the license and third-party NOTICE.** `LICENSE` and `NOTICE` (MIT attribution for the `godot-mcp` UID code) now live inside `addons/com.gladekit.mcp-bridge/`, so the packaged addon ships them; previously they sat outside the zipped folder.
 - **Unity package `changelogUrl` pointed at a 404.** It now points at `mcp-server/CHANGELOG.md`, where this file lives.
 - README refreshed against the code: 275 Unity / 115 Godot tools, ~90 core tools, 9 resources; the Godot bridge source path, Architecture, and Contributing now cover both bridges; the comparison table was re-verified against current competitor sources.

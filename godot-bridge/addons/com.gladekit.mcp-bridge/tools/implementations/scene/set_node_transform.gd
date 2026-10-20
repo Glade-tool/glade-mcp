@@ -54,8 +54,17 @@ func execute(args: Dictionary) -> Dictionary:
 	var operation: String = ToolUtils.parse_string_arg(args, "operation", "set").to_lower()
 
 	if node is Node3D:
+		for key in ["position", "rotation", "scale"]:
+			var problem: String = ToolUtils.vector_arg_problem(args, key, [3])
+			if problem != "":
+				return ToolUtils.error(problem)
 		return _apply_3d(node, args, is_global, operation, node_path)
 	if node is Node2D:
+		# 2D rotation is a scalar, so only position and scale are vectors here.
+		for key in ["position", "scale"]:
+			var problem: String = ToolUtils.vector_arg_problem(args, key, [2, 3])
+			if problem != "":
+				return ToolUtils.error(problem)
 		return _apply_2d(node, args, is_global, operation, node_path)
 	return ToolUtils.error("Node '%s' is %s — transforms only apply to Node3D / Node2D" % [node_path, node.get_class()])
 
@@ -101,8 +110,11 @@ func _apply_2d(n: Node2D, args: Dictionary, is_global: bool, operation: String, 
 	var prev_scale: Vector2 = n.scale
 
 	if args.has("position"):
-		var pv: Vector3 = ToolUtils.parse_vector3_arg(args, "position", Vector3(prev_pos.x, prev_pos.y, 0.0))
-		var combined := _combine_vec(Vector3(prev_pos.x, prev_pos.y, 0.0), pv, operation)
+		# parse_vector2_arg, not parse_vector3_arg: the documented 2D form is
+		# "x,y", which the 3-component parser rejected, silently leaving the
+		# node in place. The 2D parser reads x,y from 2- or 3-part input.
+		var p2: Vector2 = ToolUtils.parse_vector2_arg(args, "position", prev_pos)
+		var combined := _combine_vec(Vector3(prev_pos.x, prev_pos.y, 0.0), Vector3(p2.x, p2.y, 0.0), operation)
 		var next := Vector2(combined.x, combined.y)
 		if is_global:
 			n.global_position = next
@@ -134,8 +146,8 @@ func _apply_2d(n: Node2D, args: Dictionary, is_global: bool, operation: String, 
 			n.rotation_degrees = combined_r
 
 	if args.has("scale"):
-		var sv: Vector3 = ToolUtils.parse_vector3_arg(args, "scale", Vector3(prev_scale.x, prev_scale.y, 1.0))
-		var combined_s := _combine_vec(Vector3(prev_scale.x, prev_scale.y, 1.0), sv, operation)
+		var s2: Vector2 = ToolUtils.parse_vector2_arg(args, "scale", prev_scale)
+		var combined_s := _combine_vec(Vector3(prev_scale.x, prev_scale.y, 1.0), Vector3(s2.x, s2.y, 1.0), operation)
 		n.scale = Vector2(combined_s.x, combined_s.y)
 
 	return ToolUtils.success("Updated transform on '%s' (space=%s, op=%s)" % [node_path, ("global" if is_global else "local"), operation], {
