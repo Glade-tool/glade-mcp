@@ -36,7 +36,7 @@ TOOLS: List[Dict] = [
         "type": "function",
         "function": {
             "name": "instantiate_prefab",
-            "description": "MANDATORY: You MUST verify the prefab exists FIRST using check_asset_exists before calling this tool. If the prefab doesn't exist, create it with create_prefab first. Instantiate a prefab into the scene.",
+            "description": "Instantiate a prefab asset into the scene. Returns an error if no prefab exists at prefabPath; when the prefab is new, create it with create_prefab first.",
             "parameters": {
                 "type": "object",
                 "properties": {
