@@ -5,7 +5,7 @@ scene, node, script, and resource tools so AI assistants can read and modify
 the active project. Designed to be addressed by an MCP server (for use with
 Cursor, Claude Code, Windsurf, and similar) or by the GladeKit desktop app.
 
-**Status:** 115 tools registered across 17 categories (v0.7.13). This directory is a minimal Godot project wrapping the addon (`addons/com.gladekit.mcp-bridge/`) plus its GUT tests; only the addon folder ships in the release zip. Per-version detail lives in the [MCP server CHANGELOG](../mcp-server/CHANGELOG.md).
+**Status:** 115 tools registered across 17 categories (v0.7.14). This directory is a minimal Godot project wrapping the addon (`addons/com.gladekit.mcp-bridge/`) plus its GUT tests; only the addon folder ships in the release zip. Per-version detail lives in the [MCP server CHANGELOG](../mcp-server/CHANGELOG.md).
 
 | Phase | Tools | Cumulative | Status |
 | --- | --- | --- | --- |
@@ -142,7 +142,7 @@ Either way:
 3. Enable **GladeKit MCP Bridge**.
 4. Confirm the bridge is up: the editor Output panel should print
    ```
-   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.7.13, 115 tools registered, thread-polled at 200Hz)
+   [GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.7.14, 115 tools registered, thread-polled at 200Hz)
    ```
 
 The server stops automatically when you disable the plugin or close Godot.

@@ -12,8 +12,8 @@ All notable changes to `gladekit-mcp` are documented here. Format follows [Keep 
 
 ### Fixed
 
-- **Godot `set_node_transform` silently ignored some positions.** On a Node2D, the documented `"x,y"` form went through a 3-component parser, so the node stayed where it was while the tool reported success. On any node, a partial vector such as `",3,"` did the same, and with `operation: "add"` it added the node's own position to itself. 2D now reads `x,y` (2 or 3 components), and a malformed or partial position, rotation or scale returns an error saying to send every component.
-- **The Godot release zip now carries the license and third-party NOTICE.** `LICENSE` and `NOTICE` (MIT attribution for the `godot-mcp` UID code) now live inside `addons/com.gladekit.mcp-bridge/`, so the packaged addon ships them; previously they sat outside the zipped folder.
+- **Godot `set_node_transform` silently ignored some positions (Godot bridge addon v0.7.14).** On a Node2D, the documented `"x,y"` form went through a 3-component parser, so the node stayed where it was while the tool reported success. On any node, a partial vector such as `",3,"` did the same, and with `operation: "add"` it added the node's own position to itself. 2D now reads `x,y` (2 or 3 components), and a malformed or partial position, rotation or scale returns an error saying to send every component.
+- **The Godot release zip now carries the license and third-party NOTICE (from addon v0.7.14).** `LICENSE` and `NOTICE` (MIT attribution for the `godot-mcp` UID code) now live inside `addons/com.gladekit.mcp-bridge/`, so the packaged addon ships them; previously they sat outside the zipped folder.
 - **Unity package `changelogUrl` pointed at a 404.** It now points at `mcp-server/CHANGELOG.md`, where this file lives.
 - README refreshed against the code: 275 Unity / 115 Godot tools, ~90 core tools, 9 resources; the Godot bridge source path, Architecture, and Contributing now cover both bridges; the comparison table was re-verified against current competitor sources.
 

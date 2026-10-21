@@ -43,7 +43,7 @@ The Unity bridge starts automatically on `localhost:8765`. **Window > GladeKit M
 The Godot bridge starts automatically on `localhost:8766`. You should see a confirmation line in the editor Output panel:
 
 ```
-[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.7.13, 115 tools registered, thread-polled at 200Hz)
+[GladeKit MCP Bridge] listening on ws://127.0.0.1:8766  (v0.7.14, 115 tools registered, thread-polled at 200Hz)
 ```
 
 The bridge writes a per-session auth token to `~/.gladekit/godot-bridge-8766.token`; the MCP server picks it up automatically, so a web page can't drive your editor through the local socket.
